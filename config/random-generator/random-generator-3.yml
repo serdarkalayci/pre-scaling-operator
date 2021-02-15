@@ -2,12 +2,13 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: random-generator-3
-  labels:
-    app: random-generator-3
-    scaler/opt-in: "false"
+  annotations:
     scaler/state-peak-replicas: "5"
     scaler/state-bau-replicas: "2"
     scaler/state-default-replicas: "1"
+  labels:
+    app: random-generator-3
+    scaler/opt-in: "false"
 spec:
   selector:
     matchLabels:
