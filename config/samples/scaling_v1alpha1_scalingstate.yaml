@@ -1,7 +1,7 @@
 apiVersion: scaling.prescale.com/v1alpha1
 kind: ScalingState
 metadata:
-  name: scalingstate-sample
+  name: scalingstate-product
 spec:
   # Add fields here
-  foo: bar
+  state: peak

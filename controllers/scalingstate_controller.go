@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -48,9 +49,28 @@ type ScalingStateReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.7.0/pkg/reconcile
 func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = r.Log.WithValues("scalingstate", req.NamespacedName)
+	log := r.Log.
+		WithValues("reconciler kind", "ScalingState").
+		WithValues("reconciler namespace", req.Namespace).
+		WithValues("reconciler object", req.Name)
 
-	// your logic here
+	// cssd here stand for ClusterScalingStateDefinitino
+	scalingState := &scalingv1alpha1.ScalingState{}
+	err := r.Get(ctx, req.NamespacedName, scalingState)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Request object not found, could have been deleted after reconcile request.
+			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
+			// Return and don't requeue
+			log.Info("ScalingState resource not found. Ignoring since object must be deleted.")
+			return ctrl.Result{}, nil
+		}
+		// Error reading the object - requeue the request.
+		log.Error(err, "Failed to get ScalingState")
+		return ctrl.Result{}, err
+	}
+
+	log.Info("Reconciling")
 
 	return ctrl.Result{}, nil
 }
