@@ -7,9 +7,9 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - apps
+  - scaling.prescale.com
   resources:
-  - deployments
+  - clusterscalingstatedefinitions
   verbs:
   - create
   - delete
@@ -19,9 +19,23 @@ rules:
   - update
   - watch
 - apiGroups:
-  - apps.openshift.io
+  - scaling.prescale.com
   resources:
-  - deploymentconfigs
+  - clusterscalingstatedefinitions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - scaling.prescale.com
+  resources:
+  - clusterscalingstatedefinitions/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - scaling.prescale.com
+  resources:
+  - clusterscalingstates
   verbs:
   - create
   - delete
@@ -31,9 +45,23 @@ rules:
   - update
   - watch
 - apiGroups:
-  - cache.example.com
+  - scaling.prescale.com
   resources:
-  - triggerscalings
+  - clusterscalingstates/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - scaling.prescale.com
+  resources:
+  - clusterscalingstates/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - scaling.prescale.com
+  resources:
+  - scalingstates
   verbs:
   - create
   - delete
@@ -43,23 +71,16 @@ rules:
   - update
   - watch
 - apiGroups:
-  - cache.example.com
+  - scaling.prescale.com
   resources:
-  - triggerscalings/finalizers
+  - scalingstates/finalizers
   verbs:
   - update
 - apiGroups:
-  - cache.example.com
+  - scaling.prescale.com
   resources:
-  - triggerscalings/status
+  - scalingstates/status
   verbs:
   - get
   - patch
   - update
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - get
-  - list
