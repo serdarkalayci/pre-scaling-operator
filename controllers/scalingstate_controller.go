@@ -126,6 +126,7 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	for _, deployment := range deployments.Items {
 		r.Log.Info("Checking replication state for deployment", "deployment", deployment.Name)
+		r.Log.Info("Annotations", "annotations", deployment.GetAnnotations())
 	}
 
 	log.Info("Reconciling")
