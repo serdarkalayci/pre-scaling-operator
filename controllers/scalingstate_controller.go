@@ -156,11 +156,9 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			deployment.Spec.Replicas = &stateReplica.Replicas
 			r.Update(ctx, &deployment, &client.UpdateOptions{})
 		}
-
-
 	}
 
-	log.Info("Reconciling")
+	log.Info("Reconciliation loop completed successfully")
 
 	return ctrl.Result{}, nil
 }
