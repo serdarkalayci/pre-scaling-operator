@@ -14,7 +14,7 @@ spec:
     listKind: ClusterScalingStateDefinitionList
     plural: clusterscalingstatedefinitions
     singular: clusterscalingstatedefinition
-  scope: Namespaced
+  scope: Cluster
   versions:
   - name: v1alpha1
     schema:

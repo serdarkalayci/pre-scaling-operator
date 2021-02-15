@@ -25,11 +25,9 @@ import (
 
 // ClusterScalingStateSpec defines the desired state of ClusterScalingState
 type ClusterScalingStateSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of ClusterScalingState. Edit ClusterScalingState_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// The State field represents the desired state for the cluster
+	State string `json:"state"`
 }
 
 // ClusterScalingStateStatus defines the observed state of ClusterScalingState
@@ -40,6 +38,7 @@ type ClusterScalingStateStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:path=clusterscalingstates,scope=Cluster
 
 // ClusterScalingState is the Schema for the clusterscalingstates API
 type ClusterScalingState struct {

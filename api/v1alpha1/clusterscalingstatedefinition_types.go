@@ -40,6 +40,7 @@ type ClusterScalingStateDefinitionStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:path=clusterscalingstatedefinitions,scope=Cluster
 
 // ClusterScalingStateDefinition is the Schema for the clusterscalingstatedefinitions API
 type ClusterScalingStateDefinition struct {

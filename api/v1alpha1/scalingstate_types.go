@@ -28,8 +28,8 @@ type ScalingStateSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of ScalingState. Edit ScalingState_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// // The State field represents the desired state for the namespace
+	State string `json:"state"`
 }
 
 // ScalingStateStatus defines the observed state of ScalingState

@@ -53,7 +53,7 @@ kind: ScalingState
 metadata:
   namespace: product
 spec:
-  current-state: peak
+  state: peak
 ```
 
 ### Scaling state priority

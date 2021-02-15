@@ -36,10 +36,12 @@ spec:
           spec:
             description: ScalingStateSpec defines the desired state of ScalingState
             properties:
-              foo:
-                description: Foo is an example field of ScalingState. Edit ScalingState_types.go
-                  to remove/update
+              state:
+                description: // The State field represents the desired state for the
+                  namespace
                 type: string
+            required:
+            - state
             type: object
           status:
             description: ScalingStateStatus defines the observed state of ScalingState
