@@ -1,7 +1,11 @@
 apiVersion: scaling.prescale.com/v1alpha1
 kind: ClusterScalingStateDefinition
 metadata:
-  name: clusterscalingstatedefinition-sample
+  name: global-state-definition
 spec:
-  # Add fields here
-  foo: bar
+- name: peak
+  description: "Maximum scaling settings"
+- name: marketing-run
+  description: "Higher expected load after a marketing run. Possibly an email blast or twitter share."
+- name: bau
+  description: "Business as usual"
