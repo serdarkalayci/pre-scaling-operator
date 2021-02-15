@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	sr "github.com/containersol/prescale-operator/internal"
-	annotations "github.com/containersol/prescale-operator/pkg/utils"
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -28,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strconv"
 
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
 )
@@ -129,20 +127,12 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	for _, deployment := range deployments.Items {
 		r.Log.Info("Checking replication state for deployment", "deployment", deployment.Name)
-		stateReplicas := sr.StateReplicas{}
-		states := annotations.FilterByKeyPrefix(sr.StateReplicaAnnotationPrefix, deployment.GetAnnotations())
-		for key, value := range states {
-			stateName := key[len(sr.StateReplicaAnnotationPrefix):len(key)-len("-replicas")]
-			replicas, err := strconv.Atoi(value)
-			if err != nil {
-				log.Error(err, "Replicas is not a valid integer")
-				return ctrl.Result{}, err
-			}
-			stateReplicas.Add(sr.StateReplica{
-				Name:     stateName,
-				Replicas: int32(replicas),
-			})
-
+		stateReplicas, err := sr.NewStateReplicasFromAnnotations(deployment.GetAnnotations())
+		if err != nil {
+			log.WithValues("deployment", deployment.Name).
+				WithValues("namespace", deployment.Namespace).
+				Error(err, "Cannot calculate state replicas. Please check deployment annotations. Continuing.")
+			continue
 		}
 		log.WithValues("state replicas", stateReplicas.GetStates()).Info("State replicas calculated")
 		// Now we have all the state settings, we can set the replicas for the deployment accordingly
