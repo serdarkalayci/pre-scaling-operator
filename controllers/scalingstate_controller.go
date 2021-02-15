@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"context"
+	sr "github.com/containersol/prescale-operator/internal"
+	annotations "github.com/containersol/prescale-operator/pkg/utils"
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -26,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strconv"
 
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
 )
@@ -126,7 +129,35 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	for _, deployment := range deployments.Items {
 		r.Log.Info("Checking replication state for deployment", "deployment", deployment.Name)
-		r.Log.Info("Annotations", "annotations", deployment.GetAnnotations())
+		stateReplicas := sr.StateReplicas{}
+		states := annotations.FilterByKeyPrefix(sr.StateReplicaAnnotationPrefix, deployment.GetAnnotations())
+		for key, value := range states {
+			stateName := key[len(sr.StateReplicaAnnotationPrefix):len(key)-len("-replicas")]
+			replicas, err := strconv.Atoi(value)
+			if err != nil {
+				log.Error(err, "Replicas is not a valid integer")
+				return ctrl.Result{}, err
+			}
+			stateReplicas.Add(sr.StateReplica{
+				Name:     stateName,
+				Replicas: int32(replicas),
+			})
+
+		}
+		log.WithValues("state replicas", stateReplicas.GetStates()).Info("State replicas calculated")
+		// Now we have all the state settings, we can set the replicas for the deployment accordingly
+		stateReplica, err := stateReplicas.GetState(namespaceState)
+		if err != nil {
+			// TODO here we should do priority filtering, and go down one level of priority to find the lowest set one.
+			// We will ignore any that are not set
+			log.WithValues("set states", stateReplicas).WithValues("namespace state", namespaceState).Info("State could not be found")
+		} else {
+			log.Info("Updating deployment replicas for state", "replicas", stateReplica.Replicas)
+			deployment.Spec.Replicas = &stateReplica.Replicas
+			r.Update(ctx, &deployment, &client.UpdateOptions{})
+		}
+
+
 	}
 
 	log.Info("Reconciling")
