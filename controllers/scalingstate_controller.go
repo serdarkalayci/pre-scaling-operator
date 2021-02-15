@@ -19,8 +19,11 @@ package controllers
 import (
 	"context"
 	"github.com/go-logr/logr"
+	v1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selection"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -76,18 +79,56 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	if len(cssd.Items) == 0 {
 		log.Info("No ClusterScalingStateDefinition Found. Doing Nothing.")
+		// TODO Should we add errors here to crash the controller and make it explicit that one should be set ?
+		return ctrl.Result{}, nil
 	}
 
 	if len(cssd.Items) >= 2 {
 		log.Info("More than 1 ClusterScalingStateDefinition found. Merging is not yet supported. Doing Nothing.")
+		return ctrl.Result{}, nil
 	}
 
-	// @TODO Here the logic for priority needs to be added.
-	// We need to check which has higher priority, and use that as the scaling method for the namespace
+	// We now have the definitions of which states are available to developers.
+	// @TODO implement priority overrides, once the priority is set for a clusterstatedefinition
 
-	// Next we need to loop the deployments in the Namespace which have the opt-in label set
+	// Next we need to fetch the ClusterScalingState to determine which states are currently set in a namespace
+	clusterScalingStates := &scalingv1alpha1.ClusterScalingStateList{}
+	r.List(ctx, clusterScalingStates, &client.ListOptions{})
 
-	log.WithValues("cluster state definitions", len(cssd.Items)).Info("Reconciling")
+	if len(clusterScalingStates.Items) >= 2 {
+		log.Info("More than 1 ClusterScalingState found. Merging is not yet supported.")
+		return ctrl.Result{}, nil
+	}
+
+	namespaceState := scalingState.Spec.State
+	if len(clusterScalingStates.Items) == 1 {
+		log.Info("No ClusterScalingStates found to compare. Using only ScalingState for calculations.")
+		// @TODO Here the logic for priority needs to be added.
+		// We need to use the definition to decide which has higher priority, and mark that as the namespace state
+	}
+
+	log.Info("State set for namespace.", "state", namespaceState)
+	log.Info("Finding objects which are opted in for scale")
+
+	// We now need to look for Deployments which are opted in,
+	// then use their annotations to determine the correct scale
+	deployments := &v1.DeploymentList{}
+	requirements, err := labels.NewRequirement("scaler/opt-in", selection.Equals, []string{"true"})
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	selector := labels.Everything().Add(*requirements)
+	r.List(ctx, deployments, &client.ListOptions{LabelSelector: selector})
+
+	if len(deployments.Items) == 0 {
+		log.Info("No deployments found to manage in namespace. Doing Nothing.")
+	}
+
+	for _, deployment := range deployments.Items {
+		r.Log.Info("Checking replication state for deployment", "deployment", deployment.Name)
+	}
+
+	log.Info("Reconciling")
 
 	return ctrl.Result{}, nil
 }

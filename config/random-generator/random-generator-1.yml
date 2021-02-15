@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: random-generator-1
+  labels:
+    app: random-generator-1
+    scaler/opt-in: "true"
+    scaler/state-peak-replicas: "5"
+    scaler/state-bau-replicas: "2"
+    scaler/state-default-replicas: "1"
+spec:
+  selector:
+    matchLabels:
+      app: random-generator-1
+  template:
+    metadata:
+      labels:
+        app: random-generator-1
+    spec:
+      containers:
+        - name: random-generator
+          imagePullPolicy: Always
+          image: chriscmsoft/random-generator:latest
