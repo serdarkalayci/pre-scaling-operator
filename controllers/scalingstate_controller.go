@@ -121,7 +121,7 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 	selector := labels.Everything().Add(*requirements)
-	r.List(ctx, deployments, &client.ListOptions{LabelSelector: selector})
+	r.List(ctx, deployments, &client.ListOptions{LabelSelector: selector, Namespace: req.Namespace})
 
 	if len(deployments.Items) == 0 {
 		log.Info("No deployments found to manage in namespace. Doing Nothing.")
