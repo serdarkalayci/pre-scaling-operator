@@ -25,7 +25,7 @@ import (
 
 // States defines the of desired states fields of ClusterScalingStateDefinition
 type States struct {
-	// Use name to choose the cluster state. Choose between [peek|bau]
+	// Use name to define the cluster state name
 	Name string `json:"name"`
 	// Use description to describe the state
 	Description string `json:"description,omitempty"`

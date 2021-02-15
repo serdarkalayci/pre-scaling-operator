@@ -5,3 +5,5 @@ metadata:
 spec:
   - name: peak
     description: Test description
+  - name: bau
+    description: Test description

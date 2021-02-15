@@ -42,8 +42,7 @@ spec:
                   description: Use description to describe the state
                   type: string
                 name:
-                  description: Use name to choose the cluster state. Choose between
-                    [peek|bau]
+                  description: Use name to define the cluster state name
                   type: string
               required:
               - name
