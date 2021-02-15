@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	scalingv1alpha1 "github.com/andreas131989/operator/api/v1alpha1"
-	"github.com/andreas131989/operator/controllers"
+	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
+	"github.com/containersol/prescale-operator/controllers"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -71,20 +71,35 @@ func main() {
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "3ef791ac.example.com",
-		Namespace:              "",
+		LeaderElectionID:       "14b492ce.prescale.com",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 
-	if err = (&controllers.TriggerScalingReconciler{
+	if err = (&controllers.ClusterScalingStateDefinitionReconciler{
 		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("TriggerScaling"),
+		Log:    ctrl.Log.WithName("controllers").WithName("ClusterScalingStateDefinition"),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "TriggerScaling")
+		setupLog.Error(err, "unable to create controller", "controller", "ClusterScalingStateDefinition")
+		os.Exit(1)
+	}
+	if err = (&controllers.ClusterScalingStateReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("ClusterScalingState"),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ClusterScalingState")
+		os.Exit(1)
+	}
+	if err = (&controllers.ScalingStateReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("ScalingState"),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ScalingState")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

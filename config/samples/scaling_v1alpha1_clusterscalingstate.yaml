@@ -1,0 +1,7 @@
+apiVersion: scaling.prescale.com/v1alpha1
+kind: ClusterScalingState
+metadata:
+  name: clusterscalingstate-sample
+spec:
+  # Add fields here
+  foo: bar

@@ -1,0 +1,24 @@
+# permissions for end users to edit scalingstates.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: scalingstate-editor-role
+rules:
+- apiGroups:
+  - scaling.prescale.com
+  resources:
+  - scalingstates
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - scaling.prescale.com
+  resources:
+  - scalingstates/status
+  verbs:
+  - get

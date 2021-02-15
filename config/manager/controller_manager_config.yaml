@@ -8,4 +8,4 @@ webhook:
   port: 9443
 leaderElection:
   leaderElect: true
-  resourceName: 3ef791ac.example.com
+  resourceName: 14b492ce.prescale.com
