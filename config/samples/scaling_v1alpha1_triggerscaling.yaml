@@ -1,0 +1,7 @@
+apiVersion: scaling.example.com/v1alpha1
+kind: TriggerScaling
+metadata:
+  name: triggerscaling-sample
+spec:
+  # Add fields here
+  foo: bar
