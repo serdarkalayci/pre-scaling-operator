@@ -35,14 +35,20 @@ spec:
           metadata:
             type: object
           spec:
-            description: ClusterScalingStateDefinitionSpec defines the desired state
-              of ClusterScalingStateDefinition
-            properties:
-              foo:
-                description: Foo is an example field of ClusterScalingStateDefinition.
-                  Edit ClusterScalingStateDefinition_types.go to remove/update
-                type: string
-            type: object
+            items:
+              description: States defines the of desired states fields of ClusterScalingStateDefinition
+              properties:
+                description:
+                  description: Use description to describe the state
+                  type: string
+                name:
+                  description: Use name to choose the cluster state. Choose between
+                    [peek|bau]
+                  type: string
+              required:
+              - name
+              type: object
+            type: array
           status:
             description: ClusterScalingStateDefinitionStatus defines the observed
               state of ClusterScalingStateDefinition

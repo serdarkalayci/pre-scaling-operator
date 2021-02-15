@@ -23,13 +23,12 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// ClusterScalingStateDefinitionSpec defines the desired state of ClusterScalingStateDefinition
-type ClusterScalingStateDefinitionSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Foo is an example field of ClusterScalingStateDefinition. Edit ClusterScalingStateDefinition_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+// States defines the of desired states fields of ClusterScalingStateDefinition
+type States struct {
+	// Use name to choose the cluster state. Choose between [peek|bau]
+	Name string `json:"name"`
+	// Use description to describe the state
+	Description string `json:"description,omitempty"`
 }
 
 // ClusterScalingStateDefinitionStatus defines the observed state of ClusterScalingStateDefinition
@@ -47,7 +46,7 @@ type ClusterScalingStateDefinition struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ClusterScalingStateDefinitionSpec   `json:"spec,omitempty"`
+	Spec   []States                            `json:"spec,omitempty"`
 	Status ClusterScalingStateDefinitionStatus `json:"status,omitempty"`
 }
 

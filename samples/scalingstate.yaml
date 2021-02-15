@@ -1,0 +1,6 @@
+apiVersion: scaling.prescale.com/v1alpha1
+kind: ScalingState
+metadata:
+  name: sample-ss-cr
+spec:
+  state: peak
