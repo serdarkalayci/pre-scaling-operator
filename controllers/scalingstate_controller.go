@@ -18,9 +18,8 @@ package controllers
 
 import (
 	"context"
-	"k8s.io/apimachinery/pkg/api/errors"
-
 	"github.com/go-logr/logr"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -70,7 +69,25 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
-	log.Info("Reconciling")
+	// When a ScalingState is created or updated,
+	// we need to check both it and the ClusterState in order to determine the actual state the namespace should be in.
+	cssd := &scalingv1alpha1.ClusterScalingStateDefinitionList{}
+	r.List(ctx, cssd, &client.ListOptions{})
+
+	if len(cssd.Items) == 0 {
+		log.Info("No ClusterScalingStateDefinition Found. Doing Nothing.")
+	}
+
+	if len(cssd.Items) >= 2 {
+		log.Info("More than 1 ClusterScalingStateDefinition found. Merging is not yet supported. Doing Nothing.")
+	}
+
+	// @TODO Here the logic for priority needs to be added.
+	// We need to check which has higher priority, and use that as the scaling method for the namespace
+
+	// Next we need to loop the deployments in the Namespace which have the opt-in label set
+
+	log.WithValues("cluster state definitions", len(cssd.Items)).Info("Reconciling")
 
 	return ctrl.Result{}, nil
 }
