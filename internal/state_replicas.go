@@ -2,8 +2,10 @@ package state_replicas
 
 import (
 	"errors"
+	"fmt"
 	annotations2 "github.com/containersol/prescale-operator/pkg/utils"
 	"strconv"
+	"strings"
 )
 
 const StateReplicaAnnotationPrefix = "scaler/state-"
@@ -13,8 +15,21 @@ type StateReplica struct {
 	Replicas int32
 }
 
+func (sr StateReplica) String() string {
+	str := fmt.Sprintf("{name: %s, replicas: %v}", sr.Name, sr.Replicas)
+	return str
+}
+
 type StateReplicas struct {
 	states []StateReplica
+}
+
+func (sr StateReplicas) String() string {
+	states := make([]string, 0)
+	for _, state := range sr.states {
+		states = append(states, state.String())
+	}
+	return fmt.Sprintf("[%s]", strings.Join(states, ", "))
 }
 
 func (sr *StateReplicas) Add(replica StateReplica) {
