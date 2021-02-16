@@ -102,7 +102,7 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	namespaceState := scalingState.Spec.State
-	if len(clusterScalingStates.Items) == 1 {
+	if len(clusterScalingStates.Items) == 0 {
 		log.Info("No ClusterScalingStates found to compare. Using only ScalingState for calculations.")
 		// @TODO Here the logic for priority needs to be added.
 		// We need to use the definition to decide which has higher priority, and mark that as the namespace state
