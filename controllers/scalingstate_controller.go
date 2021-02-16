@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	sr "github.com/containersol/prescale-operator/internal"
+	"github.com/containersol/prescale-operator/internal/states"
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -57,6 +58,7 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		WithValues("reconciler namespace", req.Namespace).
 		WithValues("reconciler object", req.Name)
 
+
 	// cssd here stand for ClusterScalingStateDefinitino
 	scalingState := &scalingv1alpha1.ScalingState{}
 	err := r.Get(ctx, req.NamespacedName, scalingState)
@@ -89,6 +91,14 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
+	clusterStateDefinitions := states.States{}
+	for _, state := range cssd.Items[0].Spec {
+		clusterStateDefinitions = append(clusterStateDefinitions, states.State{
+			Name:     state.Name,
+			Priority: state.Priority,
+		})
+	}
+
 	// We now have the definitions of which states are available to developers.
 	// @TODO implement priority overrides, once the priority is set for a clusterstatedefinition
 
@@ -101,11 +111,21 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	namespaceState := scalingState.Spec.State
 	if len(clusterScalingStates.Items) == 0 {
 		log.Info("No ClusterScalingStates found to compare. Using only ScalingState for calculations.")
-		// @TODO Here the logic for priority needs to be added.
-		// We need to use the definition to decide which has higher priority, and mark that as the namespace state
+	}
+
+	selectedState := states.State{}
+	namespaceState, err := clusterStateDefinitions.FindState(scalingState.Spec.State)
+	if err != nil {
+		log.Error(err, "Could not determine state from namespace state name", "state", scalingState.Spec.State)
+	}
+	if len(clusterScalingStates.Items) == 1 {
+		clusterState, err := clusterStateDefinitions.FindState(clusterScalingStates.Items[0].Spec.State)
+		if err != nil {
+			log.Error(err, "Could not determine state from cluster state name", "state", clusterScalingStates.Items[0].Spec.State)
+		}
+		selectedState = states.GetPrioritisedState(namespaceState, clusterState)
 	}
 
 	log.Info("State set for namespace.", "state", namespaceState)
@@ -137,7 +157,7 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 		log.WithValues("state replicas", stateReplicas.GetStates()).Info("State replicas calculated")
 		// Now we have all the state settings, we can set the replicas for the deployment accordingly
-		stateReplica, err := stateReplicas.GetState(namespaceState)
+		stateReplica, err := stateReplicas.GetState(selectedState.Name)
 		if err != nil {
 			// TODO here we should do priority filtering, and go down one level of priority to find the lowest set one.
 			// We will ignore any that are not set
