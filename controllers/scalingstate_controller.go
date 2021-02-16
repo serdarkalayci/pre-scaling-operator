@@ -140,7 +140,9 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		if err != nil {
 			// TODO here we should do priority filtering, and go down one level of priority to find the lowest set one.
 			// We will ignore any that are not set
-			log.WithValues("set states", stateReplicas).WithValues("namespace state", namespaceState).Info("State could not be found")
+			log.WithValues("set states", stateReplicas).
+				WithValues("namespace state", namespaceState).
+				Info("State could not be found")
 		} else {
 			log.Info("Updating deployment replicas for state", "replicas", stateReplica.Replicas)
 			deployment.Spec.Replicas = &stateReplica.Replicas
