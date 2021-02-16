@@ -44,8 +44,14 @@ spec:
                 name:
                   description: Use name to define the cluster state name
                   type: string
+                priority:
+                  description: Use priority to mark one state more important than
+                    another. Priority 1 is "higher" priority than priority 10
+                  format: int32
+                  type: integer
               required:
               - name
+              - priority
               type: object
             type: array
           status:

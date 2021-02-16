@@ -29,6 +29,9 @@ type States struct {
 	Name string `json:"name"`
 	// Use description to describe the state
 	Description string `json:"description,omitempty"`
+	// Use priority to mark one state more important than another.
+	// Priority 1 is "higher" priority than priority 10
+	Priority int32 `json:"priority"`
 }
 
 // ClusterScalingStateDefinitionStatus defines the observed state of ClusterScalingStateDefinition
