@@ -14,8 +14,8 @@ func TestFilterByKeyPrefixFiltersCorrectly(t *testing.T) {
 	}
 
 	expected := map[string]string{
-		"scaler/opt-in":                     "true",
-		"scaler/state-bau-replicas":         "5",
+		"scaler/opt-in":             "true",
+		"scaler/state-bau-replicas": "5",
 	}
 	got := annotations.FilterByKeyPrefix("scaler", deploymentAnnotations)
 	if !reflect.DeepEqual(got, expected) {

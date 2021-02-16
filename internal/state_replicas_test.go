@@ -8,8 +8,8 @@ import (
 
 func TestNewStateReplicasFromAnnotationsCalculatesCorrectly(t *testing.T) {
 	annotations := map[string]string{
-		"scaler/state-peak-replicas":    "5",
-		"scaler/state-bau-replicas":     "2",
+		"scaler/state-peak-replicas": "5",
+		"scaler/state-bau-replicas":  "2",
 	}
 	got, err := state_replicas.NewStateReplicasFromAnnotations(annotations)
 	if err != nil {
@@ -30,8 +30,8 @@ func TestNewStateReplicasFromAnnotationsCalculatesCorrectly(t *testing.T) {
 
 func TestNewStateReplicasFromAnnotationsCanReturnNoStates(t *testing.T) {
 	annotations := map[string]string{
-		"no-match":                      "5",
-		"state-bau-replicas":            "2",
+		"no-match":           "5",
+		"state-bau-replicas": "2",
 	}
 	got, err := state_replicas.NewStateReplicasFromAnnotations(annotations)
 	if err != nil {
