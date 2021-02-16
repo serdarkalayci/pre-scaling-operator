@@ -47,7 +47,7 @@ func Test_getNamespaceScalingStateNameReturnsCorrectStateName(t *testing.T) {
 		}).
 		WithScheme(scheme.Scheme).
 		Build()
-	got, _ := getNamespaceScalingStateName(context.TODO(), client, "product")
+	got, _ := GetNamespaceScalingStateName(context.TODO(), client, "product")
 	if got != "peak" {
 		t.Errorf("Did not return expected state name. Expected %s, Got %s", "peak", got)
 	}
@@ -59,9 +59,9 @@ func Test_getNamespaceScalingStateNameReturnsCorrectErrorIfNoStatesExist(t *test
 		NewClientBuilder().
 		WithScheme(scheme.Scheme).
 		Build()
-	_, err := getNamespaceScalingStateName(context.TODO(), client, "product")
-	if _, ok := err.(stateNotFound); !ok {
-		t.Errorf("Received incorrect error. Expected stateNotFound, got %s", err)
+	_, err := GetNamespaceScalingStateName(context.TODO(), client, "product")
+	if _, ok := err.(NotFound); !ok {
+		t.Errorf("Received incorrect error. Expected NotFound, got %s", err)
 	}
 }
 
@@ -96,8 +96,8 @@ func Test_getNamespaceScalingStateNameReturnsCorrectErrorIfTooManyStatesExist(t 
 		}).
 		WithScheme(scheme.Scheme).
 		Build()
-	_, err := getNamespaceScalingStateName(context.TODO(), client, "product")
-	if _, ok := err.(tooManyStates); !ok {
-		t.Errorf("Received incorrect error. Expected tooManyStates, got %s", err)
+	_, err := GetNamespaceScalingStateName(context.TODO(), client, "product")
+	if _, ok := err.(TooMany); !ok {
+		t.Errorf("Received incorrect error. Expected TooMany, got %s", err)
 	}
 }

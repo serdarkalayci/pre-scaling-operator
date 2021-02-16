@@ -18,14 +18,12 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	sr "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/states"
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/apps/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/selection"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -58,92 +56,82 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		WithValues("reconciler namespace", req.Namespace).
 		WithValues("reconciler object", req.Name)
 
-
-	// cssd here stand for ClusterScalingStateDefinitino
-	scalingState := &scalingv1alpha1.ScalingState{}
-	err := r.Get(ctx, req.NamespacedName, scalingState)
+	clusterStateDefinitions, err := states.GetClusterScalingStateDefinitions(ctx, r.Client)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			// Request object not found, could have been deleted after reconcile request.
-			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
-			// Return and don't requeue
-			log.Info("ScalingState resource not found. Ignoring since object must be deleted.")
-			return ctrl.Result{}, nil
-		}
-		// Error reading the object - requeue the request.
-		log.Error(err, "Failed to get ScalingState")
+		// If we encounter an error trying to retrieve the state definitions,
+		// we will not be able to compute anything else.
+		log.Error(err, "Failed to get ClusterStateDefinitions")
 		return ctrl.Result{}, err
 	}
 
-	// When a ScalingState is created or updated,
-	// we need to check both it and the ClusterState in order to determine the actual state the namespace should be in.
-	cssd := &scalingv1alpha1.ClusterScalingStateDefinitionList{}
-	r.List(ctx, cssd, &client.ListOptions{})
-
-	if len(cssd.Items) == 0 {
-		log.Info("No ClusterScalingStateDefinition Found. Doing Nothing.")
-		// TODO Should we add errors here to crash the controller and make it explicit that one should be set ?
-		return ctrl.Result{}, nil
-	}
-
-	if len(cssd.Items) >= 2 {
-		log.Info("More than 1 ClusterScalingStateDefinition found. Merging is not yet supported. Doing Nothing.")
-		return ctrl.Result{}, nil
-	}
-
-	clusterStateDefinitions := states.States{}
-	for _, state := range cssd.Items[0].Spec {
-		clusterStateDefinitions = append(clusterStateDefinitions, states.State{
-			Name:     state.Name,
-			Priority: state.Priority,
-		})
-	}
-
-	// We now have the definitions of which states are available to developers.
-	// @TODO implement priority overrides, once the priority is set for a clusterstatedefinition
-
-	// Next we need to fetch the ClusterScalingState to determine which states are currently set in a namespace
-	clusterScalingStates := &scalingv1alpha1.ClusterScalingStateList{}
-	r.List(ctx, clusterScalingStates, &client.ListOptions{})
-
-	if len(clusterScalingStates.Items) >= 2 {
-		log.Info("More than 1 ClusterScalingState found. Merging is not yet supported.")
-		return ctrl.Result{}, nil
-	}
-
-	if len(clusterScalingStates.Items) == 0 {
-		log.Info("No ClusterScalingStates found to compare. Using only ScalingState for calculations.")
-	}
-
-	selectedState := states.State{}
-	namespaceState, err := clusterStateDefinitions.FindState(scalingState.Spec.State)
+	clusterStateName, err := states.GetClusterScalingState(ctx, r.Client)
 	if err != nil {
-		log.Error(err, "Could not determine state from namespace state name", "state", scalingState.Spec.State)
-	}
-	if len(clusterScalingStates.Items) == 1 {
-		clusterState, err := clusterStateDefinitions.FindState(clusterScalingStates.Items[0].Spec.State)
-		if err != nil {
-			log.Error(err, "Could not determine state from cluster state name", "state", clusterScalingStates.Items[0].Spec.State)
+		switch err.(type) {
+		case states.NotFound:
+			log.Info("No ClusterScalingState was found to compare. Using namespaced state instead.")
+		case states.TooMany:
+			log.Info("Too many ClusterScalingStates were found. Continuing on to using only namespaced state")
+		default:
+			// For the moment, we cannot deal with any other error.
+			log.Error(err, "Could not get ClusterScalingStates.")
+			return ctrl.Result{}, err
 		}
-		selectedState = states.GetPrioritisedState(namespaceState, clusterState)
+	}
+	clusterState := states.State{}
+	if clusterStateName != "" {
+		err = clusterStateDefinitions.FindState(clusterStateName, &clusterState)
+		if err != nil {
+			log.WithValues("state name", clusterStateName).
+				Error(err, "Could not find ClusterScalingState within ClusterStateDefinitions. Continuing without considering ClusterScalingState.")
+		}
 	}
 
-	log.Info("State set for namespace.", "state", namespaceState)
-	log.Info("Finding objects which are opted in for scale")
+	namespaceStateName, err := states.GetNamespaceScalingStateName(ctx, r.Client, req.Namespace)
+	if err != nil {
+		switch err.(type) {
+		case states.NotFound:
+			log.Info("No ScalingState was found. Using cluster state instead.")
+		case states.TooMany:
+			log.Info("Too many ScalingStates were found. Using cluster state instead.")
+		default:
+			// For the moment, we cannot deal with any other error.
+			log.Error(err, "Could not get ScalingStates.")
+			return ctrl.Result{}, err
+		}
+	}
+	namespaceState := states.State{}
+	if namespaceStateName != "" {
+		err = clusterStateDefinitions.FindState(namespaceStateName, &namespaceState)
+		if err != nil {
+			log.WithValues("state name", namespaceStateName).
+				WithValues("error", err).
+				Info("Could not find ScalingState within ClusterStateDefinitions. Continuing without considering ScalingState.")
+		}
+	}
 
+	if namespaceState == (states.State{}) && clusterState == (states.State{}) {
+		err = errors.New("no states defined for namespace. doing nothing")
+		log.Error(err, "Cannot continue as no states are set for namespace.")
+		return ctrl.Result{}, err
+	}
+
+	finalState := clusterStateDefinitions.FindPriorityState(namespaceState, clusterState)
+	log.Info("State set for namespace.", "state", finalState.Name)
+
+	log.Info("Searching Objects which are opted in to the scaler")
 	// We now need to look for Deployments which are opted in,
 	// then use their annotations to determine the correct scale
-	deployments := &v1.DeploymentList{}
-	requirements, err := labels.NewRequirement("scaler/opt-in", selection.Equals, []string{"true"})
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	selector := labels.Everything().Add(*requirements)
-	r.List(ctx, deployments, &client.ListOptions{LabelSelector: selector, Namespace: req.Namespace})
+	deployments := v1.DeploymentList{}
+	r.List(
+		ctx,
+		&deployments,
+		client.MatchingLabels(map[string]string{"scaler/opt-in": "true"}),
+		client.InNamespace(req.Namespace),
+	)
 
 	if len(deployments.Items) == 0 {
 		log.Info("No deployments found to manage in namespace. Doing Nothing.")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
 	for _, deployment := range deployments.Items {
@@ -157,12 +145,12 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 		log.WithValues("state replicas", stateReplicas.GetStates()).Info("State replicas calculated")
 		// Now we have all the state settings, we can set the replicas for the deployment accordingly
-		stateReplica, err := stateReplicas.GetState(selectedState.Name)
+		stateReplica, err := stateReplicas.GetState(finalState.Name)
 		if err != nil {
 			// TODO here we should do priority filtering, and go down one level of priority to find the lowest set one.
 			// We will ignore any that are not set
 			log.WithValues("set states", stateReplicas).
-				WithValues("namespace state", namespaceState).
+				WithValues("namespace state", finalState.Name).
 				Info("State could not be found")
 		} else {
 			log.Info("Updating deployment replicas for state", "replicas", stateReplica.Replicas)
