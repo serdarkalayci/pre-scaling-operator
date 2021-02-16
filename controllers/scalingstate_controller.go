@@ -123,6 +123,7 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	if len(deployments.Items) == 0 {
 		log.Info("No deployments found to manage in namespace. Doing Nothing.")
+		return ctrl.Result{}, err
 	}
 
 	for _, deployment := range deployments.Items {
