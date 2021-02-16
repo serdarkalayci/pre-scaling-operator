@@ -9,7 +9,7 @@ import (
 const StateReplicaAnnotationPrefix = "scaler/state-"
 
 type StateReplica struct {
-	Name string
+	Name     string
 	Replicas int32
 }
 
@@ -17,15 +17,15 @@ type StateReplicas struct {
 	states []StateReplica
 }
 
-func (sr *StateReplicas) Add (replica StateReplica) {
+func (sr *StateReplicas) Add(replica StateReplica) {
 	sr.states = append(sr.states, replica)
 }
 
-func (sr *StateReplicas) GetStates () []StateReplica {
+func (sr *StateReplicas) GetStates() []StateReplica {
 	return sr.states
 }
 
-func (sr *StateReplicas) GetState (name string) (StateReplica, error) {
+func (sr *StateReplicas) GetState(name string) (StateReplica, error) {
 	for _, state := range sr.states {
 		if state.Name == name {
 			return state, nil
@@ -38,7 +38,7 @@ func NewStateReplicasFromAnnotations(annotations map[string]string) (StateReplic
 	stateReplicas := StateReplicas{}
 	states := annotations2.FilterByKeyPrefix(StateReplicaAnnotationPrefix, annotations)
 	for key, value := range states {
-		stateName := key[len(StateReplicaAnnotationPrefix):len(key)-len("-replicas")]
+		stateName := key[len(StateReplicaAnnotationPrefix) : len(key)-len("-replicas")]
 		replicas, err := strconv.Atoi(value)
 		if err != nil {
 			return stateReplicas, errors.New("replica count in annotation is not a valid integer")
