@@ -46,7 +46,7 @@ func (sr *StateReplicas) GetState(name string) (StateReplica, error) {
 			return state, nil
 		}
 	}
-	return StateReplica{}, errors.New("No state found")
+	return StateReplica{}, errors.New("no state found")
 }
 
 func NewStateReplicasFromAnnotations(annotations map[string]string) (StateReplicas, error) {
