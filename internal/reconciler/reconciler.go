@@ -18,34 +18,13 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	log := ctrl.Log.
 		WithValues("namespace", namespace)
 
-	traceLog := log.V(3)
-
 	log.Info("Reconciling namespace")
 
-	// Here we allow overriding the cluster state by passing it in.
-	// This allows us to not recall the client when looping namespaces
-	if clusterState == (states.State{}) {
-		traceLog.Info("Cluster State is empty. Searching for ClusterState Manually")
-		var err error
-		clusterState, err = fetchClusterState(ctx, _client, stateDefinitions)
-		if err != nil {
-			return err
-		}
-	}
-
-	// If we receive an error here, we cannot handle it and should return
-	namespaceState, err := fetchNameSpaceState(ctx, _client, stateDefinitions, namespace)
+	finalState, err := GetAppliedState(ctx, _client, namespace, stateDefinitions, clusterState)
 	if err != nil {
+		log.Error(err, "Cannot determine applied state for namespace")
 		return err
 	}
-
-	if namespaceState == (states.State{}) && clusterState == (states.State{}) {
-		err = errors.New("no states defined for namespace. doing nothing")
-		log.Error(err, "Cannot continue as no states are set for namespace.")
-		return err
-	}
-
-	finalState := stateDefinitions.FindPriorityState(namespaceState, clusterState)
 
 	// We now need to look for Deployments which are opted in,
 	// then use their annotations to determine the correct scale
@@ -100,6 +79,32 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 		log.Error(err, "Could not scale deployment in namespace")
 	}
 	return nil
+}
+
+func GetAppliedState(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State) (states.State, error) {
+	// Here we allow overriding the cluster state by passing it in.
+	// This allows us to not recall the client when looping namespaces
+	if clusterState == (states.State{}) {
+		var err error
+		clusterState, err = fetchClusterState(ctx, _client, stateDefinitions)
+		if err != nil {
+			return states.State{}, err
+		}
+	}
+
+	// If we receive an error here, we cannot handle it and should return
+	namespaceState, err := fetchNameSpaceState(ctx, _client, stateDefinitions, namespace)
+	if err != nil {
+		return states.State{}, err
+	}
+
+	if namespaceState == (states.State{}) && clusterState == (states.State{}) {
+		err = errors.New("cannot continue as no states are set for namespace")
+		return states.State{}, err
+	}
+
+	finalState := stateDefinitions.FindPriorityState(namespaceState, clusterState)
+	return finalState, nil
 }
 
 func fetchClusterState(ctx context.Context, _client client.Client, stateDefinitions states.States) (states.State, error) {
