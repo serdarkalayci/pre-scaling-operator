@@ -12,3 +12,5 @@ Applications can configure the replicas needed for each state.
 When a cluster is switched from one state to the other, 
 the operator will take care of scaling all of the applications to the necessary replicas,
 as set by developers through annotations.
+
+Please check the `/docs` folder for documentation related to the architecture of the PreScale Operator 
