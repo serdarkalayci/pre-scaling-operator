@@ -42,7 +42,6 @@ func (sr *StateReplicas) GetStates() []StateReplica {
 
 func (sr *StateReplicas) GetState(name string) (StateReplica, error) {
 	for _, state := range sr.states {
-		fmt.Println(state.Name, name, state.Name == name)
 		if state.Name == name {
 			return state, nil
 		}
