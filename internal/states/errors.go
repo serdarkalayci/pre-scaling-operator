@@ -1,7 +1,7 @@
 package states
 
 type TooMany struct {
-	msg string
+	msg   string
 	count int
 }
 

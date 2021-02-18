@@ -1,0 +1,36 @@
+name: PreScaleOperator
+on:
+  push:
+    branches:
+      - master
+jobs:
+  Tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '^1.15.0'
+      - uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Download Go Modules
+        run: |
+          go mod download
+      - name: Setup Operator SDK
+        run: |
+          curl -LO https://github.com/operator-framework/operator-sdk/releases/download/v1.4.2/operator-sdk_linux_amd64
+          chmod +x operator-sdk_linux_amd64 && sudo mv operator-sdk_linux_amd64 /usr/local/bin/operator-sdk
+      - name: Setup KubeBuilder
+        run: |
+          os=$(go env GOOS)
+          arch=$(go env GOARCH)
+          curl -L https://go.kubebuilder.io/dl/2.3.1/${os}/${arch} | tar -xz -C /tmp/
+          sudo mv /tmp/kubebuilder_2.3.1_${os}_${arch} /usr/local/kubebuilder
+          export PATH=$PATH:/usr/local/kubebuilder/bin
+      - name: Run tests
+        run: |
+          make test

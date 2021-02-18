@@ -8,7 +8,7 @@ import (
 )
 
 type State struct {
-	Name string
+	Name     string
 	Priority int32
 }
 
@@ -60,7 +60,7 @@ func GetNamespaceScalingStateName(ctx context.Context, _client client.Client, na
 	}
 	if len(scalingStates.Items) > 1 {
 		return "", TooMany{
-			msg: "Too many ScalingState objects found in namespace",
+			msg:   "Too many ScalingState objects found in namespace",
 			count: len(scalingStates.Items),
 		}
 	}
@@ -81,7 +81,7 @@ func GetClusterScalingStateDefinitions(ctx context.Context, _client client.Clien
 
 	if len(cssd.Items) >= 2 {
 		return States{}, TooMany{
-			msg: "Too many cluster states found",
+			msg:   "Too many cluster states found",
 			count: len(cssd.Items),
 		}
 	}
