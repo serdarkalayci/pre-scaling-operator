@@ -37,7 +37,7 @@ type ClusterScalingStateReconciler struct {
 }
 
 // +kubebuilder:rbac:groups=scaling.prescale.com,resources=clusterscalingstates,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=scaling.prescale.com,resources=clusterscalingstates/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=scaling.prescale.com,resources=clusterscalingstates/finalizers,verbs=update
 
