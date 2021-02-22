@@ -5,7 +5,10 @@ metadata:
 spec:
 - name: peak
   description: "Maximum scaling settings"
+  priority: 1
 - name: marketing-run
   description: "Higher expected load after a marketing run. Possibly an email blast or twitter share."
+  priority: 5
 - name: bau
   description: "Business as usual"
+  priority: 10

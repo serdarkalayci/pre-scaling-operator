@@ -1,9 +1,0 @@
-apiVersion: scaling.prescale.com/v1alpha1
-kind: ClusterScalingStateDefinition
-metadata:
-  name: sample-cssd-cr
-spec:
-  - name: peak
-    description: Test description
-  - name: bau
-    description: Test description

@@ -13,4 +13,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: andreas131989/pre-scaling-operator
-  newTag: 0.0.1
+  newTag: 0.0.5

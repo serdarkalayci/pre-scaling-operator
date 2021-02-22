@@ -36,6 +36,7 @@ type ScalingStateReconciler struct {
 }
 
 // +kubebuilder:rbac:groups=scaling.prescale.com,resources=scalingstates,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=scaling.prescale.com,resources=scalingstates/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=scaling.prescale.com,resources=scalingstates/finalizers,verbs=update
 
@@ -62,7 +63,7 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
-	err = reconciler.ReconcileNamespace(ctx, r.Client, req.Namespace, clusterStateDefinitions, states.State{})
+	err = reconciler.StateReconciler(ctx, r.Client, req.Namespace, clusterStateDefinitions, states.State{})
 
 	if err != nil {
 		return ctrl.Result{}, err

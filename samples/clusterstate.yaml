@@ -1,6 +1,0 @@
-apiVersion: scaling.prescale.com/v1alpha1
-kind: ClusterScalingState
-metadata:
-  name: sample-css-cr
-spec:
-  state: peak
