@@ -18,12 +18,12 @@ package controllers
 
 import (
 	"context"
+	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
 
 	"github.com/containersol/prescale-operator/internal/reconciler"
 	"github.com/containersol/prescale-operator/internal/states"
@@ -64,10 +64,21 @@ func (r *ClusterScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.
 		return ctrl.Result{}, err
 	}
 
-	err = reconciler.StateReconciler(ctx, r.Client, "", clusterStateDefinitions, states.State{})
-
+	namespaces := corev1.NamespaceList{}
+	err = r.Client.List(ctx, &namespaces)
 	if err != nil {
+		log.Error(err, "Cannot list namespaces")
 		return ctrl.Result{}, err
+	}
+
+	for _, namespace := range namespaces.Items {
+
+		err = reconciler.ReconcileNamespace(ctx, r.Client, namespace.Name, clusterStateDefinitions, states.State{})
+
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
 	}
 
 	log.Info("Reconciliation loop completed successfully")

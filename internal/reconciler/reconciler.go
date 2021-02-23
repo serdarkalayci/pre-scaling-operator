@@ -14,16 +14,22 @@ var (
 	OptInLabel = map[string]string{"scaler/opt-in": "true"}
 )
 
-func StateReconciler(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State) error {
+func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State) error {
 	log := ctrl.Log.
 		WithValues("namespace", namespace)
 
 	log.Info("Reconciling namespace")
 
+	finalState, err := GetAppliedState(ctx, _client, namespace, stateDefinitions, clusterState)
+	if err != nil {
+		log.Error(err, "Cannot determine applied state for namespace")
+		return err
+	}
+
 	// We now need to look for Deployments which are opted in,
 	// then use their annotations to determine the correct scale
 	deployments := v1.DeploymentList{}
-	err := _client.List(ctx, &deployments, client.MatchingLabels(OptInLabel), client.InNamespace(namespace))
+	err = _client.List(ctx, &deployments, client.MatchingLabels(OptInLabel), client.InNamespace(namespace))
 	if err != nil {
 		log.Error(err, "Cannot list deployments in namespace")
 		return err
@@ -35,12 +41,6 @@ func StateReconciler(ctx context.Context, _client client.Client, namespace strin
 	}
 
 	for _, deployment := range deployments.Items {
-
-		finalState, err := GetAppliedState(ctx, _client, deployment.Namespace, stateDefinitions, clusterState)
-		if err != nil {
-			log.Error(err, "Cannot determine applied state for namespace")
-			return err
-		}
 
 		err = ReconcileDeployment(ctx, _client, deployment, finalState)
 		if err != nil {
