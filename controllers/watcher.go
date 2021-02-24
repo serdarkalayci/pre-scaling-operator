@@ -61,12 +61,14 @@ func (r *Watcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result,
 	// The first thing we need to do is determine if the deployment has the opt-in label and if it's set to true
 	// If neither of these conditions is met, then we won't reconcile.
 	labels := deployment.GetLabels()
-	if v, found := labels["scaler/opt-in"]; found {
-		if v != "true" {
-			log.Info("Opted-out deployment. Doing nothing")
-			return ctrl.Result{}, nil
+	for k := range reconciler.OptInLabel {
+		if v, found := labels[k]; found {
+			if v != "true" {
+				log.Info("Opted-out deployment. Doing nothing")
+				return ctrl.Result{}, nil
+			}
+			break
 		}
-	} else {
 		return ctrl.Result{}, nil
 	}
 
