@@ -38,6 +38,9 @@ type Watcher struct {
 	Scheme *runtime.Scheme
 }
 
+// +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch;
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;patch;update;
+
 // WatchForDeployments creates watcher for Chaos Runner Pod
 func (r *Watcher) WatchForDeployments(client client.Client, c controller.Controller) error {
 
