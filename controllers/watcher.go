@@ -17,6 +17,8 @@ import (
 	"context"
 	"github.com/containersol/prescale-operator/internal/reconciler"
 	"github.com/containersol/prescale-operator/internal/states"
+	"github.com/containersol/prescale-operator/internal/validations"
+	"strings"
 
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/apps/v1"
@@ -60,16 +62,18 @@ func (r *Watcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result,
 
 	// The first thing we need to do is determine if the deployment has the opt-in label and if it's set to true
 	// If neither of these conditions is met, then we won't reconcile.
-	labels := deployment.GetLabels()
-	for k := range reconciler.OptInLabel {
-		if v, found := labels[k]; found {
-			if v != "true" {
-				log.Info("Opted-out deployment. Doing nothing")
-				return ctrl.Result{}, nil
-			}
-			break
+	optedinDeployment, err := validations.OptinLabelExists(deployment)
+	if err != nil {
+		if strings.Contains(err.Error(), "Not Found") {
+			return ctrl.Result{}, nil
 		}
-		return ctrl.Result{}, nil
+		log.Error(err, "Failed to validate the opt-in label")
+		return ctrl.Result{}, err
+	}
+
+	if !optedinDeployment {
+		log.Info("Deployment opted out. No reconciliation")
+		return ctrl.Result{}, err
 	}
 
 	stateDefinitions, err := states.GetClusterScalingStateDefinitions(ctx, r.Client)
