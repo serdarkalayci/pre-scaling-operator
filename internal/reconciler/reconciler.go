@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	sr "github.com/containersol/prescale-operator/internal"
+	"github.com/containersol/prescale-operator/internal/resources"
 	"github.com/containersol/prescale-operator/internal/states"
 	v1 "k8s.io/api/apps/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -28,8 +29,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 	// We now need to look for Deployments which are opted in,
 	// then use their annotations to determine the correct scale
-	deployments := v1.DeploymentList{}
-	err = _client.List(ctx, &deployments, client.MatchingLabels(OptInLabel), client.InNamespace(namespace))
+	deployments, err := resources.DeploymentLister(ctx, _client, namespace, OptInLabel)
 	if err != nil {
 		log.Error(err, "Cannot list deployments in namespace")
 		return err
@@ -74,8 +74,7 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 		return client.IgnoreNotFound(err)
 	}
 	log.Info("Updating deployment replicas for state", "replicas", stateReplica.Replicas)
-	deployment.Spec.Replicas = &stateReplica.Replicas
-	err = _client.Update(ctx, &deployment, &client.UpdateOptions{})
+	err = resources.DeploymentScaler(ctx, _client, deployment, stateReplica.Replicas)
 	if err != nil {
 		log.Error(err, "Could not scale deployment in namespace")
 	}

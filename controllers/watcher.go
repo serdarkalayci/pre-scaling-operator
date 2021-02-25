@@ -16,6 +16,7 @@ package controllers
 import (
 	"context"
 	"github.com/containersol/prescale-operator/internal/reconciler"
+	"github.com/containersol/prescale-operator/internal/resources"
 	"github.com/containersol/prescale-operator/internal/states"
 	"github.com/containersol/prescale-operator/internal/validations"
 	"strings"
@@ -55,9 +56,22 @@ func (r *Watcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result,
 		WithValues("reconciler namespace", req.Namespace).
 		WithValues("reconciler object", req.Name)
 
+	stateDefinitions, err := states.GetClusterScalingStateDefinitions(ctx, r.Client)
+	if err != nil {
+		// If we encounter an error trying to retrieve the state definitions,
+		// we will not be able to compute anything else.
+		log.Error(err, "Failed to get ClusterStateDefinitions")
+		return ctrl.Result{}, err
+	}
+
+	// We need to calculate the desired state before we try to reconcile the deployment
+	finalState, err := reconciler.GetAppliedState(ctx, r.Client, req.Namespace, stateDefinitions, states.State{})
+	if err != nil {
+		log.Error(err, "Cannot determine applied state for namespace")
+	}
+
 	// Fetch the deployment
-	deployment := v1.Deployment{}
-	err := r.Client.Get(ctx, req.NamespacedName, &deployment)
+	deployment, err := resources.DeploymentGetter(ctx, r.Client, req)
 	if err != nil {
 		log.Error(err, "Failed to get the deployment data")
 		return ctrl.Result{}, err
@@ -78,23 +92,7 @@ func (r *Watcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result,
 		log.Info("Deployment opted out. No reconciliation")
 		return ctrl.Result{}, err
 	}
-
-	stateDefinitions, err := states.GetClusterScalingStateDefinitions(ctx, r.Client)
-	if err != nil {
-		// If we encounter an error trying to retrieve the state definitions,
-		// we will not be able to compute anything else.
-		log.Error(err, "Failed to get ClusterStateDefinitions")
-		return ctrl.Result{}, err
-	}
-
-	// We need to calculate the desired state before we try to reconcile the deployment
-	finalState, err := reconciler.GetAppliedState(ctx, r.Client, req.Namespace, stateDefinitions, states.State{})
-	if err != nil {
-		log.Error(err, "Cannot determine applied state for namespace")
-	}
-
 	err = reconciler.ReconcileDeployment(ctx, r.Client, deployment, finalState)
-
 	if err != nil {
 		return ctrl.Result{}, err
 	}
