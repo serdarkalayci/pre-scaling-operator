@@ -41,7 +41,8 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	}
 
 	for _, deployment := range deployments.Items {
-		err := ReconcileDeployment(ctx, _client, deployment, finalState)
+
+		err = ReconcileDeployment(ctx, _client, deployment, finalState)
 		if err != nil {
 			log.Error(err, "Could not reconcile deployment.")
 			continue
