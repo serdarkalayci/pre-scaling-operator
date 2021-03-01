@@ -71,7 +71,7 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 		log.WithValues("set states", stateReplicas).
 			WithValues("namespace state", state.Name).
 			Info("State could not be found")
-		return client.IgnoreNotFound(err)
+		return err
 	}
 	log.Info("Updating deployment replicas for state", "replicas", stateReplica.Replicas)
 	deployment.Spec.Replicas = &stateReplica.Replicas

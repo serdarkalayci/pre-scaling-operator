@@ -38,7 +38,7 @@ type Watcher struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch;
+// +kubebuilder:rbac:groups="",resources=namespaces,verbs=list;
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;patch;update;
 
 // WatchForDeployments creates watcher for Chaos Runner Pod
@@ -51,7 +51,7 @@ func (r *Watcher) WatchForDeployments(client client.Client, c controller.Control
 func (r *Watcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 
 	log := r.Log.
-		WithValues("reconciler kind", "Wachter").
+		WithValues("reconciler kind", "Watcher").
 		WithValues("reconciler namespace", req.Namespace).
 		WithValues("reconciler object", req.Name)
 
