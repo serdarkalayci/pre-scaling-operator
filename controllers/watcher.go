@@ -55,7 +55,7 @@ func (r *Watcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result,
 		WithValues("reconciler namespace", req.Namespace).
 		WithValues("reconciler object", req.Name)
 
-	// Fetch the deployment
+	// Fetch the deployment data
 	deployment := v1.Deployment{}
 	err := r.Client.Get(ctx, req.NamespacedName, &deployment)
 	if err != nil {
@@ -67,7 +67,7 @@ func (r *Watcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result,
 	// If neither of these conditions is met, then we won't reconcile.
 	optedinDeployment, err := validations.OptinLabelExists(deployment)
 	if err != nil {
-		if strings.Contains(err.Error(), "Not Found") {
+		if strings.Contains(err.Error(), "Opt-in label was not found") {
 			return ctrl.Result{}, nil
 		}
 		log.Error(err, "Failed to validate the opt-in label")
@@ -76,13 +76,12 @@ func (r *Watcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result,
 
 	if !optedinDeployment {
 		log.Info("Deployment opted out. No reconciliation")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
+	// Next step after we are certain that we have an object to reconcile, we need to get the state definitions
 	stateDefinitions, err := states.GetClusterScalingStateDefinitions(ctx, r.Client)
 	if err != nil {
-		// If we encounter an error trying to retrieve the state definitions,
-		// we will not be able to compute anything else.
 		log.Error(err, "Failed to get ClusterStateDefinitions")
 		return ctrl.Result{}, err
 	}
@@ -93,6 +92,7 @@ func (r *Watcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result,
 		log.Error(err, "Cannot determine applied state for namespace")
 	}
 
+	// After we have the deployment and state data, we are ready to reconcile the deployment
 	err = reconciler.ReconcileDeployment(ctx, r.Client, deployment, finalState)
 
 	if err != nil {
