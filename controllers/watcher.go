@@ -38,7 +38,7 @@ type Watcher struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups="",resources=namespaces,verbs=list;
+// +kubebuilder:rbac:groups="",resources=namespaces,verbs=list;watch;
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;patch;update;
 
 // WatchForDeployments creates watcher for the deployment objects
