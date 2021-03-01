@@ -41,7 +41,7 @@ type Watcher struct {
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=list;
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;patch;update;
 
-// WatchForDeployments creates watcher for Chaos Runner Pod
+// WatchForDeployments creates watcher for the deployment objects
 func (r *Watcher) WatchForDeployments(client client.Client, c controller.Controller) error {
 
 	return c.Watch(&source.Kind{Type: &v1.Deployment{}}, &handler.EnqueueRequestForObject{})
