@@ -64,16 +64,16 @@ func (r *Watcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result,
 
 	// The first thing we need to do is determine if the deployment has the opt-in label and if it's set to true
 	// If neither of these conditions is met, then we won't reconcile.
-	optedinDeployment, err := validations.OptinLabelExists(deployment)
+	optinLabel, err := validations.OptinLabelExists(deployment)
 	if err != nil {
-		if strings.Contains(err.Error(), "Opt-in label was not found") {
+		if strings.Contains(err.Error(), validations.LabelNotFound) {
 			return ctrl.Result{}, nil
 		}
 		log.Error(err, "Failed to validate the opt-in label")
 		return ctrl.Result{}, err
 	}
 
-	if !optedinDeployment {
+	if !optinLabel {
 		log.Info("Deployment opted out. No reconciliation")
 		return ctrl.Result{}, nil
 	}
@@ -89,6 +89,7 @@ func (r *Watcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result,
 	finalState, err := reconciler.GetAppliedState(ctx, r.Client, req.Namespace, stateDefinitions, states.State{})
 	if err != nil {
 		log.Error(err, "Cannot determine applied state for namespace")
+		return ctrl.Result{}, err
 	}
 
 	// After we have the deployment and state data, we are ready to reconcile the deployment
