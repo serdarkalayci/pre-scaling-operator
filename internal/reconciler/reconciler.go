@@ -6,13 +6,11 @@ import (
 	sr "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/resources"
 	"github.com/containersol/prescale-operator/internal/states"
+	"github.com/containersol/prescale-operator/internal/validations"
+	ocv1 "github.com/openshift/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-)
-
-var (
-	OptInLabel = map[string]string{"scaler/opt-in": "true"}
 )
 
 func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State) error {
@@ -29,7 +27,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 	// We now need to look for Deployments which are opted in,
 	// then use their annotations to determine the correct scale
-	deployments, err := resources.DeploymentLister(ctx, _client, namespace, OptInLabel)
+	deployments, err := resources.DeploymentLister(ctx, _client, namespace, validations.OptInLabel)
 	if err != nil {
 		log.Error(err, "Cannot list deployments in namespace")
 		return err
@@ -48,6 +46,29 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 			continue
 		}
 	}
+
+	// We now need to look for DeploymentConfigs which are opted in,
+	// then use their annotations to determine the correct scale
+	deploymentConfigs, err := resources.DeploymentConfigLister(ctx, _client, namespace, validations.OptInLabel)
+	if err != nil {
+		log.Error(err, "Cannot list deploymentConfigs in namespace")
+		return err
+	}
+
+	if len(deploymentConfigs.Items) == 0 {
+		log.Info("No deploymentConfigs to reconcile. Doing Nothing.")
+		return nil
+	}
+
+	for _, deploymentConfig := range deploymentConfigs.Items {
+
+		err = ReconcileDeploymentConfig(ctx, _client, deploymentConfig, finalState)
+		if err != nil {
+			log.Error(err, "Could not reconcile deploymentConfig.")
+			continue
+		}
+	}
+
 	return nil
 }
 
@@ -77,6 +98,36 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 	err = resources.DeploymentScaler(ctx, _client, deployment, stateReplica.Replicas)
 	if err != nil {
 		log.Error(err, "Could not scale deployment in namespace")
+	}
+	return nil
+}
+
+func ReconcileDeploymentConfig(ctx context.Context, _client client.Client, deploymentConfig ocv1.DeploymentConfig, state states.State) error {
+	log := ctrl.Log.
+		WithValues("deploymentConfig", deploymentConfig.Name).
+		WithValues("namespace", deploymentConfig.Namespace)
+	stateReplicas, err := sr.NewStateReplicasFromAnnotations(deploymentConfig.GetAnnotations())
+	if err != nil {
+		ctrl.Log.
+			WithValues("deploymentConfig", deploymentConfig.Name).
+			WithValues("namespace", deploymentConfig.Namespace).
+			Error(err, "Cannot calculate state replicas. Please check deploymentConfig annotations. Continuing.")
+		return err
+	}
+	// Now we have all the state settings, we can set the replicas for the deploymentConfig accordingly
+	stateReplica, err := stateReplicas.GetState(state.Name)
+	if err != nil {
+		// TODO here we should do priority filtering, and go down one level of priority to find the lowest set one.
+		// We will ignore any that are not set
+		log.WithValues("set states", stateReplicas).
+			WithValues("namespace state", state.Name).
+			Info("State could not be found")
+		return err
+	}
+	log.Info("Updating deployment replicas for state", "replicas", stateReplica.Replicas)
+	err = resources.DeploymentConfigScaler(ctx, _client, deploymentConfig, stateReplica.Replicas)
+	if err != nil {
+		log.Error(err, "Could not scale deploymentConfig in namespace")
 	}
 	return nil
 }

@@ -87,17 +87,17 @@ func (r *WatcherDC) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resul
 	}
 
 	// We need to calculate the desired state before we try to reconcile the deployment
-	_, err = reconciler.GetAppliedState(ctx, r.Client, req.Namespace, stateDefinitions, states.State{})
+	finalState, err := reconciler.GetAppliedState(ctx, r.Client, req.Namespace, stateDefinitions, states.State{})
 	if err != nil {
 		log.Error(err, "Cannot determine applied state for namespace")
 		return ctrl.Result{}, err
 	}
 
 	// After we have the deployment and state data, we are ready to reconcile the deployment
-	// err = reconciler.ReconcileDeployment(ctx, r.Client, deployment, finalState)
-	// if err != nil {
-	// 	return ctrl.Result{}, err
-	// }
+	err = reconciler.ReconcileDeploymentConfig(ctx, r.Client, deploymentconfig, finalState)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
 	log.Info("Reconciliation loop completed successfully for deploymentconfig")
 
