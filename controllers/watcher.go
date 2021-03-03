@@ -15,6 +15,7 @@ package controllers
 import (
 	"context"
 	"github.com/containersol/prescale-operator/internal/reconciler"
+	"github.com/containersol/prescale-operator/internal/resources"
 	"github.com/containersol/prescale-operator/internal/states"
 	"github.com/containersol/prescale-operator/internal/validations"
 	"strings"
@@ -64,7 +65,7 @@ func (r *Watcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result,
 
 	// The first thing we need to do is determine if the deployment has the opt-in label and if it's set to true
 	// If neither of these conditions is met, then we won't reconcile.
-	optinLabel, err := validations.OptinLabelExists(deployment)
+	optinLabel, err := resources.DeploymentOptinLabel(deployment)
 	if err != nil {
 		if strings.Contains(err.Error(), validations.LabelNotFound) {
 			return ctrl.Result{}, nil

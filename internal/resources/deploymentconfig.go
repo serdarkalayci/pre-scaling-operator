@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"github.com/containersol/prescale-operator/internal/validations"
 	v1 "github.com/openshift/api/apps/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,4 +39,9 @@ func DeploymentConfigScaler(ctx context.Context, _client client.Client, deployme
 	}
 
 	return nil
+}
+
+func DeploymentConfigOptinLabel(deploymentConfig v1.DeploymentConfig) (bool, error) {
+
+	return validations.OptinLabelExists(deploymentConfig.GetLabels())
 }

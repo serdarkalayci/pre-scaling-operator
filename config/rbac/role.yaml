@@ -24,6 +24,16 @@ rules:
   - update
   - watch
 - apiGroups:
+  - apps.openshift.io
+  resources:
+  - deploymentconfigs
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - scaling.prescale.com
   resources:
   - clusterscalingstatedefinitions

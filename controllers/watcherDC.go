@@ -15,12 +15,12 @@ package controllers
 import (
 	"context"
 	"github.com/containersol/prescale-operator/internal/reconciler"
+	"github.com/containersol/prescale-operator/internal/resources"
 	"github.com/containersol/prescale-operator/internal/states"
-	// "github.com/containersol/prescale-operator/internal/validations"
-	// "strings"
-
+	"github.com/containersol/prescale-operator/internal/validations"
 	"github.com/go-logr/logr"
 	ocv1 "github.com/openshift/api/apps/v1"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-// Watcher reconciles a ScalingState object
+// WatcherDC reconciles a ScalingState object
 type WatcherDC struct {
 	client.Client
 	Log    logr.Logger
@@ -65,19 +65,19 @@ func (r *WatcherDC) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resul
 
 	// The first thing we need to do is determine if the deployment has the opt-in label and if it's set to true
 	// If neither of these conditions is met, then we won't reconcile.
-	// optinLabel, err := validations.OptinLabelExists(deployment)
-	// if err != nil {
-	// 	if strings.Contains(err.Error(), validations.LabelNotFound) {
-	// 		return ctrl.Result{}, nil
-	// 	}
-	// 	log.Error(err, "Failed to validate the opt-in label")
-	// 	return ctrl.Result{}, err
-	// }
+	optinLabel, err := resources.DeploymentConfigOptinLabel(deploymentconfig)
+	if err != nil {
+		if strings.Contains(err.Error(), validations.LabelNotFound) {
+			return ctrl.Result{}, nil
+		}
+		log.Error(err, "Failed to validate the opt-in label")
+		return ctrl.Result{}, err
+	}
 
-	// if !optinLabel {
-	// 	log.Info("Deployment opted out. No reconciliation")
-	// 	return ctrl.Result{}, nil
-	// }
+	if !optinLabel {
+		log.Info("Deployment opted out. No reconciliation")
+		return ctrl.Result{}, nil
+	}
 
 	// Next step after we are certain that we have an object to reconcile, we need to get the state definitions
 	stateDefinitions, err := states.GetClusterScalingStateDefinitions(ctx, r.Client)
