@@ -24,6 +24,7 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	dc "github.com/openshift/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -78,6 +79,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := dc.AddToScheme(mgr.GetScheme()); err != nil {
+		setupLog.Error(err, "unable to add to scheme")
+		os.Exit(1)
+	}
+
 	if err = (&controllers.ClusterScalingStateDefinitionReconciler{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("ClusterScalingStateDefinition"),
@@ -107,7 +113,15 @@ func main() {
 		Log:    ctrl.Log.WithName("controllers").WithName("Watcher"),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ScalingState")
+		setupLog.Error(err, "unable to create controller", "controller", "Watcher")
+		os.Exit(1)
+	}
+	if err = (&controllers.WatcherDC{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("WatcherDC"),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "WatcherDC")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
