@@ -7,6 +7,9 @@ import (
 	"strconv"
 )
 
+const LabelNotFound = "Opt-in label was not found"
+
+// OptinLabelExists checks if the opt-in label exists in the target object and returns its value
 func OptinLabelExists(deployment v1.Deployment) (bool, error) {
 
 	var optinlabel bool
@@ -18,5 +21,5 @@ func OptinLabelExists(deployment v1.Deployment) (bool, error) {
 			return optinlabel, err
 		}
 	}
-	return optinlabel, errors.New("Not Found")
+	return optinlabel, errors.New(LabelNotFound)
 }
