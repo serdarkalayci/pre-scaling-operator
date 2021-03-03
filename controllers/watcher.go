@@ -1,5 +1,4 @@
 /*
-Copyright 2019 LitmusChaos Authors
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -39,10 +38,10 @@ type Watcher struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch;
+// +kubebuilder:rbac:groups="",resources=namespaces,verbs=list;watch;
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;patch;update;
 
-// WatchForDeployments creates watcher for Chaos Runner Pod
+// WatchForDeployments creates watcher for the deployment objects
 func (r *Watcher) WatchForDeployments(client client.Client, c controller.Controller) error {
 
 	return c.Watch(&source.Kind{Type: &v1.Deployment{}}, &handler.EnqueueRequestForObject{})
@@ -52,7 +51,7 @@ func (r *Watcher) WatchForDeployments(client client.Client, c controller.Control
 func (r *Watcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 
 	log := r.Log.
-		WithValues("reconciler kind", "Wachter").
+		WithValues("reconciler kind", "Watcher").
 		WithValues("reconciler namespace", req.Namespace).
 		WithValues("reconciler object", req.Name)
 
@@ -79,18 +78,18 @@ func (r *Watcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result,
 
 	// The first thing we need to do is determine if the deployment has the opt-in label and if it's set to true
 	// If neither of these conditions is met, then we won't reconcile.
-	optedinDeployment, err := validations.OptinLabelExists(deployment)
+	optinLabel, err := validations.OptinLabelExists(deployment)
 	if err != nil {
-		if strings.Contains(err.Error(), "Not Found") {
+		if strings.Contains(err.Error(), validations.LabelNotFound) {
 			return ctrl.Result{}, nil
 		}
 		log.Error(err, "Failed to validate the opt-in label")
 		return ctrl.Result{}, err
 	}
 
-	if !optedinDeployment {
+	if !optinLabel {
 		log.Info("Deployment opted out. No reconciliation")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 	err = reconciler.ReconcileDeployment(ctx, r.Client, deployment, finalState)
 	if err != nil {
