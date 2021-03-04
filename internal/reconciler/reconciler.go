@@ -3,10 +3,10 @@ package reconciler
 import (
 	"context"
 	"errors"
-	sr "github.com/containersol/prescale-operator/internal"
+	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/resources"
+	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
-	"github.com/containersol/prescale-operator/internal/validations"
 	ocv1 "github.com/openshift/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -27,7 +27,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 	// We now need to look for Deployments which are opted in,
 	// then use their annotations to determine the correct scale
-	deployments, err := resources.DeploymentLister(ctx, _client, namespace, validations.OptInLabel)
+	deployments, err := resources.DeploymentLister(ctx, _client, namespace, c.OptInLabel)
 	if err != nil {
 		log.Error(err, "Cannot list deployments in namespace")
 		return err
@@ -49,7 +49,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 	// We now need to look for DeploymentConfigs which are opted in,
 	// then use their annotations to determine the correct scale
-	deploymentConfigs, err := resources.DeploymentConfigLister(ctx, _client, namespace, validations.OptInLabel)
+	deploymentConfigs, err := resources.DeploymentConfigLister(ctx, _client, namespace, c.OptInLabel)
 	if err != nil {
 		log.Error(err, "Cannot list deploymentConfigs in namespace")
 		return err

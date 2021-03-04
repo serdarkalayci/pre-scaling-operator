@@ -1,7 +1,7 @@
 package state_replicas_test
 
 import (
-	state_replicas "github.com/containersol/prescale-operator/internal"
+	"github.com/containersol/prescale-operator/internal/state_replicas"
 	"reflect"
 	"testing"
 )

@@ -14,10 +14,10 @@ package controllers
 
 import (
 	"context"
+	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/reconciler"
 	"github.com/containersol/prescale-operator/internal/resources"
 	"github.com/containersol/prescale-operator/internal/states"
-	"github.com/containersol/prescale-operator/internal/validations"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -67,7 +67,7 @@ func (r *Watcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result,
 	// If neither of these conditions is met, then we won't reconcile.
 	optinLabel, err := resources.DeploymentOptinLabel(deployment)
 	if err != nil {
-		if strings.Contains(err.Error(), validations.LabelNotFound) {
+		if strings.Contains(err.Error(), c.LabelNotFound) {
 			return ctrl.Result{}, nil
 		}
 		log.Error(err, "Failed to validate the opt-in label")
