@@ -25,7 +25,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 		return err
 	}
 
-	// We now need to look for Deployments which are opted in,
+	// We now need to look for objects (currently supported deployments and deploymentConfigs) which are opted in,
 	// then use their annotations to determine the correct scale
 	deployments, err := resources.DeploymentLister(ctx, _client, namespace, c.OptInLabel)
 	if err != nil {
@@ -33,8 +33,14 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 		return err
 	}
 
-	if len(deployments.Items) == 0 {
-		log.Info("No deployments to reconcile. Doing Nothing.")
+	deploymentConfigs, err := resources.DeploymentConfigLister(ctx, _client, namespace, c.OptInLabel)
+	if err != nil {
+		log.Error(err, "Cannot list deploymentConfigs in namespace")
+		return err
+	}
+
+	if len(deployments.Items) == 0 && len(deploymentConfigs.Items) == 0 {
+		log.Info("No objects to reconcile. Doing Nothing.")
 		return nil
 	}
 
@@ -45,19 +51,6 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 			log.Error(err, "Could not reconcile deployment.")
 			continue
 		}
-	}
-
-	// We now need to look for DeploymentConfigs which are opted in,
-	// then use their annotations to determine the correct scale
-	deploymentConfigs, err := resources.DeploymentConfigLister(ctx, _client, namespace, c.OptInLabel)
-	if err != nil {
-		log.Error(err, "Cannot list deploymentConfigs in namespace")
-		return err
-	}
-
-	if len(deploymentConfigs.Items) == 0 {
-		log.Info("No deploymentConfigs to reconcile. Doing Nothing.")
-		return nil
 	}
 
 	for _, deploymentConfig := range deploymentConfigs.Items {
