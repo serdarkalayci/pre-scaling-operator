@@ -108,20 +108,20 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "ScalingState")
 		os.Exit(1)
 	}
-	if err = (&controllers.Watcher{
+	if err = (&controllers.DeploymentWatcher{
 		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("Watcher"),
+		Log:    ctrl.Log.WithName("controllers").WithName("DeploymentWatcher"),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Watcher")
+		setupLog.Error(err, "unable to create controller", "controller", "DeploymentWatcher")
 		os.Exit(1)
 	}
-	if err = (&controllers.WatcherDC{
+	if err = (&controllers.DeploymentConfigWatcher{
 		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("WatcherDC"),
+		Log:    ctrl.Log.WithName("controllers").WithName("DeploymentConfigWatcher"),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "WatcherDC")
+		setupLog.Error(err, "unable to create controller", "controller", "DeploymentConfigWatcher")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

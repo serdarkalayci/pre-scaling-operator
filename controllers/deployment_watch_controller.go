@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-// Watcher reconciles a ScalingState object
-type Watcher struct {
+// DeploymentWatcher reconciles a ScalingState object
+type DeploymentWatcher struct {
 	client.Client
 	Log    logr.Logger
 	Scheme *runtime.Scheme
@@ -42,16 +42,16 @@ type Watcher struct {
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;patch;update;
 
 // WatchForDeployments creates watcher for the deployment objects
-func (r *Watcher) WatchForDeployments(client client.Client, c controller.Controller) error {
+func (r *DeploymentWatcher) WatchForDeployments(client client.Client, c controller.Controller) error {
 
 	return c.Watch(&source.Kind{Type: &v1.Deployment{}}, &handler.EnqueueRequestForObject{})
 }
 
 // Reconcile tries to reconcile the replicas of the opted-in deployments
-func (r *Watcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *DeploymentWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 
 	log := r.Log.
-		WithValues("reconciler kind", "Watcher").
+		WithValues("reconciler kind", "DeploymentWatcher").
 		WithValues("reconciler namespace", req.Namespace).
 		WithValues("reconciler object", req.Name)
 
@@ -105,7 +105,7 @@ func (r *Watcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result,
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *Watcher) SetupWithManager(mgr ctrl.Manager) error {
+func (r *DeploymentWatcher) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.Deployment{}).
 		Complete(r)
