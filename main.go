@@ -18,9 +18,10 @@ package main
 
 import (
 	"flag"
+	"os"
+
 	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/validations"
-	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -118,8 +119,6 @@ func main() {
 	if err != nil {
 		setupLog.Error(err, "unable to identify cluster")
 	}
-	setupLog.WithValues("env is", c.OpenshiftCluster).
-		Info("Cluster")
 	if c.OpenshiftCluster {
 		if err = (&controllers.DeploymentConfigWatcher{
 			Client: mgr.GetClient(),

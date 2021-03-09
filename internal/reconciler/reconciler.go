@@ -3,10 +3,12 @@ package reconciler
 import (
 	"context"
 	"errors"
+
 	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/resources"
 	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
+
 	// "github.com/containersol/prescale-operator/internal/validations"
 	ocv1 "github.com/openshift/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"

@@ -1,49 +1,26 @@
 package validations
 
 import (
+	"strings"
+
+	c "github.com/containersol/prescale-operator/internal"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-// Load load the configuration
-func Load() *kubernetes.Clientset {
-	config, err := GetConfig().ClientConfig()
-
-	if err != nil {
-		panic(err)
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		panic(err)
-	}
-
-	return clientset
-}
-
 // GetConfig return the client configuration
-func GetConfig() clientcmd.ClientConfig {
+func getConfig() clientcmd.ClientConfig {
 	configLoadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		configLoadingRules,
 		&clientcmd.ConfigOverrides{})
 }
 
-// DefaultNamespace return the client configuration
-func DefaultNamespace() (namespace string) {
-	configLoadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-	clientconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(configLoadingRules, &clientcmd.ConfigOverrides{})
-	namespace, _, err := clientconfig.Namespace()
-	if err != nil {
-		panic(err)
-	}
-	return namespace
-}
-
 // ClusterCheck checks if we are operating in an Openshift cluster
 func ClusterCheck() (bool, error) {
 
-	restConfig, err := GetConfig().ClientConfig()
+	restConfig, err := getConfig().ClientConfig()
 	if err != nil {
 		return false, err
 	}
@@ -53,10 +30,15 @@ func ClusterCheck() (bool, error) {
 		return false, err
 	}
 
-	_, err = kubernetesclient.DiscoveryClient.ServerResourcesForGroupVersion("apps.openshift.io/v1")
+	_, err = kubernetesclient.DiscoveryClient.ServerResourcesForGroupVersion(c.OpenshiftObjectGroup)
 	if err != nil {
+		if strings.Contains(err.Error(), c.ResourceNotFound) {
+			return false, nil
+		}
 		return false, err
 	}
 
-	return false, nil
+	ctrl.Log.Info("Openshift resources found. Activating the Openshift objects watcher")
+
+	return true, nil
 }
