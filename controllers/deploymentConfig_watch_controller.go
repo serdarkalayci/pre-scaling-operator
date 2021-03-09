@@ -51,7 +51,7 @@ func (r *DeploymentConfigWatcher) WatchForDeploymentConfigs(client client.Client
 func (r *DeploymentConfigWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 
 	log := r.Log.
-		WithValues("reconciler kind", "Watcher").
+		WithValues("reconciler kind", "DeploymentConfigWatcher").
 		WithValues("reconciler namespace", req.Namespace).
 		WithValues("reconciler object", req.Name)
 

@@ -7,6 +7,7 @@ import (
 	"github.com/containersol/prescale-operator/internal/resources"
 	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
+	// "github.com/containersol/prescale-operator/internal/validations"
 	ocv1 "github.com/openshift/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -14,6 +15,9 @@ import (
 )
 
 func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State) error {
+
+	var objectsToReconcile int
+
 	log := ctrl.Log.
 		WithValues("namespace", namespace)
 
@@ -32,17 +36,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 		log.Error(err, "Cannot list deployments in namespace")
 		return err
 	}
-
-	deploymentConfigs, err := resources.DeploymentConfigLister(ctx, _client, namespace, c.OptInLabel)
-	if err != nil {
-		log.Error(err, "Cannot list deploymentConfigs in namespace")
-		return err
-	}
-
-	if len(deployments.Items) == 0 && len(deploymentConfigs.Items) == 0 {
-		log.Info("No objects to reconcile. Doing Nothing.")
-		return nil
-	}
+	objectsToReconcile = objectsToReconcile + len(deployments.Items)
 
 	for _, deployment := range deployments.Items {
 
@@ -53,13 +47,32 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 		}
 	}
 
-	for _, deploymentConfig := range deploymentConfigs.Items {
-
-		err = ReconcileDeploymentConfig(ctx, _client, deploymentConfig, finalState)
+	if err != nil {
+		log.Error(err, "unable to identify cluster")
+	}
+	log.WithValues("env is", c.OpenshiftCluster).
+		Info("Cluster")
+	if c.OpenshiftCluster {
+		deploymentConfigs, err := resources.DeploymentConfigLister(ctx, _client, namespace, c.OptInLabel)
 		if err != nil {
-			log.Error(err, "Could not reconcile deploymentConfig.")
-			continue
+			log.Error(err, "Cannot list deploymentConfigs in namespace")
+			return err
 		}
+		objectsToReconcile = objectsToReconcile + len(deploymentConfigs.Items)
+
+		for _, deploymentConfig := range deploymentConfigs.Items {
+
+			err = ReconcileDeploymentConfig(ctx, _client, deploymentConfig, finalState)
+			if err != nil {
+				log.Error(err, "Could not reconcile deploymentConfig.")
+				continue
+			}
+		}
+	}
+
+	if objectsToReconcile == 0 {
+		log.Info("No objects to reconcile. Doing Nothing.")
+		return nil
 	}
 
 	return nil

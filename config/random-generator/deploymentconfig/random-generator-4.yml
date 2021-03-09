@@ -8,7 +8,7 @@ metadata:
     scaler/state-default-replicas: "1"
   labels:
     deployment-config.name: random-generator-4
-    scaler/opt-in: "false"
+    scaler/opt-in: "true"
 spec:
   replicas: 1
   selector:

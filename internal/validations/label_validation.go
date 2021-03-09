@@ -2,8 +2,9 @@ package validations
 
 import (
 	"errors"
-	c "github.com/containersol/prescale-operator/internal"
 	"strconv"
+
+	c "github.com/containersol/prescale-operator/internal"
 )
 
 // OptinLabelExists checks if the opt-in label exists in the target object and returns its value

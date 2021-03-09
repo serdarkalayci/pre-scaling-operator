@@ -18,6 +18,8 @@ package main
 
 import (
 	"flag"
+	c "github.com/containersol/prescale-operator/internal"
+	"github.com/containersol/prescale-operator/internal/validations"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -44,7 +46,7 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
+	utilruntime.Must(dc.AddToScheme(scheme))
 	utilruntime.Must(scalingv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
@@ -76,11 +78,6 @@ func main() {
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
-	}
-
-	if err := dc.AddToScheme(mgr.GetScheme()); err != nil {
-		setupLog.Error(err, "unable to add to scheme")
 		os.Exit(1)
 	}
 
@@ -116,13 +113,22 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "DeploymentWatcher")
 		os.Exit(1)
 	}
-	if err = (&controllers.DeploymentConfigWatcher{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("DeploymentConfigWatcher"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DeploymentConfigWatcher")
-		os.Exit(1)
+
+	c.OpenshiftCluster, err = validations.ClusterCheck()
+	if err != nil {
+		setupLog.Error(err, "unable to identify cluster")
+	}
+	setupLog.WithValues("env is", c.OpenshiftCluster).
+		Info("Cluster")
+	if c.OpenshiftCluster {
+		if err = (&controllers.DeploymentConfigWatcher{
+			Client: mgr.GetClient(),
+			Log:    ctrl.Log.WithName("controllers").WithName("DeploymentConfigWatcher"),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "DeploymentConfigWatcher")
+			os.Exit(1)
+		}
 	}
 	// +kubebuilder:scaffold:builder
 
