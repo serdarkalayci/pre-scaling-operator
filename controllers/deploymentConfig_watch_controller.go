@@ -14,13 +14,14 @@ package controllers
 
 import (
 	"context"
+	"strings"
+
 	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/reconciler"
 	"github.com/containersol/prescale-operator/internal/resources"
 	"github.com/containersol/prescale-operator/internal/states"
 	"github.com/go-logr/logr"
 	ocv1 "github.com/openshift/api/apps/v1"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -59,11 +60,11 @@ func (r *DeploymentConfigWatcher) Reconcile(ctx context.Context, req ctrl.Reques
 
 	err := r.Client.Get(ctx, req.NamespacedName, &deploymentconfig)
 	if err != nil {
-		log.Error(err, "Failed to get the deployment data")
+		log.Error(err, "Failed to get the deploymentconfig data")
 		return ctrl.Result{}, err
 	}
 
-	// The first thing we need to do is determine if the deployment has the opt-in label and if it's set to true
+	// The first thing we need to do is determine if the deploymentconfig has the opt-in label and if it's set to true
 	// If neither of these conditions is met, then we won't reconcile.
 	optinLabel, err := resources.DeploymentConfigOptinLabel(deploymentconfig)
 	if err != nil {
@@ -75,7 +76,7 @@ func (r *DeploymentConfigWatcher) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	if !optinLabel {
-		log.Info("Deployment opted out. No reconciliation")
+		log.Info("Deploymentconfig opted out. No reconciliation")
 		return ctrl.Result{}, nil
 	}
 
@@ -86,14 +87,14 @@ func (r *DeploymentConfigWatcher) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-	// We need to calculate the desired state before we try to reconcile the deployment
+	// We need to calculate the desired state before we try to reconcile the deploymentconfig
 	finalState, err := reconciler.GetAppliedState(ctx, r.Client, req.Namespace, stateDefinitions, states.State{})
 	if err != nil {
 		log.Error(err, "Cannot determine applied state for namespace")
 		return ctrl.Result{}, err
 	}
 
-	// After we have the deployment and state data, we are ready to reconcile the deployment
+	// After we have the deploymentconfig and state data, we are ready to reconcile the deploymentconfig
 	err = reconciler.ReconcileDeploymentConfig(ctx, r.Client, deploymentconfig, finalState)
 	if err != nil {
 		return ctrl.Result{}, err

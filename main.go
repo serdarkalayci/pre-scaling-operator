@@ -115,6 +115,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	//We need to identify if the operator is running on an Openshift cluster. If yes, we activate the deploymentconfig watcher
 	c.OpenshiftCluster, err = validations.ClusterCheck()
 	if err != nil {
 		setupLog.Error(err, "unable to identify cluster")

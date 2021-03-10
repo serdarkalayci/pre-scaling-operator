@@ -2,12 +2,14 @@ package resources
 
 import (
 	"context"
+
 	"github.com/containersol/prescale-operator/internal/validations"
 	v1 "github.com/openshift/api/apps/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+//DeploymentConfigLister lists all deploymentconfigs in a namespace
 func DeploymentConfigLister(ctx context.Context, _client client.Client, namespace string, OptInLabel map[string]string) (v1.DeploymentConfigList, error) {
 
 	deploymentconfigs := v1.DeploymentConfigList{}
@@ -19,6 +21,7 @@ func DeploymentConfigLister(ctx context.Context, _client client.Client, namespac
 
 }
 
+//DeploymentConfigGetter returns the specific deploymentconfig data given a reconciliation request
 func DeploymentConfigGetter(ctx context.Context, _client client.Client, req ctrl.Request) (v1.DeploymentConfig, error) {
 
 	deploymentconfig := v1.DeploymentConfig{}
@@ -30,6 +33,7 @@ func DeploymentConfigGetter(ctx context.Context, _client client.Client, req ctrl
 
 }
 
+//DeploymentConfigScaler scales the deploymentconfig to the desired replica number
 func DeploymentConfigScaler(ctx context.Context, _client client.Client, deploymentConfig v1.DeploymentConfig, replicas int32) error {
 
 	deploymentConfig.Spec.Replicas = replicas
@@ -41,6 +45,7 @@ func DeploymentConfigScaler(ctx context.Context, _client client.Client, deployme
 	return nil
 }
 
+//DeploymentConfigOptinLabel returns true if the optin-label is found and is true for the deploymentconfig
 func DeploymentConfigOptinLabel(deploymentConfig v1.DeploymentConfig) (bool, error) {
 
 	return validations.OptinLabelExists(deploymentConfig.GetLabels())

@@ -2,12 +2,14 @@ package resources
 
 import (
 	"context"
+
 	"github.com/containersol/prescale-operator/internal/validations"
 	v1 "k8s.io/api/apps/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+//DeploymentLister lists all deployments in a namespace
 func DeploymentLister(ctx context.Context, _client client.Client, namespace string, OptInLabel map[string]string) (v1.DeploymentList, error) {
 
 	deployments := v1.DeploymentList{}
@@ -19,6 +21,7 @@ func DeploymentLister(ctx context.Context, _client client.Client, namespace stri
 
 }
 
+//DeploymentGetter returns the specific deployment data given a reconciliation request
 func DeploymentGetter(ctx context.Context, _client client.Client, req ctrl.Request) (v1.Deployment, error) {
 
 	deployment := v1.Deployment{}
@@ -30,6 +33,7 @@ func DeploymentGetter(ctx context.Context, _client client.Client, req ctrl.Reque
 
 }
 
+//DeploymentScaler scales the deployment to the desired replica number
 func DeploymentScaler(ctx context.Context, _client client.Client, deployment v1.Deployment, replicas int32) error {
 
 	deployment.Spec.Replicas = &replicas
@@ -41,6 +45,7 @@ func DeploymentScaler(ctx context.Context, _client client.Client, deployment v1.
 	return nil
 }
 
+//DeploymentOptinLabel returns true if the optin-label is found and is true for the deployment
 func DeploymentOptinLabel(deployment v1.Deployment) (bool, error) {
 
 	return validations.OptinLabelExists(deployment.GetLabels())

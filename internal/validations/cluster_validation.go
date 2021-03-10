@@ -30,6 +30,7 @@ func ClusterCheck() (bool, error) {
 		return false, err
 	}
 
+	//We use the discovery client to identify the API resources of a given group and version
 	openshiftObjects, err := kubernetesclient.DiscoveryClient.ServerResourcesForGroupVersion(c.OpenshiftObjectGroup)
 	if err != nil {
 		if strings.Contains(err.Error(), c.ResourceNotFound) {
@@ -38,6 +39,7 @@ func ClusterCheck() (bool, error) {
 		return false, err
 	}
 
+	// We enable the deploymentconfig watcher only if we verify that the deploymentconfig API resource exists in the API server
 	for resource := range openshiftObjects.APIResources {
 		if openshiftObjects.APIResources[resource].Kind == c.OpenshiftResources {
 			ctrl.Log.
