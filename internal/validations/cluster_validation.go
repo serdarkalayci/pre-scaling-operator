@@ -30,7 +30,7 @@ func ClusterCheck() (bool, error) {
 		return false, err
 	}
 
-	_, err = kubernetesclient.DiscoveryClient.ServerResourcesForGroupVersion(c.OpenshiftObjectGroup)
+	openshiftObjects, err := kubernetesclient.DiscoveryClient.ServerResourcesForGroupVersion(c.OpenshiftObjectGroup)
 	if err != nil {
 		if strings.Contains(err.Error(), c.ResourceNotFound) {
 			return false, nil
@@ -38,7 +38,14 @@ func ClusterCheck() (bool, error) {
 		return false, err
 	}
 
-	ctrl.Log.Info("Openshift resources found. Activating the Openshift objects watcher")
+	for resource := range openshiftObjects.APIResources {
+		if openshiftObjects.APIResources[resource].Kind == c.OpenshiftResources {
+			ctrl.Log.
+				WithValues("kind", openshiftObjects.APIResources[resource].Kind).
+				Info("Openshift resources found. Activating the Openshift objects watcher")
+			return true, nil
+		}
+	}
 
-	return true, nil
+	return false, nil
 }
