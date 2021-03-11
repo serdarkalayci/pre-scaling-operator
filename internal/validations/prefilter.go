@@ -38,7 +38,8 @@ func PreFilter() predicate.Predicate {
 			newoptin := labels.GetLabelValue(newlabels, "scaler/opt-in")
 			deploymentName := e.Object.GetName()
 			log := ctrl.Log
-			log.Info("(CreateEvent) New opted-in deployment detected. Reconciling.. " + deploymentName)
+			log.WithValues("OptIn is: ", newoptin)
+			log.Info("(CreateEvent) New deployment detected: " + deploymentName)
 
 			return newoptin
 		},
