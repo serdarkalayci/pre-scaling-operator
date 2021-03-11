@@ -64,7 +64,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 		for _, deploymentConfig := range deploymentConfigs.Items {
 
-			err = ReconcileDeploymentConfig(ctx, _client, deploymentConfig, finalState)
+			err = ReconcileDeploymentConfig(ctx, _client, deploymentConfig, finalState, true)
 			if err != nil {
 				log.Error(err, "Could not reconcile deploymentConfig.")
 				continue
@@ -115,7 +115,7 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 	return nil
 }
 
-func ReconcileDeploymentConfig(ctx context.Context, _client client.Client, deploymentConfig ocv1.DeploymentConfig, state states.State) error {
+func ReconcileDeploymentConfig(ctx context.Context, _client client.Client, deploymentConfig ocv1.DeploymentConfig, state states.State, optinLabel bool) error {
 	log := ctrl.Log.
 		WithValues("deploymentConfig", deploymentConfig.Name).
 		WithValues("namespace", deploymentConfig.Namespace)
@@ -128,6 +128,11 @@ func ReconcileDeploymentConfig(ctx context.Context, _client client.Client, deplo
 		return err
 	}
 	// Now we have all the state settings, we can set the replicas for the deploymentConfig accordingly
+	if !optinLabel {
+		// the deployment opted out. We need to set back to default.
+		log.Info("The deployment opted out. Will scale back to default")
+		state.Name = "default"
+	}
 	stateReplica, err := stateReplicas.GetState(state.Name)
 	if err != nil {
 		// TODO here we should do priority filtering, and go down one level of priority to find the lowest set one.
