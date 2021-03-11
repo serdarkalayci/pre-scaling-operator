@@ -14,11 +14,13 @@ package controllers
 
 import (
 	"context"
+	"strings"
+
 	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/reconciler"
 	"github.com/containersol/prescale-operator/internal/resources"
 	"github.com/containersol/prescale-operator/internal/states"
-	"strings"
+	"github.com/containersol/prescale-operator/pkg/utils/labels"
 
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/apps/v1"
@@ -27,7 +29,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
@@ -47,14 +51,53 @@ func (r *DeploymentWatcher) WatchForDeployments(client client.Client, c controll
 	return c.Watch(&source.Kind{Type: &v1.Deployment{}}, &handler.EnqueueRequestForObject{})
 }
 
+func PreFilter() predicate.Predicate {
+	return predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			// Ignore updates to CR status in which case metadata.Generation does not change
+			oldlabels := e.ObjectOld.GetLabels()
+			newlabels := e.ObjectNew.GetLabels()
+			deploymentName := e.ObjectNew.GetName()
+			var oldoptin, newoptin bool
+
+			newoptin = labels.GetLabelValue(newlabels, "scaler/opt-in")
+			oldoptin = labels.GetLabelValue(oldlabels, "scaler/opt-in")
+
+			//Compare
+			log := ctrl.Log.
+				WithValues("old", oldoptin).
+				WithValues("new", newoptin)
+			log.Info("(UpdateEvent) Labels are for deployment " + deploymentName)
+			return oldoptin != newoptin
+		},
+		CreateFunc: func(e event.CreateEvent) bool {
+			newlabels := e.Object.GetLabels()
+
+			newoptin := labels.GetLabelValue(newlabels, "scaler/opt-in")
+			deploymentName := e.Object.GetName()
+			log := ctrl.Log.
+				WithValues("new", newoptin)
+			log.Info("(CreateEvent) Labels are" + deploymentName)
+
+			return newoptin
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+
+			log := ctrl.Log
+			log.Info("Deletion event. Returning false")
+			return false
+		},
+	}
+}
+
 // Reconcile tries to reconcile the replicas of the opted-in deployments
 func (r *DeploymentWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-
+	
+	
 	log := r.Log.
 		WithValues("reconciler kind", "DeploymentWatcher").
 		WithValues("reconciler namespace", req.Namespace).
 		WithValues("reconciler object", req.Name)
-
 	// Fetch the deployment data
 	deployment := v1.Deployment{}
 	err := r.Client.Get(ctx, req.NamespacedName, &deployment)
@@ -108,5 +151,6 @@ func (r *DeploymentWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *DeploymentWatcher) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.Deployment{}).
+		WithEventFilter(PreFilter()).
 		Complete(r)
 }

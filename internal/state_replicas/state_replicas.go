@@ -3,9 +3,10 @@ package state_replicas
 import (
 	"errors"
 	"fmt"
-	annotations2 "github.com/containersol/prescale-operator/pkg/utils"
 	"strconv"
 	"strings"
+
+	annotations2 "github.com/containersol/prescale-operator/pkg/utils/annotations"
 )
 
 const StateReplicaAnnotationPrefix = "scaler/state-"
