@@ -97,10 +97,6 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 		// the deployment opted out. We need to set back to default.
 		log.Info("The deployment opted out. Will scale back to default")
 		state.Name = "default"
-		if err != nil {
-			log.Error(err, "Default state not found on the annotation.")
-			return err
-		}
 	}
 	stateReplica, err := stateReplicas.GetState(state.Name)
 	if err != nil {
