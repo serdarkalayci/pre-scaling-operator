@@ -7,7 +7,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-// PreFilter for incoming changes of deployments. We only care about changes on opt-in label.
+// PreFilter for incoming changes of deployments or deploymentconfigs. We only care about changes on the opt-in label.
 func PreFilter() predicate.Predicate {
 	return predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
@@ -26,7 +26,7 @@ func PreFilter() predicate.Predicate {
 				log := ctrl.Log.
 					WithValues("old", oldoptin).
 					WithValues("new", newoptin)
-				log.Info("(UpdateEvent) Labels are for deployment. Deployment" + deploymentName + " opted out. Trying to reconcile back to default replica count")
+				log.Info("(UpdateEvent) Labels are for deployment " + deploymentName + ". The deployment opted out. Trying to reconcile back to default replica count")
 				return true
 			}
 
