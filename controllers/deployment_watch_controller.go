@@ -51,7 +51,7 @@ func (r *DeploymentWatcher) WatchForDeployments(client client.Client, c controll
 	return c.Watch(&source.Kind{Type: &v1.Deployment{}}, &handler.EnqueueRequestForObject{})
 }
 
-// Filters the incoming changes to deployments. We only care about changes on the labels.
+// PreFilter for incoming changes of deployments. We only care about changes on opt-in label.
 func PreFilter() predicate.Predicate {
 	return predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
