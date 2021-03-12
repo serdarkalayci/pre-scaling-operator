@@ -86,8 +86,7 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 		WithValues("namespace", deployment.Namespace)
 	stateReplicas, err := sr.NewStateReplicasFromAnnotations(deployment.GetAnnotations())
 	if err != nil {
-		ctrl.Log.
-			WithValues("deployment", deployment.Name).
+		log.WithValues("deployment", deployment.Name).
 			WithValues("namespace", deployment.Namespace).
 			Error(err, "Cannot calculate state replicas. Please check deployment annotations. Continuing.")
 		return err
@@ -116,8 +115,7 @@ func ReconcileDeploymentConfig(ctx context.Context, _client client.Client, deplo
 		WithValues("namespace", deploymentConfig.Namespace)
 	stateReplicas, err := sr.NewStateReplicasFromAnnotations(deploymentConfig.GetAnnotations())
 	if err != nil {
-		ctrl.Log.
-			WithValues("deploymentConfig", deploymentConfig.Name).
+		log.WithValues("deploymentConfig", deploymentConfig.Name).
 			WithValues("namespace", deploymentConfig.Namespace).
 			Error(err, "Cannot calculate state replicas. Please check deploymentConfig annotations. Continuing.")
 		return err
