@@ -3,18 +3,23 @@ package reconciler
 import (
 	"context"
 	"errors"
-	sr "github.com/containersol/prescale-operator/internal"
+
+	c "github.com/containersol/prescale-operator/internal"
+	"github.com/containersol/prescale-operator/internal/resources"
+	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
+
+	// "github.com/containersol/prescale-operator/internal/validations"
+	ocv1 "github.com/openshift/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var (
-	OptInLabel = map[string]string{"scaler/opt-in": "true"}
-)
-
 func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State) error {
+
+	var objectsToReconcile int
+
 	log := ctrl.Log.
 		WithValues("namespace", namespace)
 
@@ -26,19 +31,14 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 		return err
 	}
 
-	// We now need to look for Deployments which are opted in,
+	// We now need to look for objects (currently supported deployments and deploymentConfigs) which are opted in,
 	// then use their annotations to determine the correct scale
-	deployments := v1.DeploymentList{}
-	err = _client.List(ctx, &deployments, client.MatchingLabels(OptInLabel), client.InNamespace(namespace))
+	deployments, err := resources.DeploymentLister(ctx, _client, namespace, c.OptInLabel)
 	if err != nil {
 		log.Error(err, "Cannot list deployments in namespace")
 		return err
 	}
-
-	if len(deployments.Items) == 0 {
-		log.Info("No deployments to reconcile. Doing Nothing.")
-		return nil
-	}
+	objectsToReconcile = objectsToReconcile + len(deployments.Items)
 
 	for _, deployment := range deployments.Items {
 
@@ -48,6 +48,35 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 			continue
 		}
 	}
+
+	if err != nil {
+		log.Error(err, "unable to identify cluster")
+	}
+	log.WithValues("env is", c.OpenshiftCluster).
+		Info("Cluster")
+	if c.OpenshiftCluster {
+		deploymentConfigs, err := resources.DeploymentConfigLister(ctx, _client, namespace, c.OptInLabel)
+		if err != nil {
+			log.Error(err, "Cannot list deploymentConfigs in namespace")
+			return err
+		}
+		objectsToReconcile = objectsToReconcile + len(deploymentConfigs.Items)
+
+		for _, deploymentConfig := range deploymentConfigs.Items {
+
+			err = ReconcileDeploymentConfig(ctx, _client, deploymentConfig, finalState)
+			if err != nil {
+				log.Error(err, "Could not reconcile deploymentConfig.")
+				continue
+			}
+		}
+	}
+
+	if objectsToReconcile == 0 {
+		log.Info("No objects to reconcile. Doing Nothing.")
+		return nil
+	}
+
 	return nil
 }
 
@@ -57,8 +86,7 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 		WithValues("namespace", deployment.Namespace)
 	stateReplicas, err := sr.NewStateReplicasFromAnnotations(deployment.GetAnnotations())
 	if err != nil {
-		ctrl.Log.
-			WithValues("deployment", deployment.Name).
+		log.WithValues("deployment", deployment.Name).
 			WithValues("namespace", deployment.Namespace).
 			Error(err, "Cannot calculate state replicas. Please check deployment annotations. Continuing.")
 		return err
@@ -74,10 +102,38 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 		return err
 	}
 	log.Info("Updating deployment replicas for state", "replicas", stateReplica.Replicas)
-	deployment.Spec.Replicas = &stateReplica.Replicas
-	err = _client.Update(ctx, &deployment, &client.UpdateOptions{})
+	err = resources.DeploymentScaler(ctx, _client, deployment, stateReplica.Replicas)
 	if err != nil {
 		log.Error(err, "Could not scale deployment in namespace")
+	}
+	return nil
+}
+
+func ReconcileDeploymentConfig(ctx context.Context, _client client.Client, deploymentConfig ocv1.DeploymentConfig, state states.State) error {
+	log := ctrl.Log.
+		WithValues("deploymentConfig", deploymentConfig.Name).
+		WithValues("namespace", deploymentConfig.Namespace)
+	stateReplicas, err := sr.NewStateReplicasFromAnnotations(deploymentConfig.GetAnnotations())
+	if err != nil {
+		log.WithValues("deploymentConfig", deploymentConfig.Name).
+			WithValues("namespace", deploymentConfig.Namespace).
+			Error(err, "Cannot calculate state replicas. Please check deploymentConfig annotations. Continuing.")
+		return err
+	}
+	// Now we have all the state settings, we can set the replicas for the deploymentConfig accordingly
+	stateReplica, err := stateReplicas.GetState(state.Name)
+	if err != nil {
+		// TODO here we should do priority filtering, and go down one level of priority to find the lowest set one.
+		// We will ignore any that are not set
+		log.WithValues("set states", stateReplicas).
+			WithValues("namespace state", state.Name).
+			Info("State could not be found")
+		return err
+	}
+	log.Info("Updating deployment replicas for state", "replicas", stateReplica.Replicas)
+	err = resources.DeploymentConfigScaler(ctx, _client, deploymentConfig, stateReplica.Replicas)
+	if err != nil {
+		log.Error(err, "Could not scale deploymentConfig in namespace")
 	}
 	return nil
 }

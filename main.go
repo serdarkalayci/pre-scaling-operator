@@ -20,10 +20,14 @@ import (
 	"flag"
 	"os"
 
+	c "github.com/containersol/prescale-operator/internal"
+	"github.com/containersol/prescale-operator/internal/validations"
+
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	dc "github.com/openshift/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -43,7 +47,7 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
+	utilruntime.Must(dc.AddToScheme(scheme))
 	utilruntime.Must(scalingv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
@@ -102,13 +106,29 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "ScalingState")
 		os.Exit(1)
 	}
-	if err = (&controllers.Watcher{
+	if err = (&controllers.DeploymentWatcher{
 		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("Watcher"),
+		Log:    ctrl.Log.WithName("controllers").WithName("DeploymentWatcher"),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ScalingState")
+		setupLog.Error(err, "unable to create controller", "controller", "DeploymentWatcher")
 		os.Exit(1)
+	}
+
+	//We need to identify if the operator is running on an Openshift cluster. If yes, we activate the deploymentconfig watcher
+	c.OpenshiftCluster, err = validations.ClusterCheck()
+	if err != nil {
+		setupLog.Error(err, "unable to identify cluster")
+	}
+	if c.OpenshiftCluster {
+		if err = (&controllers.DeploymentConfigWatcher{
+			Client: mgr.GetClient(),
+			Log:    ctrl.Log.WithName("controllers").WithName("DeploymentConfigWatcher"),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "DeploymentConfigWatcher")
+			os.Exit(1)
+		}
 	}
 	// +kubebuilder:scaffold:builder
 

@@ -14,13 +14,15 @@ package controllers
 
 import (
 	"context"
-	"github.com/containersol/prescale-operator/internal/reconciler"
-	"github.com/containersol/prescale-operator/internal/states"
-	"github.com/containersol/prescale-operator/internal/validations"
 	"strings"
 
+	c "github.com/containersol/prescale-operator/internal"
+	"github.com/containersol/prescale-operator/internal/reconciler"
+	"github.com/containersol/prescale-operator/internal/resources"
+	"github.com/containersol/prescale-operator/internal/states"
 	"github.com/go-logr/logr"
-	v1 "k8s.io/api/apps/v1"
+	ocv1 "github.com/openshift/api/apps/v1"
+
 	"k8s.io/apimachinery/pkg/runtime"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -30,43 +32,43 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-// Watcher reconciles a ScalingState object
-type Watcher struct {
+// DeploymentConfigWatcher reconciles a ScalingState object
+type DeploymentConfigWatcher struct {
 	client.Client
 	Log    logr.Logger
 	Scheme *runtime.Scheme
 }
 
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=list;watch;
-// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;patch;update;
+// +kubebuilder:rbac:groups=apps.openshift.io,resources=deploymentconfigs,verbs=get;list;watch;patch;update;
 
-// WatchForDeployments creates watcher for the deployment objects
-func (r *Watcher) WatchForDeployments(client client.Client, c controller.Controller) error {
+// WatchForDeploymentConfigs creates watcher for the deploymentconfig objects
+func (r *DeploymentConfigWatcher) WatchForDeploymentConfigs(client client.Client, c controller.Controller) error {
 
-	return c.Watch(&source.Kind{Type: &v1.Deployment{}}, &handler.EnqueueRequestForObject{})
+	return c.Watch(&source.Kind{Type: &ocv1.DeploymentConfig{}}, &handler.EnqueueRequestForObject{})
 }
 
 // Reconcile tries to reconcile the replicas of the opted-in deployments
-func (r *Watcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *DeploymentConfigWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 
 	log := r.Log.
-		WithValues("reconciler kind", "Watcher").
+		WithValues("reconciler kind", "DeploymentConfigWatcher").
 		WithValues("reconciler namespace", req.Namespace).
 		WithValues("reconciler object", req.Name)
 
-	// Fetch the deployment data
-	deployment := v1.Deployment{}
-	err := r.Client.Get(ctx, req.NamespacedName, &deployment)
+	deploymentconfig := ocv1.DeploymentConfig{}
+
+	err := r.Client.Get(ctx, req.NamespacedName, &deploymentconfig)
 	if err != nil {
-		log.Error(err, "Failed to get the deployment data")
+		log.Error(err, "Failed to get the deploymentconfig data")
 		return ctrl.Result{}, err
 	}
 
-	// The first thing we need to do is determine if the deployment has the opt-in label and if it's set to true
+	// The first thing we need to do is determine if the deploymentconfig has the opt-in label and if it's set to true
 	// If neither of these conditions is met, then we won't reconcile.
-	optinLabel, err := validations.OptinLabelExists(deployment)
+	optinLabel, err := resources.DeploymentConfigOptinLabel(deploymentconfig)
 	if err != nil {
-		if strings.Contains(err.Error(), validations.LabelNotFound) {
+		if strings.Contains(err.Error(), c.LabelNotFound) {
 			return ctrl.Result{}, nil
 		}
 		log.Error(err, "Failed to validate the opt-in label")
@@ -74,7 +76,7 @@ func (r *Watcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result,
 	}
 
 	if !optinLabel {
-		log.Info("Deployment opted out. No reconciliation")
+		log.Info("Deploymentconfig opted out. No reconciliation")
 		return ctrl.Result{}, nil
 	}
 
@@ -85,28 +87,27 @@ func (r *Watcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result,
 		return ctrl.Result{}, err
 	}
 
-	// We need to calculate the desired state before we try to reconcile the deployment
+	// We need to calculate the desired state before we try to reconcile the deploymentconfig
 	finalState, err := reconciler.GetAppliedState(ctx, r.Client, req.Namespace, stateDefinitions, states.State{})
 	if err != nil {
 		log.Error(err, "Cannot determine applied state for namespace")
 		return ctrl.Result{}, err
 	}
 
-	// After we have the deployment and state data, we are ready to reconcile the deployment
-	err = reconciler.ReconcileDeployment(ctx, r.Client, deployment, finalState)
-
+	// After we have the deploymentconfig and state data, we are ready to reconcile the deploymentconfig
+	err = reconciler.ReconcileDeploymentConfig(ctx, r.Client, deploymentconfig, finalState)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	log.Info("Reconciliation loop completed successfully")
+	log.Info("Reconciliation loop completed successfully for deploymentconfig")
 
 	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *Watcher) SetupWithManager(mgr ctrl.Manager) error {
+func (r *DeploymentConfigWatcher) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1.Deployment{}).
+		For(&ocv1.DeploymentConfig{}).
 		Complete(r)
 }
