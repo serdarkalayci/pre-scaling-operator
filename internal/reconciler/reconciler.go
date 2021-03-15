@@ -130,7 +130,7 @@ func ReconcileDeploymentConfig(ctx context.Context, _client client.Client, deplo
 	// Now we have all the state settings, we can set the replicas for the deploymentConfig accordingly
 	if !optinLabel {
 		// the deployment opted out. We need to set back to default.
-		log.Info("The deployment opted out. Will scale back to default")
+		log.Info("The deploymentconfig opted out. Will scale back to default")
 		state.Name = "default"
 	}
 	stateReplica, err := stateReplicas.GetState(state.Name)

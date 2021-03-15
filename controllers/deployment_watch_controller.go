@@ -64,8 +64,7 @@ func (r *DeploymentWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	// The first thing we need to do is determine if the deployment has the opt-in label and if it's set to true
-	// If neither of these conditions is met, then we won't reconcile.
+	// The first thing we need to do is determine if the deployment has the opt-in label
 	optinLabel, err := resources.DeploymentOptinLabel(deployment)
 	if err != nil {
 		if strings.Contains(err.Error(), c.LabelNotFound) {
