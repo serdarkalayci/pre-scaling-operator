@@ -8,6 +8,7 @@ import (
 	"github.com/containersol/prescale-operator/internal/resources"
 	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
+	"github.com/containersol/prescale-operator/pkg/utils/labels"
 
 	// "github.com/containersol/prescale-operator/internal/validations"
 	ocv1 "github.com/openshift/api/apps/v1"
@@ -41,8 +42,8 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	objectsToReconcile = objectsToReconcile + len(deployments.Items)
 
 	for _, deployment := range deployments.Items {
-
-		err = ReconcileDeployment(ctx, _client, deployment, finalState, true)
+		optin := labels.GetLabelValue(deployment.GetLabels(), "scaler/opt-in")
+		err = ReconcileDeployment(ctx, _client, deployment, finalState, optin)
 		if err != nil {
 			log.Error(err, "Could not reconcile deployment.")
 			continue
