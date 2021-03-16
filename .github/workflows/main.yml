@@ -73,6 +73,7 @@ jobs:
         with:
           images: ghcr.io/containersolutions/pre-scaling-operator,containersol/pre-scaling-operator
           tag-sha: true
+          tag-custom: ci
           tag-semver: |
             {{version}}
             {{major}}.{{minor}}
