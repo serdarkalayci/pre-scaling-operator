@@ -76,11 +76,6 @@ func (r *DeploymentConfigWatcher) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-	if !optinLabel {
-		log.Info("Deploymentconfig opted out. No reconciliation")
-		return ctrl.Result{}, nil
-	}
-
 	// Next step after we are certain that we have an object to reconcile, we need to get the state definitions
 	stateDefinitions, err := states.GetClusterScalingStateDefinitions(ctx, r.Client)
 	if err != nil {
