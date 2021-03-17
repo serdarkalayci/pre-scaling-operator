@@ -13,8 +13,10 @@ import (
 	// "github.com/containersol/prescale-operator/internal/validations"
 	ocv1 "github.com/openshift/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
+	retry "k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State) error {
@@ -108,11 +110,32 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 			Info("State could not be found")
 		return err
 	}
+
 	log.Info("Updating deployment replicas for state", "replicas", stateReplica.Replicas)
-	err = resources.DeploymentScaler(ctx, _client, deployment, stateReplica.Replicas)
-	if err != nil {
-		log.Error(err, "Could not scale deployment in namespace")
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		updateErr := resources.DeploymentScaler(ctx, _client, deployment, stateReplica.Replicas)
+		if updateErr != nil {
+
+			// We need to get a newer version of the object from the client
+			var req reconcile.Request
+			req.NamespacedName.Namespace = deployment.Namespace
+			req.NamespacedName.Name = deployment.Name
+			deployment, err = resources.DeploymentGetter(ctx, _client, req)
+
+			if err != nil {
+				log.Error(err, "Error getting refreshed deployment in conflict resolution")
+			}
+			log.Info("Updating deployment failed due to a conflict! Retrying..")
+		}
+		return updateErr
+	})
+	if retryErr != nil {
+		log.Error(retryErr, "Unable to scale the deployment, err: %v")
 	}
+	log.WithValues("Deployment", deployment.Name).
+		WithValues("StateReplica mode", stateReplica.Name).
+		WithValues("Replica count", stateReplica.Replicas).
+		Info("Succesfully scaled deployment")
 	return nil
 }
 
@@ -144,11 +167,32 @@ func ReconcileDeploymentConfig(ctx context.Context, _client client.Client, deplo
 		return err
 	}
 	log.Info("Updating deployment replicas for state", "replicas", stateReplica.Replicas)
-	err = resources.DeploymentConfigScaler(ctx, _client, deploymentConfig, stateReplica.Replicas)
-	if err != nil {
-		log.Error(err, "Could not scale deploymentConfig in namespace")
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		updateErr := resources.DeploymentConfigScaler(ctx, _client, deploymentConfig, stateReplica.Replicas)
+		if updateErr != nil {
+
+			// We need to get a newer version of the object from the client
+			var req reconcile.Request
+			req.NamespacedName.Namespace = deploymentConfig.Namespace
+			req.NamespacedName.Name = deploymentConfig.Name
+			deploymentConfig, err = resources.DeploymentConfigGetter(ctx, _client, req)
+
+			if err != nil {
+				log.Error(err, "Error getting refreshed deployment in conflict resolution")
+			}
+			log.Info("Updating deployment failed due to a conflict! Retrying..")
+		}
+		return updateErr
+	})
+	if retryErr != nil {
+		log.Error(retryErr, "Unable to scale the deployment, err: %v")
 	}
+	log.WithValues("Deployment", deploymentConfig.Name).
+		WithValues("StateReplica mode", stateReplica.Name).
+		WithValues("Replica count", stateReplica.Replicas).
+		Info("Succesfully scaled deployment")
 	return nil
+
 }
 
 func GetAppliedState(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State) (states.State, error) {
