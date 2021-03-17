@@ -5,23 +5,35 @@ import (
 
 	"github.com/containersol/prescale-operator/pkg/utils/annotations"
 	"github.com/containersol/prescale-operator/pkg/utils/labels"
+	v1 "k8s.io/api/apps/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-// PreFilter for incoming changes of deployments or deploymentconfigs. We only care about changes on the opt-in label.
+// PreFilter for incoming changes of deployments or deploymentconfigs. We only care about changes on the opt-in label, replica count and annotations.
 func PreFilter() predicate.Predicate {
 	return predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			// Ignore updates to CR status in which case metadata.Generation does not change
 			deploymentName := e.ObjectNew.GetName()
+			var oldoptin, newoptin, replicaChange, annotationchange bool
 
-			var oldoptin, newoptin, annotationchange bool
 			var annotationsnew, annotationsold map[string]string
 
-			newoptin = labels.GetLabelValue(e.ObjectNew.GetLabels(), "scaler/opt-in")
 			oldoptin = labels.GetLabelValue(e.ObjectOld.GetLabels(), "scaler/opt-in")
+			newoptin = labels.GetLabelValue(e.ObjectNew.GetLabels(), "scaler/opt-in")
+			oldDeployment, ok1 := e.ObjectOld.(*v1.Deployment)
+			newDeployment, ok2 := e.ObjectNew.(*v1.Deployment)
+
+			if !ok1 || !ok2 {
+				return false
+			}
+
+			// Check if replicas count has changed
+			if *oldDeployment.Spec.Replicas != *newDeployment.Spec.Replicas {
+				replicaChange = true
+			}
 
 			// Check for changes in relevant annotations.
 			annotationsnew = annotations.FilterByKeyPrefix("scaler", e.ObjectNew.GetAnnotations())
@@ -32,10 +44,13 @@ func PreFilter() predicate.Predicate {
 			if !eq {
 				annotationchange = true
 			}
+
 			// eval if we need to reconcile.
-			if (annotationchange && oldoptin) || (oldoptin && !newoptin) || (!oldoptin && newoptin) {
+			// (a || b || ~ c || ~ d) && (c || d)
+			if (annotationchange || replicaChange || !oldoptin || !newoptin) && (oldoptin || newoptin) {
 				log := ctrl.Log.
 					WithValues("Annotationchange", annotationchange).
+					WithValues("Replicachange", replicaChange).
 					WithValues("OldOptIn", oldoptin).
 					WithValues("NewOptIn", newoptin)
 				log.Info("Reconciling for deployment " + deploymentName)
