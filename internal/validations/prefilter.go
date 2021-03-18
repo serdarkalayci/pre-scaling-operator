@@ -23,6 +23,17 @@ func PreFilter() predicate.Predicate {
 
 			oldoptin = labels.GetLabelValue(e.ObjectOld.GetLabels(), "scaler/opt-in")
 			newoptin = labels.GetLabelValue(e.ObjectNew.GetLabels(), "scaler/opt-in")
+
+			// Both optin are false, there is no case where we need to reconcile
+			if !oldoptin && !newoptin {
+				return false
+			}
+
+			// optinLabel has changed, we need to reconcile in any case
+			if (oldoptin != newoptin) {
+				return true
+			}
+
 			oldDeployment, ok1 := e.ObjectOld.(*v1.Deployment)
 			newDeployment, ok2 := e.ObjectNew.(*v1.Deployment)
 
@@ -46,8 +57,8 @@ func PreFilter() predicate.Predicate {
 			}
 
 			// eval if we need to reconcile.
-			// (a || b || ~ c || ~ d) && (c || d)
-			if (annotationchange || replicaChange || !oldoptin || !newoptin) && (oldoptin || newoptin) {
+			// (a || b) && c && d
+			if ((annotationchange || replicaChange) && newoptin && oldoptin) {
 				log := ctrl.Log.
 					WithValues("Annotationchange", annotationchange).
 					WithValues("Replicachange", replicaChange).
