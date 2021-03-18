@@ -3,8 +3,10 @@ package validations
 import (
 	"reflect"
 
+	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/pkg/utils/annotations"
 	"github.com/containersol/prescale-operator/pkg/utils/labels"
+	ocv1 "github.com/openshift/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -30,19 +32,21 @@ func PreFilter() predicate.Predicate {
 			}
 
 			// optinLabel has changed, we need to reconcile in any case
-			if (oldoptin != newoptin) {
+			if oldoptin != newoptin {
 				return true
 			}
-
-			oldDeployment, ok1 := e.ObjectOld.(*v1.Deployment)
-			newDeployment, ok2 := e.ObjectNew.(*v1.Deployment)
-
-			if !ok1 || !ok2 {
-				return false
+			var replicasOld, replicasNew *int32
+			//TODO: make this generic
+			if c.OpenshiftCluster {
+				replicasOld = &e.ObjectOld.(*ocv1.DeploymentConfig).Spec.Replicas
+				replicasNew = &e.ObjectNew.(*ocv1.DeploymentConfig).Spec.Replicas
+			} else {
+				replicasOld = e.ObjectOld.(*v1.Deployment).Spec.Replicas
+				replicasNew = e.ObjectNew.(*v1.Deployment).Spec.Replicas
 			}
 
 			// Check if replicas count has changed
-			if *oldDeployment.Spec.Replicas != *newDeployment.Spec.Replicas {
+			if *replicasOld != *replicasNew {
 				replicaChange = true
 			}
 
@@ -58,7 +62,7 @@ func PreFilter() predicate.Predicate {
 
 			// eval if we need to reconcile.
 			// (a || b) && c && d
-			if ((annotationchange || replicaChange) && newoptin && oldoptin) {
+			if (annotationchange || replicaChange) && newoptin && oldoptin {
 				log := ctrl.Log.
 					WithValues("Annotationchange", annotationchange).
 					WithValues("Replicachange", replicaChange).
