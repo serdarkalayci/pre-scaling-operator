@@ -9,6 +9,9 @@ func GetLabelValue(labels map[string]string, optin string) bool {
 	if v, found := labels[optin]; found {
 
 		detect, _ = strconv.ParseBool(v)
+		if detect {
+			return true
+		}
 	}
-	return detect
+	return false
 }
