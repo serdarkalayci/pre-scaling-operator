@@ -83,7 +83,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	return nil
 }
 
-func ReconcileDeployment(ctx context.Context, _client client.Client, deployment v1.Deployment, state states.State, optinLabel bool) error {
+func ReconcileDeployment(ctx context.Context, _client client.Client, deployment v1.Deployment, state states.State, optIn bool) error {
 	log := ctrl.Log.
 		WithValues("deployment", deployment.Name).
 		WithValues("namespace", deployment.Namespace)
@@ -96,7 +96,7 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 		return err
 	}
 	// Now we have all the state settings, we can set the replicas for the deployment accordingly
-	if !optinLabel {
+	if !optIn {
 		// the deployment opted out. We need to set back to default.
 		log.Info("The deployment opted out. Will scale back to default")
 		state.Name = c.DefaultReplicaAnnotation
@@ -145,7 +145,7 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 	return nil
 }
 
-func ReconcileDeploymentConfig(ctx context.Context, _client client.Client, deploymentConfig ocv1.DeploymentConfig, state states.State, optinLabel bool) error {
+func ReconcileDeploymentConfig(ctx context.Context, _client client.Client, deploymentConfig ocv1.DeploymentConfig, state states.State, optIn bool) error {
 	log := ctrl.Log.
 		WithValues("deploymentConfig", deploymentConfig.Name).
 		WithValues("namespace", deploymentConfig.Namespace)
@@ -158,7 +158,7 @@ func ReconcileDeploymentConfig(ctx context.Context, _client client.Client, deplo
 		return err
 	}
 	// Now we have all the state settings, we can set the replicas for the deploymentConfig accordingly
-	if !optinLabel {
+	if !optIn {
 		// the deployment opted out. We need to set back to default.
 		log.Info("The deploymentconfig opted out. Will scale back to default")
 		state.Name = c.DefaultReplicaAnnotation
