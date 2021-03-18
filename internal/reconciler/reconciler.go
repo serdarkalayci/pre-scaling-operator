@@ -99,7 +99,7 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 	if !optinLabel {
 		// the deployment opted out. We need to set back to default.
 		log.Info("The deployment opted out. Will scale back to default")
-		state.Name = "default"
+		state.Name = c.DefaultReplicaAnnotation
 	}
 	stateReplica, err := stateReplicas.GetState(state.Name)
 	if err != nil {
@@ -113,32 +113,30 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 	var oldReplicaCount int32
 	oldReplicaCount = *deployment.Spec.Replicas
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		if oldReplicaCount != stateReplica.Replicas {
-			log.Info("Updating deployment replicas for state", "replicas", stateReplica.Replicas)
-			updateErr := resources.DeploymentScaler(ctx, _client, deployment, stateReplica.Replicas)
-			if updateErr != nil {
-
-				// We need to get a newer version of the object from the client
-				var req reconcile.Request
-				req.NamespacedName.Namespace = deployment.Namespace
-				req.NamespacedName.Name = deployment.Name
-				deployment, err = resources.DeploymentGetter(ctx, _client, req)
-				if err != nil {
-					log.Error(err, "Error getting refreshed deployment in conflict resolution")
-				}
-				log.Info("Updating deployment failed due to a conflict! Retrying..")
-			} else {
-				log.WithValues("Deployment", deployment.Name).
-					WithValues("StateReplica mode", stateReplica.Name).
-					WithValues("Old Replica count", oldReplicaCount).
-					WithValues("New Replica count", stateReplica.Replicas).
-					Info("Deployment succesfully updated")
-			}
-			return updateErr
-		} else {
+		if oldReplicaCount == stateReplica.Replicas {
 			log.Info("No Update on deployment. Desired replica count already matches current.")
 			return nil
 		}
+		log.Info("Updating deploymentconfig replicas for state", "replicas", stateReplica.Replicas)
+		updateErr := resources.DeploymentScaler(ctx, _client, deployment, stateReplica.Replicas)
+		if updateErr == nil {
+			log.WithValues("Deployment", deployment.Name).
+				WithValues("StateReplica mode", stateReplica.Name).
+				WithValues("Old Replica count", oldReplicaCount).
+				WithValues("New Replica count", stateReplica.Replicas).
+				Info("Deployment succesfully updated")
+			return nil
+		}
+		log.Info("Updating deployment failed due to a conflict! Retrying..")
+		// We need to get a newer version of the object from the client
+		var req reconcile.Request
+		req.NamespacedName.Namespace = deployment.Namespace
+		req.NamespacedName.Name = deployment.Name
+		deployment, err = resources.DeploymentGetter(ctx, _client, req)
+		if err != nil {
+			log.Error(err, "Error getting refreshed deployment in conflict resolution")
+		}
+		return updateErr
 
 	})
 	if retryErr != nil {
@@ -163,7 +161,7 @@ func ReconcileDeploymentConfig(ctx context.Context, _client client.Client, deplo
 	if !optinLabel {
 		// the deployment opted out. We need to set back to default.
 		log.Info("The deploymentconfig opted out. Will scale back to default")
-		state.Name = "default"
+		state.Name = c.DefaultReplicaAnnotation
 	}
 	stateReplica, err := stateReplicas.GetState(state.Name)
 	if err != nil {
@@ -177,32 +175,30 @@ func ReconcileDeploymentConfig(ctx context.Context, _client client.Client, deplo
 	var oldReplicaCount int32
 	oldReplicaCount = *&deploymentConfig.Spec.Replicas
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		if oldReplicaCount != stateReplica.Replicas {
-			log.Info("Updating deploymentconfig replicas for state", "replicas", stateReplica.Replicas)
-			updateErr := resources.DeploymentConfigScaler(ctx, _client, deploymentConfig, stateReplica.Replicas)
-			if updateErr != nil {
-
-				// We need to get a newer version of the object from the client
-				var req reconcile.Request
-				req.NamespacedName.Namespace = deploymentConfig.Namespace
-				req.NamespacedName.Name = deploymentConfig.Name
-				deploymentConfig, err = resources.DeploymentConfigGetter(ctx, _client, req)
-				if err != nil {
-					log.Error(err, "Error getting refreshed deployment in conflict resolution")
-				}
-				log.Info("Updating deployment failed due to a conflict! Retrying..")
-			} else {
-				log.WithValues("Deploymentconfig", deploymentConfig.Name).
-					WithValues("StateReplica mode", stateReplica.Name).
-					WithValues("Old Replica count", oldReplicaCount).
-					WithValues("New Replica count", stateReplica.Replicas).
-					Info("Deploymentconfig succesfully updated")
-			}
-			return updateErr
-		} else {
-			log.Info("No Update on deploymentconfig. Desired replica count already matches current.")
+		if oldReplicaCount == stateReplica.Replicas {
+			log.Info("No Update on deployment. Desired replica count already matches current.")
 			return nil
 		}
+		log.Info("Updating deploymentconfig replicas for state", "replicas", stateReplica.Replicas)
+		updateErr := resources.DeploymentConfigScaler(ctx, _client, deploymentConfig, stateReplica.Replicas)
+		if updateErr == nil {
+			log.WithValues("Deploymentconfig", deploymentConfig.Name).
+				WithValues("StateReplica mode", stateReplica.Name).
+				WithValues("Old Replica count", oldReplicaCount).
+				WithValues("New Replica count", stateReplica.Replicas).
+				Info("Deploymentconfig succesfully updated")
+			return nil
+		}
+		log.Info("Updating deployment failed due to a conflict! Retrying..")
+		// We need to get a newer version of the object from the client
+		var req reconcile.Request
+		req.NamespacedName.Namespace = deploymentConfig.Namespace
+		req.NamespacedName.Name = deploymentConfig.Name
+		deploymentConfig, err = resources.DeploymentConfigGetter(ctx, _client, req)
+		if err != nil {
+			log.Error(err, "Error getting refreshed deployment in conflict resolution")
+		}
+		return updateErr
 
 	})
 	if retryErr != nil {
