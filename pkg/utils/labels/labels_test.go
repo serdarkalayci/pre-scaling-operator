@@ -1,2 +1,0 @@
-package labels_test
-
