@@ -12,6 +12,9 @@ const (
 
 	//OpenshiftResources respresents the Openshift object to watch
 	OpenshiftResources = "DeploymentConfig"
+
+	//Key for the default replica annotation
+	DefaultReplicaAnnotation = "default"
 )
 
 var (

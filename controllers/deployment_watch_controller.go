@@ -14,11 +14,13 @@ package controllers
 
 import (
 	"context"
+	"strings"
+
 	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/reconciler"
 	"github.com/containersol/prescale-operator/internal/resources"
 	"github.com/containersol/prescale-operator/internal/states"
-	"strings"
+	"github.com/containersol/prescale-operator/internal/validations"
 
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/apps/v1"
@@ -54,7 +56,6 @@ func (r *DeploymentWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		WithValues("reconciler kind", "DeploymentWatcher").
 		WithValues("reconciler namespace", req.Namespace).
 		WithValues("reconciler object", req.Name)
-
 	// Fetch the deployment data
 	deployment := v1.Deployment{}
 	err := r.Client.Get(ctx, req.NamespacedName, &deployment)
@@ -63,8 +64,7 @@ func (r *DeploymentWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	// The first thing we need to do is determine if the deployment has the opt-in label and if it's set to true
-	// If neither of these conditions is met, then we won't reconcile.
+	// The first thing we need to do is determine if the deployment has the opt-in label
 	optinLabel, err := resources.DeploymentOptinLabel(deployment)
 	if err != nil {
 		if strings.Contains(err.Error(), c.LabelNotFound) {
@@ -72,11 +72,6 @@ func (r *DeploymentWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 		log.Error(err, "Failed to validate the opt-in label")
 		return ctrl.Result{}, err
-	}
-
-	if !optinLabel {
-		log.Info("Deployment opted out. No reconciliation")
-		return ctrl.Result{}, nil
 	}
 
 	// Next step after we are certain that we have an object to reconcile, we need to get the state definitions
@@ -94,7 +89,7 @@ func (r *DeploymentWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// After we have the deployment and state data, we are ready to reconcile the deployment
-	err = reconciler.ReconcileDeployment(ctx, r.Client, deployment, finalState)
+	err = reconciler.ReconcileDeployment(ctx, r.Client, deployment, finalState, optinLabel)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -108,5 +103,6 @@ func (r *DeploymentWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *DeploymentWatcher) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.Deployment{}).
+		WithEventFilter(validations.PreFilter()).
 		Complete(r)
 }

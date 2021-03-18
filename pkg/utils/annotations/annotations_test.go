@@ -1,9 +1,10 @@
 package annotations_test
 
 import (
-	annotations "github.com/containersol/prescale-operator/pkg/utils"
 	"reflect"
 	"testing"
+
+	annotations "github.com/containersol/prescale-operator/pkg/utils/annotations"
 )
 
 func TestFilterByKeyPrefixFiltersCorrectly(t *testing.T) {
