@@ -43,6 +43,7 @@ var _ = Describe("Deployment Watch Controller", func() {
 		It("Should Update Deployment replica count correctly", func() {
 			By("Creating the deployment object first")
 			Expect(k8sClient.Create(context.Background(), &deployment)).Should(Succeed())
+			By("Creating the ClusterScalingState object first")
 			Expect(k8sClient.Create(context.Background(), clusterscalingstate)).Should(Succeed())
 			time.Sleep(time.Second * 5)
 
@@ -66,6 +67,10 @@ var _ = Describe("Deployment Watch Controller", func() {
 func CreateClusterScalingState() *v1alpha1.ClusterScalingState {
 
 	scalingState := &v1alpha1.ClusterScalingState{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ClusterScalingState",
+			APIVersion: "scaling.prescale.com/v1alpha1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "clusterscalingstate-sample",
 		},
