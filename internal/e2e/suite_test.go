@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
@@ -31,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
+	"github.com/containersol/prescale-operator/controllers"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -40,6 +42,7 @@ import (
 var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
+var k8sManager ctrl.Manager
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -52,9 +55,12 @@ func TestAPIs(t *testing.T) {
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
+	var useCluster bool = true
+
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths: []string{filepath.Join("..", "..", "config", "crd", "bases")},
+		CRDDirectoryPaths:  []string{filepath.Join("..", "..", "config", "crd", "bases")},
+		UseExistingCluster: &useCluster,
 	}
 
 	cfg, err := testEnv.Start()
@@ -69,6 +75,36 @@ var _ = BeforeSuite(func() {
 
 	err = scalingv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
+
+	// register controllers
+	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
+		Scheme: scheme.Scheme,
+	})
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&controllers.ClusterScalingStateReconciler{
+		Client: k8sManager.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("ClusterScalingStateController"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&controllers.ClusterScalingStateDefinitionReconciler{
+		Client: k8sManager.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("ClusterScalingStateDefinitionController"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&controllers.ScalingStateReconciler{
+		Client: k8sManager.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("ScalingStateController"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&controllers.DeploymentWatcher{
+		Client: k8sManager.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("DeploymentWatchController"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
 
 	//install CRDs
 	options := envtest.CRDInstallOptions{
