@@ -5,9 +5,11 @@ import (
 	"strconv"
 	"time"
 
+	c "github.com/containersol/prescale-operator/internal"
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
+	ocv1 "github.com/openshift/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,6 +24,7 @@ var _ = Describe("e2e Test for the Deployment Watch Controller", func() {
 	var casenumber = 1
 
 	var deployment v1.Deployment
+	var deploymentconfig ocv1.DeploymentConfig
 	//var clusterscalingstate *v1alpha1.ClusterScalingState
 
 	var key = types.NamespacedName{
@@ -45,41 +48,80 @@ var _ = Describe("e2e Test for the Deployment Watch Controller", func() {
 		When("a deployment is already in place", func() {
 			table.DescribeTable("And then the deployment gets modified..", func(annotationchange bool, replicachange bool, optinOld bool, optinNew bool, expectedReplicas int) {
 				key.Name = "case" + strconv.Itoa(casenumber)
+				fetchedDeployment := v1.Deployment{}
+				fetchedDeploymentConfig := ocv1.DeploymentConfig{}
 
-				deployment = CreateDeployment(key, optinOld, casenumber)
-				Expect(k8sClient.Create(context.Background(), &deployment)).Should(Succeed())
-				time.Sleep(time.Second * 2)
+				if c.OpenshiftCluster {
 
-				// Get the deployment (created by the Before() step to edit it according to the test)
-				fetched := v1.Deployment{}
-				Eventually(func() v1.Deployment {
-					k8sClient.Get(context.Background(), key, &fetched)
-					return fetched
-				}, timeout, interval).Should(Not(BeNil()))
+					deploymentconfig = *CreateDeploymentConfig(key, optinOld, casenumber)
+					Expect(k8sClient.Create(context.Background(), &deploymentconfig)).Should(Succeed())
 
-				if annotationchange {
-					fetched = ChangeAnnotation(fetched)
+					time.Sleep(time.Second * 2)
+
+					Eventually(func() ocv1.DeploymentConfig {
+						k8sClient.Get(context.Background(), key, &fetchedDeploymentConfig)
+						return fetchedDeploymentConfig
+					}, timeout, interval).Should(Not(BeNil()))
+
+					if annotationchange {
+						fetchedDeploymentConfig = ChangeAnnotationDC(fetchedDeploymentConfig)
+					}
+
+					if replicachange {
+						fetchedDeploymentConfig = ChangeReplicasDC(fetchedDeploymentConfig)
+					}
+
+					fetchedDeploymentConfig = ChangeOptInDC(fetchedDeploymentConfig, optinNew)
+
+					// Update with the new changes
+					By("Then a deployment is updated")
+					Expect(k8sClient.Update(context.Background(), &fetchedDeploymentConfig)).Should(Succeed())
+
+					time.Sleep(time.Second * 2)
+
+					var replicas32 int32 = int32(expectedReplicas)
+
+					Eventually(func() int32 {
+						k8sClient.Get(context.Background(), key, &fetchedDeploymentConfig)
+						return fetchedDeploymentConfig.Spec.Replicas
+					}, timeout, interval).Should(Equal(replicas32))
+
+				} else {
+
+					deployment = CreateDeployment(key, optinOld, casenumber)
+					Expect(k8sClient.Create(context.Background(), &deployment)).Should(Succeed())
+
+					time.Sleep(time.Second * 2)
+
+					Eventually(func() v1.Deployment {
+						k8sClient.Get(context.Background(), key, &fetchedDeployment)
+						return fetchedDeployment
+					}, timeout, interval).Should(Not(BeNil()))
+
+					if annotationchange {
+						fetchedDeployment = ChangeAnnotation(fetchedDeployment)
+					}
+
+					if replicachange {
+						fetchedDeployment = ChangeReplicas(fetchedDeployment)
+					}
+
+					fetchedDeployment = ChangeOptIn(fetchedDeployment, optinNew)
+
+					// Update with the new changes
+					By("Then a deployment is updated")
+					Expect(k8sClient.Update(context.Background(), &fetchedDeployment)).Should(Succeed())
+
+					time.Sleep(time.Second * 2)
+
+					var replicas32 int32 = int32(expectedReplicas)
+
+					Eventually(func() int32 {
+						k8sClient.Get(context.Background(), key, &fetchedDeployment)
+						return *fetchedDeployment.Spec.Replicas
+					}, timeout, interval).Should(Equal(replicas32))
 				}
 
-				if replicachange {
-					fetched = ChangeReplicas(fetched)
-				}
-
-				// Enable/Disable optin
-				fetched = ChangeOptIn(fetched, optinNew)
-
-				// Update with the new changes
-				By("Then a deployment is updated")
-				Expect(k8sClient.Update(context.Background(), &fetched)).Should(Succeed())
-
-				time.Sleep(time.Second * 2)
-
-				var replicas32 int32 = int32(expectedReplicas)
-
-				Eventually(func() int32 {
-					k8sClient.Get(context.Background(), key, &fetched)
-					return *fetched.Spec.Replicas
-				}, timeout, interval).Should(Equal(replicas32))
 			},
 
 				// Default Replica Count from test if oldoptin = true: 3
@@ -122,6 +164,18 @@ func ChangeAnnotation(deployment v1.Deployment) v1.Deployment {
 	return deployment
 }
 
+func ChangeAnnotationDC(deploymentconfig ocv1.DeploymentConfig) ocv1.DeploymentConfig {
+	annotations := map[string]string{
+		"scaler/state-bau-replicas":     "4", // That reflects the annotation change and will change replica # to 4
+		"scaler/state-default-replicas": "2",
+		"scaler/state-peak-replicas":    "7",
+	}
+
+	deploymentconfig.Annotations = annotations
+
+	return deploymentconfig
+}
+
 func ChangeOptIn(deployment v1.Deployment, optIn bool) v1.Deployment {
 
 	labels := map[string]string{
@@ -133,6 +187,17 @@ func ChangeOptIn(deployment v1.Deployment, optIn bool) v1.Deployment {
 	return deployment
 }
 
+func ChangeOptInDC(deploymentconfig ocv1.DeploymentConfig, optIn bool) ocv1.DeploymentConfig {
+
+	labels := map[string]string{
+		"app":           "random-generator-1",
+		"scaler/opt-in": strconv.FormatBool(optIn),
+	}
+
+	deploymentconfig.Labels = labels
+	return deploymentconfig
+}
+
 // This covers the case when someone external simply edits the replica count. Depending on the opt-in the operator needs to rectify this.
 func ChangeReplicas(deployment v1.Deployment) v1.Deployment {
 	var replicas int32 = 5
@@ -142,6 +207,16 @@ func ChangeReplicas(deployment v1.Deployment) v1.Deployment {
 
 	deployment.Spec = spec2
 	return deployment
+}
+
+func ChangeReplicasDC(deploymentconfig ocv1.DeploymentConfig) ocv1.DeploymentConfig {
+	var replicas int32 = 5
+
+	spec2 := deploymentconfig.Spec
+	spec2.Replicas = replicas
+
+	deploymentconfig.Spec = spec2
+	return deploymentconfig
 }
 
 func CreateDeployment(deploymentInfo types.NamespacedName, optInOld bool, casenumber int) v1.Deployment {
@@ -197,4 +272,56 @@ func CreateDeployment(deploymentInfo types.NamespacedName, optInOld bool, casenu
 		},
 	}
 	return *dep
+}
+
+func CreateDeploymentConfig(deploymentInfo types.NamespacedName, optInOld bool, casenumber int) *ocv1.DeploymentConfig {
+	var replicaCount int32
+	if optInOld {
+		replicaCount = 3 // Deployment should start with "bau" in the test. Therefore 3
+	} else {
+		replicaCount = 1
+	}
+
+	var appName = "random-generator-1"
+	labels := map[string]string{
+		"app":           appName,
+		"scaler/opt-in": strconv.FormatBool(optInOld),
+	}
+
+	annotations := map[string]string{
+		"scaler/state-bau-replicas":     "3",
+		"scaler/state-default-replicas": "2",
+		"scaler/state-peak-replicas":    "7",
+	}
+
+	matchlabels := map[string]string{
+		"app": appName,
+	}
+	var deploymentname string
+	deploymentname = "case" + strconv.Itoa(casenumber)
+
+	deploymentConfig := &ocv1.DeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        deploymentname,
+			Namespace:   deploymentInfo.Namespace,
+			Labels:      labels,
+			Annotations: annotations,
+		},
+
+		Spec: ocv1.DeploymentConfigSpec{
+			Replicas: replicaCount,
+			Template: &corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: matchlabels,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Image: "chriscmsoft/random-generator:latest",
+						Name:  deploymentInfo.Name},
+					},
+				},
+			},
+		},
+	}
+	return deploymentConfig
 }
