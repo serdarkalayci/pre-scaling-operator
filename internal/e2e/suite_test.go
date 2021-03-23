@@ -17,11 +17,14 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -31,6 +34,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"github.com/containersol/prescale-operator/api/v1alpha1"
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
 	"github.com/containersol/prescale-operator/controllers"
 	// +kubebuilder:scaffold:imports
@@ -43,6 +47,9 @@ var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
 var k8sManager ctrl.Manager
+
+var css *v1alpha1.ClusterScalingState = CreateClusterScalingState()
+var cssd *v1alpha1.ClusterScalingStateDefinition = CreateClusterScalingStateDefinition()
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -76,36 +83,6 @@ var _ = BeforeSuite(func() {
 	err = scalingv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	// register controllers
-	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme: scheme.Scheme,
-	})
-	Expect(err).ToNot(HaveOccurred())
-
-	err = (&controllers.ClusterScalingStateReconciler{
-		Client: k8sManager.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ClusterScalingStateController"),
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = (&controllers.ClusterScalingStateDefinitionReconciler{
-		Client: k8sManager.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ClusterScalingStateDefinitionController"),
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = (&controllers.ScalingStateReconciler{
-		Client: k8sManager.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ScalingStateController"),
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = (&controllers.DeploymentWatcher{
-		Client: k8sManager.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("DeploymentWatchController"),
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
 	//install CRDs
 	options := envtest.CRDInstallOptions{
 		Paths: testEnv.CRDDirectoryPaths,
@@ -114,16 +91,124 @@ var _ = BeforeSuite(func() {
 	_, err = envtest.InstallCRDs(cfg, options)
 	Expect(err).NotTo(HaveOccurred())
 
-	// +kubebuilder:scaffold:scheme
+	// register controllers
+	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
+		Scheme: scheme.Scheme,
+	})
+	Expect(err).ToNot(HaveOccurred())
 
-	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
-	Expect(err).NotTo(HaveOccurred())
+	err = (&controllers.ClusterScalingStateDefinitionReconciler{
+		Client: k8sManager.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("ClusterScalingStateDefinition"),
+		Scheme: k8sManager.GetScheme(),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&controllers.ClusterScalingStateReconciler{
+		Client: k8sManager.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("ClusterScalingState"),
+		Scheme: k8sManager.GetScheme(),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&controllers.ScalingStateReconciler{
+		Client: k8sManager.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("ScalingState"),
+		Scheme: k8sManager.GetScheme(),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&controllers.DeploymentWatcher{
+		Client: k8sManager.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("DeploymentWatcher"),
+		Scheme: k8sManager.GetScheme(),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	go func() {
+		err = k8sManager.Start(ctrl.SetupSignalHandler())
+		Expect(err).ToNot(HaveOccurred())
+	}()
+
+	k8sClient = k8sManager.GetClient()
 	Expect(k8sClient).NotTo(BeNil())
+
+	Expect(k8sClient.Create(context.Background(), css)).Should(Succeed())
+
+	Expect(k8sClient.Create(context.Background(), cssd)).Should(Succeed())
+
+	// Give some time to startup
+	time.Sleep(time.Second * 15)
 
 }, 60)
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
+	Expect(k8sClient.Delete(context.Background(), cssd)).Should(Succeed())
+	Expect(k8sClient.Delete(context.Background(), css)).Should(Succeed())
+
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
+
 })
+
+func CreateClusterScalingState() *v1alpha1.ClusterScalingState {
+
+	scalingState := &v1alpha1.ClusterScalingState{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ClusterScalingState",
+			APIVersion: "scaling.prescale.com/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "clusterscalingstate-sample",
+		},
+		Spec: v1alpha1.ClusterScalingStateSpec{
+			State: "bau",
+		},
+	}
+
+	return scalingState
+}
+
+func CreateClusterScalingStateDefinition() *v1alpha1.ClusterScalingStateDefinition {
+
+	states := []v1alpha1.States{
+		{
+			Name:        "marketing",
+			Description: "marketing run",
+			Priority:    5,
+		},
+		{
+			Name:        "bau",
+			Description: "Business as usual",
+			Priority:    10,
+		},
+	}
+
+	scalingState := &v1alpha1.ClusterScalingStateDefinition{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "ClusterScalingStateDefinition",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "global-state-definition",
+		},
+		Spec: states,
+	}
+
+	return scalingState
+}
+
+// apiVersion: scaling.prescale.com/v1alpha1
+// kind: ClusterScalingStateDefinition
+// metadata:
+//   name: global-state-definition
+// spec:
+// - name: peak
+//   description: "Maximum scaling settings"
+//   priority: 1
+// - name: marketing-run
+//   description: "Higher expected load after a marketing run. Possibly an email blast or twitter share."
+//   priority: 5
+// - name: bau
+//   description: "Business as usual"
+//   priority: 10
