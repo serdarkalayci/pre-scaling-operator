@@ -62,7 +62,7 @@ func TestAPIs(t *testing.T) {
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
-	var useCluster bool = true
+	var useCluster bool = false
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
@@ -197,18 +197,3 @@ func CreateClusterScalingStateDefinition() *v1alpha1.ClusterScalingStateDefiniti
 
 	return scalingState
 }
-
-// apiVersion: scaling.prescale.com/v1alpha1
-// kind: ClusterScalingStateDefinition
-// metadata:
-//   name: global-state-definition
-// spec:
-// - name: peak
-//   description: "Maximum scaling settings"
-//   priority: 1
-// - name: marketing-run
-//   description: "Higher expected load after a marketing run. Possibly an email blast or twitter share."
-//   priority: 5
-// - name: bau
-//   description: "Business as usual"
-//   priority: 10

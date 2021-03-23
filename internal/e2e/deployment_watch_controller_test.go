@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-var _ = Describe("Deployment Watch Controller", func() {
+var _ = Describe("e2e Test for the Deployment Watch Controller", func() {
 
 	const timeout = time.Second * 25
 	const interval = time.Millisecond * 200
@@ -41,8 +41,8 @@ var _ = Describe("Deployment Watch Controller", func() {
 		time.Sleep(time.Second * 1)
 	})
 
-	Context("Deployment change Test", func() {
-		When("A deployment is already in place", func() {
+	Context("Deployment in place and modification test", func() {
+		When("a deployment is already in place", func() {
 			table.DescribeTable("And then the deployment gets modified..", func(annotationchange bool, replicachange bool, optinOld bool, optinNew bool, expectedReplicas int) {
 				key.Name = "case" + strconv.Itoa(casenumber)
 
@@ -133,6 +133,7 @@ func ChangeOptIn(deployment v1.Deployment, optIn bool) v1.Deployment {
 	return deployment
 }
 
+// This covers the case when someone external simply edits the replica count. Depending on the opt-in the operator needs to rectify this.
 func ChangeReplicas(deployment v1.Deployment) v1.Deployment {
 	var replicas int32 = 5
 
