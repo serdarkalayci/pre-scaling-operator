@@ -62,7 +62,7 @@ func TestAPIs(t *testing.T) {
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
-	var useCluster bool = false
+	var useCluster bool = true
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{

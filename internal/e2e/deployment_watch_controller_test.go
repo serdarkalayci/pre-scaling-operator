@@ -29,7 +29,7 @@ var _ = Describe("e2e Test for the Deployment Watch Controller", func() {
 
 	var key = types.NamespacedName{
 		Name:      "test",
-		Namespace: "default",
+		Namespace: "devops-scaling-operator",
 	}
 
 	BeforeEach(func() {
