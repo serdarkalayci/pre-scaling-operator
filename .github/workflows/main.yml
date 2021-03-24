@@ -3,7 +3,7 @@ on:
   pull_request:
   push:
     branches:
-      - master
+      - controller-integration-test
   release:
     types:
       - edited
@@ -43,9 +43,26 @@ jobs:
           curl -L https://go.kubebuilder.io/dl/2.3.1/${os}/${arch} | tar -xz -C /tmp/
           sudo mv /tmp/kubebuilder_2.3.1_${os}_${arch} /usr/local/kubebuilder
           export PATH=$PATH:/usr/local/kubebuilder/bin
+
+
+      - name: Installing Prerequisites (KinD Cluster)
+        uses: engineerd/setup-kind@v0.5.0
+        with:
+            version: "v0.7.0"
+
+      - name: Configuring and testing kind Installation
+        run: |
+          kubectl cluster-info --context kind-kind
+          kind get kubeconfig --internal >$HOME/.kube/config
+          kubectl get nodes
+
       - name: Run tests
         run: |
           make test
+ 
+      - name: Deleting KinD cluster
+        if: ${{ always() }}
+        run: kind delete cluster
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
