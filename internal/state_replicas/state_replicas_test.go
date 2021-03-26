@@ -1,9 +1,10 @@
 package state_replicas_test
 
 import (
-	"github.com/containersol/prescale-operator/internal/state_replicas"
 	"reflect"
 	"testing"
+
+	"github.com/containersol/prescale-operator/internal/state_replicas"
 )
 
 func TestNewStateReplicasFromAnnotationsCalculatesCorrectly(t *testing.T) {

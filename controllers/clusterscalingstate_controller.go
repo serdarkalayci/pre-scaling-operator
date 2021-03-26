@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
