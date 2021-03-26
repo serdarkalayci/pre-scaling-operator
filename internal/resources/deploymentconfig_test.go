@@ -241,6 +241,42 @@ func TestDeploymentConfigScaler(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "TestAutoscaler",
+			args: args{
+				ctx: context.TODO(),
+				_client: fake.NewClientBuilder().
+					WithObjects(&v1.DeploymentConfig{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       "DeploymentConfig",
+							APIVersion: "apps.openshift.io/v1",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "foo",
+						},
+						Spec:   v1.DeploymentConfigSpec{},
+						Status: v1.DeploymentConfigStatus{},
+					}).
+					WithScheme(scheme.Scheme).
+					Build(),
+				deploymentConfig: v1.DeploymentConfig{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "DeploymentConfig",
+						APIVersion: "apps.openshift.io/v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        "foo",
+						Annotations: map[string]string{"scaler/type": "autoscale"},
+					},
+					Spec: v1.DeploymentConfigSpec{
+						Replicas: 4,
+					},
+					Status: v1.DeploymentConfigStatus{},
+				},
+				replicas: 2,
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

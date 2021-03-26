@@ -36,6 +36,14 @@ func DeploymentGetter(ctx context.Context, _client client.Client, req ctrl.Reque
 //DeploymentScaler scales the deployment to the desired replica number
 func DeploymentScaler(ctx context.Context, _client client.Client, deployment v1.Deployment, replicas int32) error {
 
+	if v, found := deployment.GetAnnotations()["scaler/type"]; found {
+		if v == "autoscale" {
+			if replicas <= *deployment.Spec.Replicas {
+				return nil
+			}
+		}
+	}
+
 	deployment.Spec.Replicas = &replicas
 	err := _client.Update(ctx, &deployment, &client.UpdateOptions{})
 	if err != nil {

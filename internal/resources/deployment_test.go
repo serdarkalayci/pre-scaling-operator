@@ -221,6 +221,43 @@ func TestDeploymentScaler(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "TestAutoscaler",
+			args: args{
+				ctx: context.TODO(),
+				_client: fake.NewClientBuilder().
+					WithObjects(&v1.Deployment{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       "Deployment",
+							APIVersion: "apps/v1",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "foo",
+						},
+						Spec:   v1.DeploymentSpec{},
+						Status: v1.DeploymentStatus{},
+					}).
+					Build(),
+				deployment: v1.Deployment{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Deployment",
+						APIVersion: "apps/v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        "foo",
+						Annotations: map[string]string{"scaler/type": "autoscale"},
+					},
+					Spec: v1.DeploymentSpec{
+						Replicas: new(int32),
+					},
+					Status: v1.DeploymentStatus{
+						Replicas: 5,
+					},
+				},
+				replicas: 2,
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
