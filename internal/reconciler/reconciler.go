@@ -53,9 +53,6 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 		}
 	}
 
-	if err != nil {
-		log.Error(err, "unable to identify cluster")
-	}
 	log.WithValues("env is", c.OpenshiftCluster).
 		Info("Cluster")
 	if c.OpenshiftCluster {
@@ -84,7 +81,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	return nil
 }
 
-func ReconcileDeployment(ctx context.Context, _client client.Client, deployment v1.Deployment, state states.State, optIn bool) error {
+func ObjectStateReplicas(state states.State, deployment v1.Deployment, optIn bool) (sr.StateReplica, error) {
 	log := ctrl.Log.
 		WithValues("deployment", deployment.Name).
 		WithValues("namespace", deployment.Namespace)
@@ -93,7 +90,7 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 		log.WithValues("deployment", deployment.Name).
 			WithValues("namespace", deployment.Namespace).
 			Error(err, "Cannot calculate state replicas. Please check deployment annotations. Continuing.")
-		return err
+		return sr.StateReplica{}, err
 	}
 	// Now we have all the state settings, we can set the replicas for the deployment accordingly
 	if !optIn {
@@ -108,6 +105,20 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 		log.WithValues("set states", stateReplicas).
 			WithValues("namespace state", state.Name).
 			Info("State could not be found")
+		return stateReplica, err
+	}
+	return stateReplica, err
+}
+
+func ReconcileDeployment(ctx context.Context, _client client.Client, deployment v1.Deployment, state states.State, optIn bool) error {
+
+	log := ctrl.Log.
+		WithValues("deployment", deployment.Name).
+		WithValues("namespace", deployment.Namespace)
+
+	stateReplica, err := ObjectStateReplicas(state, deployment, optIn)
+	if err != nil {
+		log.Error(err, "Error getting the state replicas")
 		return err
 	}
 
@@ -122,39 +133,55 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 	log.Info("Quota Check")
 
 	if allowed {
-		var oldReplicaCount int32
-		oldReplicaCount = *deployment.Spec.Replicas
-		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			if oldReplicaCount == stateReplica.Replicas {
-				log.Info("No Update on deployment. Desired replica count already matches current.")
-				return nil
-			}
-			log.Info("Updating deploymentconfig replicas for state", "replicas", stateReplica.Replicas)
-			updateErr := resources.DeploymentScaler(ctx, _client, deployment, stateReplica.Replicas)
-			if updateErr == nil {
-				log.WithValues("Deployment", deployment.Name).
-					WithValues("StateReplica mode", stateReplica.Name).
-					WithValues("Old Replica count", oldReplicaCount).
-					WithValues("New Replica count", stateReplica.Replicas).
-					Info("Deployment succesfully updated")
-				return nil
-			}
-			log.Info("Updating deployment failed due to a conflict! Retrying..")
-			// We need to get a newer version of the object from the client
-			var req reconcile.Request
-			req.NamespacedName.Namespace = deployment.Namespace
-			req.NamespacedName.Name = deployment.Name
-			deployment, err = resources.DeploymentGetter(ctx, _client, req)
-			if err != nil {
-				log.Error(err, "Error getting refreshed deployment in conflict resolution")
-			}
-			return updateErr
-
-		})
-		if retryErr != nil {
-			log.Error(retryErr, "Unable to scale the deployment, err: %v")
+		err = ScaleDeployment(ctx, _client, deployment, stateReplica)
+		if err != nil {
+			log.Error(err, "Error scaling the deployment")
+			return err
 		}
 	}
+
+	return err
+}
+
+func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.Deployment, stateReplica sr.StateReplica) error {
+	log := ctrl.Log.
+		WithValues("deployment", deployment.Name).
+		WithValues("namespace", deployment.Namespace)
+
+	var err error
+	var oldReplicaCount int32
+	oldReplicaCount = *deployment.Spec.Replicas
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if oldReplicaCount == stateReplica.Replicas {
+			log.Info("No Update on deployment. Desired replica count already matches current.")
+			return nil
+		}
+		log.Info("Updating deploymentconfig replicas for state", "replicas", stateReplica.Replicas)
+		updateErr := resources.DeploymentScaler(ctx, _client, deployment, stateReplica.Replicas)
+		if updateErr == nil {
+			log.WithValues("Deployment", deployment.Name).
+				WithValues("StateReplica mode", stateReplica.Name).
+				WithValues("Old Replica count", oldReplicaCount).
+				WithValues("New Replica count", stateReplica.Replicas).
+				Info("Deployment succesfully updated")
+			return nil
+		}
+		log.Info("Updating deployment failed due to a conflict! Retrying..")
+		// We need to get a newer version of the object from the client
+		var req reconcile.Request
+		req.NamespacedName.Namespace = deployment.Namespace
+		req.NamespacedName.Name = deployment.Name
+		deployment, err = resources.DeploymentGetter(ctx, _client, req)
+		if err != nil {
+			log.Error(err, "Error getting refreshed deployment in conflict resolution")
+		}
+		return updateErr
+
+	})
+	if retryErr != nil {
+		log.Error(retryErr, "Unable to scale the deployment, err: %v")
+	}
+
 	return nil
 }
 
