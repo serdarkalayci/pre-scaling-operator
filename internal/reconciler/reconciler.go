@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	c "github.com/containersol/prescale-operator/internal"
+	"github.com/containersol/prescale-operator/internal/quotas"
 	"github.com/containersol/prescale-operator/internal/resources"
 	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
@@ -109,37 +110,50 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 			Info("State could not be found")
 		return err
 	}
-	var oldReplicaCount int32
-	oldReplicaCount = *deployment.Spec.Replicas
-	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		if oldReplicaCount == stateReplica.Replicas {
-			log.Info("No Update on deployment. Desired replica count already matches current.")
-			return nil
-		}
-		log.Info("Updating deploymentconfig replicas for state", "replicas", stateReplica.Replicas)
-		updateErr := resources.DeploymentScaler(ctx, _client, deployment, stateReplica.Replicas)
-		if updateErr == nil {
-			log.WithValues("Deployment", deployment.Name).
-				WithValues("StateReplica mode", stateReplica.Name).
-				WithValues("Old Replica count", oldReplicaCount).
-				WithValues("New Replica count", stateReplica.Replicas).
-				Info("Deployment succesfully updated")
-			return nil
-		}
-		log.Info("Updating deployment failed due to a conflict! Retrying..")
-		// We need to get a newer version of the object from the client
-		var req reconcile.Request
-		req.NamespacedName.Namespace = deployment.Namespace
-		req.NamespacedName.Name = deployment.Name
-		deployment, err = resources.DeploymentGetter(ctx, _client, req)
-		if err != nil {
-			log.Error(err, "Error getting refreshed deployment in conflict resolution")
-		}
-		return updateErr
 
-	})
-	if retryErr != nil {
-		log.Error(retryErr, "Unable to scale the deployment, err: %v")
+	allowed, err := quotas.IsAllowed(ctx, deployment, stateReplica.Replicas)
+	if err != nil {
+		log.Error(err, "Cannot find quotas")
+		return err
+	}
+
+	log = ctrl.Log.
+		WithValues("Allowed", allowed)
+	log.Info("Quota Check")
+
+	if allowed {
+		var oldReplicaCount int32
+		oldReplicaCount = *deployment.Spec.Replicas
+		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			if oldReplicaCount == stateReplica.Replicas {
+				log.Info("No Update on deployment. Desired replica count already matches current.")
+				return nil
+			}
+			log.Info("Updating deploymentconfig replicas for state", "replicas", stateReplica.Replicas)
+			updateErr := resources.DeploymentScaler(ctx, _client, deployment, stateReplica.Replicas)
+			if updateErr == nil {
+				log.WithValues("Deployment", deployment.Name).
+					WithValues("StateReplica mode", stateReplica.Name).
+					WithValues("Old Replica count", oldReplicaCount).
+					WithValues("New Replica count", stateReplica.Replicas).
+					Info("Deployment succesfully updated")
+				return nil
+			}
+			log.Info("Updating deployment failed due to a conflict! Retrying..")
+			// We need to get a newer version of the object from the client
+			var req reconcile.Request
+			req.NamespacedName.Namespace = deployment.Namespace
+			req.NamespacedName.Name = deployment.Name
+			deployment, err = resources.DeploymentGetter(ctx, _client, req)
+			if err != nil {
+				log.Error(err, "Error getting refreshed deployment in conflict resolution")
+			}
+			return updateErr
+
+		})
+		if retryErr != nil {
+			log.Error(retryErr, "Unable to scale the deployment, err: %v")
+		}
 	}
 	return nil
 }
