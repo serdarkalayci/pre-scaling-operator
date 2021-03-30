@@ -3,6 +3,7 @@ package quotas
 import (
 	"context"
 
+	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -24,6 +25,47 @@ func getConfig() clientcmd.ClientConfig {
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		configLoadingRules,
 		&clientcmd.ConfigOverrides{})
+}
+
+func IsAllowedforNamespace(ctx context.Context, deployments v1.DeploymentList, scaleReplicalist []sr.StateReplica) (bool, error) {
+
+	var limitsneeded, leftovers corev1.ResourceList
+
+	for _, deployment := range deployments.Items {
+		containers := deployment.Spec.Template.Spec.Containers
+
+		for i, c := range containers {
+
+			limitsneeded = Add(limitsneeded, Mul(scaleReplicalist[i].Replicas, c.Resources.Limits))
+		}
+	}
+
+	log := ctrl.Log.
+		WithValues("Limits needed", limitsneeded)
+	log.Info("Namespace Identified Resources")
+
+	rq, err := resourceQuota(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	leftovers = subtract(rq.Items[0].Status.Hard, rq.Items[0].Status.Used)
+	log = ctrl.Log.
+		WithValues("Rq name", rq.Items[0].Name).
+		WithValues("Leftover resources", leftovers)
+	log.Info("Namespace Resource Quota")
+
+	checklimits := subtract(leftovers, TranslateResourcesToQuotaResources(limitsneeded))
+
+	log = ctrl.Log.
+		WithValues("Limits", checklimits)
+	log.Info("Namespace Final checks")
+
+	if len(IsNegative(checklimits)) != 0 {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func IsAllowed(ctx context.Context, deployment v1.Deployment, replicas int32) (bool, error) {

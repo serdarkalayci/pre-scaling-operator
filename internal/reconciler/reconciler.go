@@ -9,9 +9,7 @@ import (
 	"github.com/containersol/prescale-operator/internal/resources"
 	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
-	"github.com/containersol/prescale-operator/pkg/utils/labels"
 
-	// "github.com/containersol/prescale-operator/internal/validations"
 	ocv1 "github.com/openshift/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
 	retry "k8s.io/client-go/util/retry"
@@ -44,15 +42,32 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	}
 	objectsToReconcile = objectsToReconcile + len(deployments.Items)
 
-	for _, deployment := range deployments.Items {
-		optin := labels.GetLabelValue(deployment.GetLabels(), "scaler/opt-in")
-		err = ReconcileDeployment(ctx, _client, deployment, finalState, optin)
-		if err != nil {
-			log.Error(err, "Could not reconcile deployment.")
-			continue
-		}
+	scaleReplicalist, err := ObjectStateReplicasList(finalState, deployments)
+	if err != nil {
+		log.Error(err, "Cannot fetch replicas of all opted-in deployments")
+		return err
 	}
 
+	allowed, err := quotas.IsAllowedforNamespace(ctx, deployments, scaleReplicalist)
+	if err != nil {
+		log.Error(err, "Cannot find namespace quotas")
+		return err
+	}
+
+	log = ctrl.Log.
+		WithValues("Allowed", allowed)
+	log.Info("Namespace Quota Check")
+
+	if allowed {
+
+		for i, deployment := range deployments.Items {
+			err = ReconcileDeploymentforScalingState(ctx, _client, deployment, scaleReplicalist[i])
+			if err != nil {
+				log.Error(err, "Could not reconcile deployment.")
+				continue
+			}
+		}
+	}
 	log.WithValues("env is", c.OpenshiftCluster).
 		Info("Cluster")
 	if c.OpenshiftCluster {
@@ -110,6 +125,40 @@ func ObjectStateReplicas(state states.State, deployment v1.Deployment, optIn boo
 	return stateReplica, err
 }
 
+func ObjectStateReplicasList(state states.State, deployments v1.DeploymentList) ([]sr.StateReplica, error) {
+
+	var stateReplicaList []sr.StateReplica
+	var err error
+
+	for _, deployment := range deployments.Items {
+		log := ctrl.Log.
+			WithValues("deployment", deployment.Name).
+			WithValues("namespace", deployment.Namespace)
+		stateReplicas, err := sr.NewStateReplicasFromAnnotations(deployment.GetAnnotations())
+		if err != nil {
+			log.WithValues("deployment", deployment.Name).
+				WithValues("namespace", deployment.Namespace).
+				Error(err, "Cannot calculate state replicas. Please check deployment annotations. Continuing.")
+			return []sr.StateReplica{}, err
+		}
+
+		stateReplica, err := stateReplicas.GetState(state.Name)
+		if err != nil {
+			// TODO here we should do priority filtering, and go down one level of priority to find the lowest set one.
+			// We will ignore any that are not set
+			log.WithValues("set states", stateReplicas).
+				WithValues("namespace state", state.Name).
+				Info("State could not be found")
+			return []sr.StateReplica{}, err
+		}
+
+		stateReplicaList = append(stateReplicaList, stateReplica)
+
+	}
+
+	return stateReplicaList, err
+}
+
 func ReconcileDeployment(ctx context.Context, _client client.Client, deployment v1.Deployment, state states.State, optIn bool) error {
 
 	log := ctrl.Log.
@@ -138,6 +187,27 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 			log.Error(err, "Error scaling the deployment")
 			return err
 		}
+	}
+
+	return err
+}
+
+func ReconcileDeploymentforScalingState(ctx context.Context, _client client.Client, deployment v1.Deployment, stateReplica sr.StateReplica) error {
+
+	log := ctrl.Log.
+		WithValues("deployment", deployment.Name).
+		WithValues("namespace", deployment.Namespace)
+
+	// stateReplica, err := ObjectStateReplicas(state, deployment, optIn)
+	// if err != nil {
+	// 	log.Error(err, "Error getting the state replicas")
+	// 	return err
+	// }
+
+	err := ScaleDeployment(ctx, _client, deployment, stateReplica)
+	if err != nil {
+		log.Error(err, "Error scaling the deployment")
+		return err
 	}
 
 	return err
