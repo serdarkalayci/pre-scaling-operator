@@ -198,12 +198,6 @@ func ReconcileDeploymentforScalingState(ctx context.Context, _client client.Clie
 		WithValues("deployment", deployment.Name).
 		WithValues("namespace", deployment.Namespace)
 
-	// stateReplica, err := ObjectStateReplicas(state, deployment, optIn)
-	// if err != nil {
-	// 	log.Error(err, "Error getting the state replicas")
-	// 	return err
-	// }
-
 	err := ScaleDeployment(ctx, _client, deployment, stateReplica)
 	if err != nil {
 		log.Error(err, "Error scaling the deployment")

@@ -31,13 +31,9 @@ func IsAllowedforNamespace(ctx context.Context, deployments v1.DeploymentList, s
 
 	var limitsneeded, leftovers corev1.ResourceList
 
-	for _, deployment := range deployments.Items {
-		containers := deployment.Spec.Template.Spec.Containers
+	for i, deployment := range deployments.Items {
 
-		for i, c := range containers {
-
-			limitsneeded = Add(limitsneeded, Mul(scaleReplicalist[i].Replicas, c.Resources.Limits))
-		}
+		limitsneeded = Add(limitsneeded, Mul(scaleReplicalist[i].Replicas, deployment.Spec.Template.Spec.Containers[0].Resources.Limits))
 	}
 
 	log := ctrl.Log.
