@@ -7,7 +7,9 @@ import (
 	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
 	"github.com/containersol/prescale-operator/internal/validations"
+	"github.com/containersol/prescale-operator/pkg/utils/math"
 	v1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -167,4 +169,20 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 	}
 
 	return nil
+}
+
+func LimitsNeededDeployment(deployment v1.Deployment, replicas int32) corev1.ResourceList {
+
+	return math.Mul(replicas, deployment.Spec.Template.Spec.Containers[0].Resources.Limits)
+}
+
+func LimitsNeededDeploymentList(deployments v1.DeploymentList, scaleReplicalist []sr.StateReplica) corev1.ResourceList {
+
+	var limitsneeded corev1.ResourceList
+	for i, deployment := range deployments.Items {
+
+		limitsneeded = math.Add(limitsneeded, math.Mul(scaleReplicalist[i].Replicas, deployment.Spec.Template.Spec.Containers[0].Resources.Limits))
+	}
+
+	return limitsneeded
 }
