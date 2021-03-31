@@ -4,6 +4,8 @@ const (
 	//LabelNotFound is the message for when the label doesn't exist in the application manifest
 	LabelNotFound = "Opt-in label was not found"
 
+	RQNotFound = "No resource quotas found"
+
 	//ResourceNotFound is the message returned when the API server doesn't have the desired resource
 	ResourceNotFound = "the server could not find the requested resource"
 

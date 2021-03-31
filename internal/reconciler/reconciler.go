@@ -48,9 +48,9 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 		return err
 	}
 
-	allowed, err := quotas.IsAllowedforNamespace(ctx, deployments, scaleReplicalist)
+	allowed, err := quotas.ResourceQuotaCheckforNamespace(ctx, deployments, scaleReplicalist, namespace)
 	if err != nil {
-		log.Error(err, "Cannot find namespace quotas")
+		log.Error(err, "Cannot calculate the resource quotas")
 		return err
 	}
 
@@ -112,9 +112,9 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 		return err
 	}
 
-	allowed, err := quotas.IsAllowed(ctx, deployment, stateReplica.Replicas)
+	allowed, err := quotas.ResourceQuotaCheck(ctx, deployment, stateReplica.Replicas, deployment.Namespace)
 	if err != nil {
-		log.Error(err, "Cannot find quotas")
+		log.Error(err, "Cannot calculate the resource quotas")
 		return err
 	}
 

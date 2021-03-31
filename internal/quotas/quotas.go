@@ -2,7 +2,10 @@ package quotas
 
 import (
 	"context"
+	"errors"
+	"strings"
 
+	c "github.com/containersol/prescale-operator/internal"
 	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -13,13 +16,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-type Quotas struct {
-	RequestCPU    string
-	LimitCPU      string
-	RequestMemory string
-	LimitMemory   string
-}
-
 func getConfig() clientcmd.ClientConfig {
 	configLoadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
@@ -27,23 +23,18 @@ func getConfig() clientcmd.ClientConfig {
 		&clientcmd.ConfigOverrides{})
 }
 
-func IsAllowedforNamespace(ctx context.Context, deployments v1.DeploymentList, scaleReplicalist []sr.StateReplica) (bool, error) {
+func isAllowedforNamespace(ctx context.Context, deployments v1.DeploymentList, scaleReplicalist []sr.StateReplica, rq *corev1.ResourceQuotaList) (bool, error) {
 
 	var limitsneeded, leftovers corev1.ResourceList
 
 	for i, deployment := range deployments.Items {
 
-		limitsneeded = Add(limitsneeded, Mul(scaleReplicalist[i].Replicas, deployment.Spec.Template.Spec.Containers[0].Resources.Limits))
+		limitsneeded = add(limitsneeded, mul(scaleReplicalist[i].Replicas, deployment.Spec.Template.Spec.Containers[0].Resources.Limits))
 	}
 
 	log := ctrl.Log.
 		WithValues("Limits needed", limitsneeded)
 	log.Info("Namespace Identified Resources")
-
-	rq, err := resourceQuota(ctx)
-	if err != nil {
-		return false, err
-	}
 
 	leftovers = subtract(rq.Items[0].Status.Hard, rq.Items[0].Status.Used)
 	log = ctrl.Log.
@@ -51,20 +42,20 @@ func IsAllowedforNamespace(ctx context.Context, deployments v1.DeploymentList, s
 		WithValues("Leftover resources", leftovers)
 	log.Info("Namespace Resource Quota")
 
-	checklimits := subtract(leftovers, TranslateResourcesToQuotaResources(limitsneeded))
+	checklimits := subtract(leftovers, translateResourcesToQuotaResources(limitsneeded))
 
 	log = ctrl.Log.
 		WithValues("Limits", checklimits)
 	log.Info("Namespace Final checks")
 
-	if len(IsNegative(checklimits)) != 0 {
+	if len(isNegative(checklimits)) != 0 {
 		return false, nil
 	}
 
 	return true, nil
 }
 
-func IsAllowed(ctx context.Context, deployment v1.Deployment, replicas int32) (bool, error) {
+func isAllowed(ctx context.Context, deployment v1.Deployment, replicas int32, rq *corev1.ResourceQuotaList) (bool, error) {
 
 	containers := deployment.Spec.Template.Spec.Containers
 
@@ -72,17 +63,12 @@ func IsAllowed(ctx context.Context, deployment v1.Deployment, replicas int32) (b
 
 	for _, c := range containers {
 
-		limitsneeded = Mul(replicas, c.Resources.Limits)
+		limitsneeded = mul(replicas, c.Resources.Limits)
 
 		log := ctrl.Log.
 			WithValues("Name", c.Name).
 			WithValues("Limits needed", limitsneeded)
 		log.Info("Identified Resources")
-	}
-
-	rq, err := resourceQuota(ctx)
-	if err != nil {
-		return false, err
 	}
 
 	for _, q := range rq.Items {
@@ -93,20 +79,61 @@ func IsAllowed(ctx context.Context, deployment v1.Deployment, replicas int32) (b
 		log.Info("Resource Quota")
 	}
 
-	checklimits := subtract(leftovers, TranslateResourcesToQuotaResources(limitsneeded))
+	checklimits := subtract(leftovers, translateResourcesToQuotaResources(limitsneeded))
 
 	log := ctrl.Log.
 		WithValues("Limits", checklimits)
 	log.Info("Final checks")
 
-	if len(IsNegative(checklimits)) != 0 {
+	if len(isNegative(checklimits)) != 0 {
 		return false, nil
 	}
 
 	return true, nil
 }
 
-func resourceQuota(ctx context.Context) (*corev1.ResourceQuotaList, error) {
+func ResourceQuotaCheckforNamespace(ctx context.Context, deployments v1.DeploymentList, scaleReplicalist []sr.StateReplica, namespace string) (bool, error) {
+	var allowed bool
+	rq, err := resourceQuota(ctx, namespace)
+	if err != nil {
+		if strings.Contains(err.Error(), c.RQNotFound) {
+			ctrl.Log.Info("WARNING: No Resource Quotas found for this namespace")
+			return true, nil
+		}
+		return false, err
+	}
+
+	allowed, err = isAllowedforNamespace(ctx, deployments, scaleReplicalist, rq)
+	if err != nil {
+		ctrl.Log.Error(err, "Cannot find namespace quotas")
+		return false, err
+	}
+
+	return allowed, nil
+}
+
+func ResourceQuotaCheck(ctx context.Context, deployment v1.Deployment, replicas int32, namespace string) (bool, error) {
+
+	var allowed bool
+	rq, err := resourceQuota(ctx, namespace)
+	if err != nil {
+		if strings.Contains(err.Error(), c.RQNotFound) {
+			ctrl.Log.Info("WARNING: No Resource Quotas found for this namespace")
+			return true, nil
+		}
+		return false, err
+	}
+
+	allowed, err = isAllowed(ctx, deployment, replicas, rq)
+	if err != nil {
+		ctrl.Log.Error(err, "Cannot find namespace quotas")
+		return false, err
+	}
+
+	return allowed, nil
+}
+
+func resourceQuota(ctx context.Context, namespace string) (*corev1.ResourceQuotaList, error) {
 
 	rq := &corev1.ResourceQuotaList{}
 
@@ -120,9 +147,13 @@ func resourceQuota(ctx context.Context) (*corev1.ResourceQuotaList, error) {
 		return &corev1.ResourceQuotaList{}, err
 	}
 
-	rq, err = kubernetesclient.CoreV1().ResourceQuotas("default").List(ctx, metav1.ListOptions{})
+	rq, err = kubernetesclient.CoreV1().ResourceQuotas(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return &corev1.ResourceQuotaList{}, err
+	}
+
+	if len(rq.Items) == 0 {
+		return &corev1.ResourceQuotaList{}, errors.New(c.RQNotFound)
 	}
 
 	return rq, nil
@@ -147,16 +178,15 @@ func subtract(a corev1.ResourceList, b corev1.ResourceList) corev1.ResourceList 
 	return result
 }
 
-func Mul(times int32, resources corev1.ResourceList) corev1.ResourceList {
+func mul(times int32, resources corev1.ResourceList) corev1.ResourceList {
 	result := corev1.ResourceList{}
 	for i := 0; int32(i) < times; i++ {
-		result = Add(result, resources)
+		result = add(result, resources)
 	}
 	return result
 }
 
-// Add returns the result of a + b for each named resource
-func Add(a corev1.ResourceList, b corev1.ResourceList) corev1.ResourceList {
+func add(a corev1.ResourceList, b corev1.ResourceList) corev1.ResourceList {
 	result := corev1.ResourceList{}
 	for key, value := range a {
 		quantity := value.DeepCopy()
@@ -175,7 +205,7 @@ func Add(a corev1.ResourceList, b corev1.ResourceList) corev1.ResourceList {
 	return result
 }
 
-func TranslateResourcesToQuotaResources(resources corev1.ResourceList) corev1.ResourceList {
+func translateResourcesToQuotaResources(resources corev1.ResourceList) corev1.ResourceList {
 	result := make(corev1.ResourceList)
 	cpu, ok := resources[corev1.ResourceCPU]
 	if ok {
@@ -188,8 +218,7 @@ func TranslateResourcesToQuotaResources(resources corev1.ResourceList) corev1.Re
 	return result
 }
 
-// IsNegative returns the set of resource names that have a negative value.
-func IsNegative(a corev1.ResourceList) []corev1.ResourceName {
+func isNegative(a corev1.ResourceList) []corev1.ResourceName {
 	results := []corev1.ResourceName{}
 	zero := resource.MustParse("0")
 	for k, v := range a {
