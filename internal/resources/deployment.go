@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"strings"
 
 	c "github.com/containersol/prescale-operator/internal"
 	sr "github.com/containersol/prescale-operator/internal/state_replicas"
@@ -90,9 +91,9 @@ func DeploymentStateReplicas(state states.State, deployment v1.Deployment, optIn
 		log.WithValues("set states", stateReplicas).
 			WithValues("namespace state", state.Name).
 			Info("State could not be found")
-		return stateReplica, err
+		return sr.StateReplica{}, err
 	}
-	return stateReplica, err
+	return stateReplica, nil
 }
 
 func DeploymentStateReplicasList(state states.State, deployments v1.DeploymentList) ([]sr.StateReplica, error) {
@@ -110,6 +111,22 @@ func DeploymentStateReplicasList(state states.State, deployments v1.DeploymentLi
 				WithValues("namespace", deployment.Namespace).
 				Error(err, "Cannot calculate state replicas. Please check deployment annotations. Continuing.")
 			return []sr.StateReplica{}, err
+		}
+
+		optIn, err := DeploymentOptinLabel(deployment)
+		if err != nil {
+			if strings.Contains(err.Error(), c.LabelNotFound) {
+				return []sr.StateReplica{}, nil
+			}
+			log.Error(err, "Failed to validate the opt-in label")
+			return []sr.StateReplica{}, err
+		}
+
+		// Now we have all the state settings, we can set the replicas for the deployment accordingly
+		if !optIn {
+			// the deployment opted out. We need to set back to default.
+			log.Info("The deployment opted out. Will scale back to default")
+			state.Name = c.DefaultReplicaAnnotation
 		}
 
 		stateReplica, err := stateReplicas.GetState(state.Name)

@@ -8,25 +8,24 @@ import (
 	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/resources"
 	sr "github.com/containersol/prescale-operator/internal/state_replicas"
+	"github.com/containersol/prescale-operator/pkg/utils/client"
 	"github.com/containersol/prescale-operator/pkg/utils/math"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-func getConfig() clientcmd.ClientConfig {
-	configLoadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		configLoadingRules,
-		&clientcmd.ConfigOverrides{})
-}
-
 func ResourceQuotaCheckforNamespace(ctx context.Context, deployments v1.DeploymentList, scaleReplicalist []sr.StateReplica, namespace string) (bool, error) {
 	var allowed bool
-	rq, err := resourceQuota(ctx, namespace)
+
+	kubernetesclient, err := client.GetClientSet()
+	if err != nil {
+		return false, err
+	}
+
+	rq, err := resourceQuota(ctx, namespace, kubernetesclient)
 	if err != nil {
 		if strings.Contains(err.Error(), c.RQNotFound) {
 			ctrl.Log.Info("WARNING: No Resource Quotas found for this namespace")
@@ -47,7 +46,13 @@ func ResourceQuotaCheckforNamespace(ctx context.Context, deployments v1.Deployme
 func ResourceQuotaCheck(ctx context.Context, deployment v1.Deployment, replicas int32, namespace string) (bool, error) {
 
 	var allowed bool
-	rq, err := resourceQuota(ctx, namespace)
+
+	kubernetesclient, err := client.GetClientSet()
+	if err != nil {
+		return false, err
+	}
+
+	rq, err := resourceQuota(ctx, namespace, kubernetesclient)
 	if err != nil {
 		if strings.Contains(err.Error(), c.RQNotFound) {
 			ctrl.Log.Info("WARNING: No Resource Quotas found for this namespace")
@@ -72,11 +77,18 @@ func isAllowed(rq *corev1.ResourceQuotaList, limitsneeded corev1.ResourceList) (
 		WithValues("Limits needed", limitsneeded)
 	log.Info("Identified Resources")
 
-	leftovers = math.Subtract(rq.Items[0].Status.Hard, rq.Items[0].Status.Used)
-	log = ctrl.Log.
-		WithValues("Rq name", rq.Items[0].Name).
-		WithValues("Leftover resources", leftovers)
-	log.Info("Resource Quota")
+	for _, q := range rq.Items {
+		leftovers = math.Subtract(q.Status.Hard, q.Status.Used)
+		log = ctrl.Log.
+			WithValues("Rq name", q.Name).
+			WithValues("Leftover resources", leftovers)
+		log.Info("Resource Quota")
+	}
+	// leftovers = math.Subtract(rq.Items[0].Status.Hard, rq.Items[0].Status.Used)
+	// log = ctrl.Log.
+	// 	WithValues("Rq name", rq.Items[0].Name).
+	// 	WithValues("Leftover resources", leftovers)
+	// log.Info("Resource Quota")
 
 	checklimits := math.Subtract(leftovers, math.TranslateResourcesToQuotaResources(limitsneeded))
 
@@ -91,21 +103,11 @@ func isAllowed(rq *corev1.ResourceQuotaList, limitsneeded corev1.ResourceList) (
 	return true, nil
 }
 
-func resourceQuota(ctx context.Context, namespace string) (*corev1.ResourceQuotaList, error) {
+func resourceQuota(ctx context.Context, namespace string, kubernetesclient *kubernetes.Clientset) (*corev1.ResourceQuotaList, error) {
 
 	rq := &corev1.ResourceQuotaList{}
 
-	restConfig, err := getConfig().ClientConfig()
-	if err != nil {
-		return &corev1.ResourceQuotaList{}, err
-	}
-
-	kubernetesclient, err := kubernetes.NewForConfig(restConfig)
-	if err != nil {
-		return &corev1.ResourceQuotaList{}, err
-	}
-
-	rq, err = kubernetesclient.CoreV1().ResourceQuotas(namespace).List(ctx, metav1.ListOptions{})
+	rq, err := kubernetesclient.CoreV1().ResourceQuotas(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return &corev1.ResourceQuotaList{}, err
 	}

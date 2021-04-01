@@ -41,8 +41,8 @@ func TestTranslateResourcesToQuotaResources(t *testing.T) {
 		resources corev1.ResourceList
 	}
 
-	cpu, _ := resource.ParseQuantity("500m")
-	mem, _ := resource.ParseQuantity("500Mi")
+	cpu := resource.NewQuantity(500, resource.DecimalSI)
+	mem := resource.NewQuantity(500, resource.BinarySI)
 
 	tests := []struct {
 		name string
@@ -53,13 +53,13 @@ func TestTranslateResourcesToQuotaResources(t *testing.T) {
 			name: "TestTranslationOfResourceList",
 			args: args{
 				resources: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    cpu,
-					corev1.ResourceMemory: mem,
+					corev1.ResourceCPU:    *cpu,
+					corev1.ResourceMemory: *mem,
 				},
 			},
 			want: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceLimitsCPU:    cpu,
-				corev1.ResourceLimitsMemory: mem,
+				corev1.ResourceLimitsCPU:    *cpu,
+				corev1.ResourceLimitsMemory: *mem,
 			},
 		},
 	}
@@ -77,8 +77,8 @@ func TestIsNegative(t *testing.T) {
 		a corev1.ResourceList
 	}
 
-	cpu, _ := resource.ParseQuantity("-500m")
-	mem, _ := resource.ParseQuantity("500Mi")
+	cpu := resource.NewQuantity(-500, resource.DecimalSI)
+	mem := resource.NewQuantity(500, resource.BinarySI)
 
 	tests := []struct {
 		name string
@@ -89,8 +89,8 @@ func TestIsNegative(t *testing.T) {
 			name: "TestNegativeCPU",
 			args: args{
 				a: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU:    cpu,
-					corev1.ResourceMemory: mem,
+					corev1.ResourceCPU:    *cpu,
+					corev1.ResourceMemory: *mem,
 				},
 			},
 			want: []corev1.ResourceName{"cpu"},
