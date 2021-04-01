@@ -84,11 +84,6 @@ func isAllowed(rq *corev1.ResourceQuotaList, limitsneeded corev1.ResourceList) (
 			WithValues("Leftover resources", leftovers)
 		log.Info("Resource Quota")
 	}
-	// leftovers = math.Subtract(rq.Items[0].Status.Hard, rq.Items[0].Status.Used)
-	// log = ctrl.Log.
-	// 	WithValues("Rq name", rq.Items[0].Name).
-	// 	WithValues("Leftover resources", leftovers)
-	// log.Info("Resource Quota")
 
 	checklimits := math.Subtract(leftovers, math.TranslateResourcesToQuotaResources(limitsneeded))
 
@@ -103,7 +98,7 @@ func isAllowed(rq *corev1.ResourceQuotaList, limitsneeded corev1.ResourceList) (
 	return true, nil
 }
 
-func resourceQuota(ctx context.Context, namespace string, kubernetesclient *kubernetes.Clientset) (*corev1.ResourceQuotaList, error) {
+func resourceQuota(ctx context.Context, namespace string, kubernetesclient kubernetes.Interface) (*corev1.ResourceQuotaList, error) {
 
 	rq := &corev1.ResourceQuotaList{}
 

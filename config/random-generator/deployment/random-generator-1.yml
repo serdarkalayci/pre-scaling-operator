@@ -4,7 +4,7 @@ metadata:
   name: random-generator-1
   annotations:
     scaler/type: "scale-once" # Change to 'autoscale' to allow scaling up
-    scaler/state-peak-replicas: "5"
+    scaler/state-peak-replicas: "444"
     scaler/state-bau-replicas: "3"
     scaler/state-default-replicas: "1"
   labels:
@@ -23,3 +23,13 @@ spec:
         - name: random-generator
           imagePullPolicy: Always
           image: chriscmsoft/random-generator:latest
+          resources:
+            requests:
+              cpu: "60m"
+              memory: "80Mi"
+            limits:
+              cpu: "120m"
+              memory: "100Mi"
+
+
+              
