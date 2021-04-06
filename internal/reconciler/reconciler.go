@@ -70,7 +70,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 	}
 
-	allowed, err := quotas.ResourceQuotaCheckforNamespace(ctx, scaleReplicalist, namespace, limitsneeded)
+	allowed, err := quotas.ResourceQuotaCheck(ctx, namespace, limitsneeded)
 	if err != nil {
 		log.Error(err, "Cannot calculate the resource quotas")
 		return err
@@ -129,7 +129,7 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 		return err
 	}
 
-	allowed, err := quotas.ResourceQuotaCheck(ctx, deployment, stateReplica.Replicas, deployment.Namespace)
+	allowed, err := quotas.ResourceQuotaCheck(ctx, deployment.Namespace, resources.LimitsNeededDeployment(deployment, stateReplica.Replicas))
 	if err != nil {
 		log.Error(err, "Cannot calculate the resource quotas")
 		return err
@@ -161,7 +161,7 @@ func ReconcileDeploymentConfig(ctx context.Context, _client client.Client, deplo
 		return err
 	}
 
-	allowed, err := quotas.ResourceQuotaCheckDC(ctx, deploymentConfig, stateReplica.Replicas, deploymentConfig.Namespace)
+	allowed, err := quotas.ResourceQuotaCheck(ctx, deploymentConfig.Namespace, resources.LimitsNeededDeploymentConfig(deploymentConfig, stateReplica.Replicas))
 	if err != nil {
 		log.Error(err, "Cannot calculate the resource quotas")
 		return err

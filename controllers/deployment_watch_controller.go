@@ -20,6 +20,7 @@ import (
 	"github.com/containersol/prescale-operator/internal/reconciler"
 	"github.com/containersol/prescale-operator/internal/resources"
 	"github.com/containersol/prescale-operator/internal/states"
+	"github.com/containersol/prescale-operator/internal/validations"
 
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/apps/v1"
@@ -102,6 +103,6 @@ func (r *DeploymentWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *DeploymentWatcher) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.Deployment{}).
-		// WithEventFilter(validations.PreFilter()).
+		WithEventFilter(validations.PreFilter()).
 		Complete(r)
 }
