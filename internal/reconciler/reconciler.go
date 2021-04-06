@@ -8,9 +8,10 @@ import (
 	"github.com/containersol/prescale-operator/internal/quotas"
 	"github.com/containersol/prescale-operator/internal/resources"
 	"github.com/containersol/prescale-operator/internal/states"
-
+	"github.com/containersol/prescale-operator/pkg/utils/math"
 	ocv1 "github.com/openshift/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -18,6 +19,8 @@ import (
 func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State) error {
 
 	var objectsToReconcile int
+	var deploymentConfigs ocv1.DeploymentConfigList
+	var limitsneeded corev1.ResourceList
 
 	log := ctrl.Log.
 		WithValues("namespace", namespace)
@@ -45,34 +48,12 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 		return err
 	}
 
-	allowed, err := quotas.ResourceQuotaCheckforNamespace(ctx, deployments, scaleReplicalist, namespace)
-	if err != nil {
-		log.Error(err, "Cannot calculate the resource quotas")
-		return err
-	}
+	limitsneeded = resources.LimitsNeededDeploymentList(deployments, scaleReplicalist)
 
-	log = ctrl.Log.
-		WithValues("Allowed", allowed)
-	log.Info("Namespace Quota Check")
-
-	if allowed {
-
-		for i, deployment := range deployments.Items {
-			log := ctrl.Log.
-				WithValues("deployment", deployment.Name).
-				WithValues("namespace", deployment.Namespace)
-
-			err := resources.ScaleDeployment(ctx, _client, deployment, scaleReplicalist[i])
-			if err != nil {
-				log.Error(err, "Error scaling the deployment")
-				continue
-			}
-		}
-	}
 	log.WithValues("env is", c.OpenshiftCluster).
 		Info("Cluster")
 	if c.OpenshiftCluster {
-		deploymentConfigs, err := resources.DeploymentConfigLister(ctx, _client, namespace, c.OptInLabel)
+		deploymentConfigs, err = resources.DeploymentConfigLister(ctx, _client, namespace, c.OptInLabel)
 		if err != nil {
 			log.Error(err, "Cannot list deploymentConfigs in namespace")
 			return err
@@ -85,18 +66,35 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 			return err
 		}
 
-		allowed, err := quotas.ResourceQuotaCheckforNamespaceDC(ctx, deploymentConfigs, scaleReplicalist, namespace)
-		if err != nil {
-			log.Error(err, "Cannot calculate the resource quotas")
-			return err
+		limitsneeded = math.Add(limitsneeded, resources.LimitsNeededDeploymentConfigList(deploymentConfigs, scaleReplicalist))
+
+	}
+
+	allowed, err := quotas.ResourceQuotaCheckforNamespace(ctx, scaleReplicalist, namespace, limitsneeded)
+	if err != nil {
+		log.Error(err, "Cannot calculate the resource quotas")
+		return err
+	}
+
+	log = ctrl.Log.
+		WithValues("Allowed", allowed)
+	log.Info("Namespace Quota Check")
+
+	if allowed {
+		for i, deployment := range deployments.Items {
+			log := ctrl.Log.
+				WithValues("deployment", deployment.Name).
+				WithValues("namespace", deployment.Namespace)
+
+			err := resources.ScaleDeployment(ctx, _client, deployment, scaleReplicalist[i])
+			if err != nil {
+				log.Error(err, "Error scaling the deployment")
+				continue
+			}
 		}
-
-		log = ctrl.Log.
-			WithValues("Allowed", allowed)
-		log.Info("Namespace Quota Check")
-
+	}
+	if c.OpenshiftCluster {
 		if allowed {
-
 			for i, deploymentConfig := range deploymentConfigs.Items {
 				log := ctrl.Log.
 					WithValues("deploymentconfig", deploymentConfig.Name).

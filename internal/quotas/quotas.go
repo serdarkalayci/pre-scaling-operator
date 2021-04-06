@@ -18,7 +18,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-func ResourceQuotaCheckforNamespace(ctx context.Context, deployments v1.DeploymentList, scaleReplicalist []sr.StateReplica, namespace string) (bool, error) {
+func ResourceQuotaCheckforNamespace(ctx context.Context, scaleReplicalist []sr.StateReplica, namespace string, limitsneeded corev1.ResourceList) (bool, error) {
 	var allowed bool
 
 	kubernetesclient, err := client.GetClientSet()
@@ -35,7 +35,7 @@ func ResourceQuotaCheckforNamespace(ctx context.Context, deployments v1.Deployme
 		return false, err
 	}
 
-	allowed, err = isAllowed(rq, resources.LimitsNeededDeploymentList(deployments, scaleReplicalist))
+	allowed, err = isAllowed(rq, limitsneeded)
 	if err != nil {
 		ctrl.Log.Error(err, "Cannot find namespace quotas")
 		return false, err
@@ -63,32 +63,6 @@ func ResourceQuotaCheck(ctx context.Context, deployment v1.Deployment, replicas 
 	}
 
 	allowed, err = isAllowed(rq, resources.LimitsNeededDeployment(deployment, replicas))
-	if err != nil {
-		ctrl.Log.Error(err, "Cannot find namespace quotas")
-		return false, err
-	}
-
-	return allowed, nil
-}
-
-func ResourceQuotaCheckforNamespaceDC(ctx context.Context, deploymentconfigs ocv1.DeploymentConfigList, scaleReplicalist []sr.StateReplica, namespace string) (bool, error) {
-	var allowed bool
-
-	kubernetesclient, err := client.GetClientSet()
-	if err != nil {
-		return false, err
-	}
-
-	rq, err := resourceQuota(ctx, namespace, kubernetesclient)
-	if err != nil {
-		if strings.Contains(err.Error(), c.RQNotFound) {
-			ctrl.Log.Info("WARNING: No Resource Quotas found for this namespace")
-			return true, nil
-		}
-		return false, err
-	}
-
-	allowed, err = isAllowed(rq, resources.LimitsNeededDeploymentConfigList(deploymentconfigs, scaleReplicalist))
 	if err != nil {
 		ctrl.Log.Error(err, "Cannot find namespace quotas")
 		return false, err
