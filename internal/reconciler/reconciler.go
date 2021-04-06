@@ -7,15 +7,12 @@ import (
 	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/quotas"
 	"github.com/containersol/prescale-operator/internal/resources"
-	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
 
 	ocv1 "github.com/openshift/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
-	retry "k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State) error {
@@ -82,12 +79,34 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 		}
 		objectsToReconcile = objectsToReconcile + len(deploymentConfigs.Items)
 
-		for _, deploymentConfig := range deploymentConfigs.Items {
+		scaleReplicalist, err := resources.DeploymentConfigStateReplicasList(finalState, deploymentConfigs)
+		if err != nil {
+			log.Error(err, "Cannot fetch replicas of all opted-in deploymentconfigs")
+			return err
+		}
 
-			err = ReconcileDeploymentConfig(ctx, _client, deploymentConfig, finalState, true)
-			if err != nil {
-				log.Error(err, "Could not reconcile deploymentConfig.")
-				continue
+		allowed, err := quotas.ResourceQuotaCheckforNamespaceDC(ctx, deploymentConfigs, scaleReplicalist, namespace)
+		if err != nil {
+			log.Error(err, "Cannot calculate the resource quotas")
+			return err
+		}
+
+		log = ctrl.Log.
+			WithValues("Allowed", allowed)
+		log.Info("Namespace Quota Check")
+
+		if allowed {
+
+			for i, deploymentConfig := range deploymentConfigs.Items {
+				log := ctrl.Log.
+					WithValues("deploymentconfig", deploymentConfig.Name).
+					WithValues("namespace", deploymentConfig.Namespace)
+
+				err := resources.ScaleDeploymentConfig(ctx, _client, deploymentConfig, scaleReplicalist[i])
+				if err != nil {
+					log.Error(err, "Error scaling the deploymentconfig")
+					continue
+				}
 			}
 		}
 	}
@@ -130,67 +149,38 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 		}
 	}
 
-	return err
+	return nil
 }
 
 func ReconcileDeploymentConfig(ctx context.Context, _client client.Client, deploymentConfig ocv1.DeploymentConfig, state states.State, optIn bool) error {
 	log := ctrl.Log.
-		WithValues("deploymentConfig", deploymentConfig.Name).
+		WithValues("deploymentconfig", deploymentConfig.Name).
 		WithValues("namespace", deploymentConfig.Namespace)
-	stateReplicas, err := sr.NewStateReplicasFromAnnotations(deploymentConfig.GetAnnotations())
-	if err != nil {
-		log.WithValues("deploymentConfig", deploymentConfig.Name).
-			WithValues("namespace", deploymentConfig.Namespace).
-			Error(err, "Cannot calculate state replicas. Please check deploymentConfig annotations. Continuing.")
-		return err
-	}
-	// Now we have all the state settings, we can set the replicas for the deploymentConfig accordingly
-	if !optIn {
-		// the deployment opted out. We need to set back to default.
-		log.Info("The deploymentconfig opted out. Will scale back to default")
-		state.Name = c.DefaultReplicaAnnotation
-	}
-	stateReplica, err := stateReplicas.GetState(state.Name)
-	if err != nil {
-		// TODO here we should do priority filtering, and go down one level of priority to find the lowest set one.
-		// We will ignore any that are not set
-		log.WithValues("set states", stateReplicas).
-			WithValues("namespace state", state.Name).
-			Info("State could not be found")
-		return err
-	}
-	var oldReplicaCount int32
-	oldReplicaCount = *&deploymentConfig.Spec.Replicas
-	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		if oldReplicaCount == stateReplica.Replicas {
-			log.Info("No Update on deployment. Desired replica count already matches current.")
-			return nil
-		}
-		log.Info("Updating deploymentconfig replicas for state", "replicas", stateReplica.Replicas)
-		updateErr := resources.DeploymentConfigScaler(ctx, _client, deploymentConfig, stateReplica.Replicas)
-		if updateErr == nil {
-			log.WithValues("Deploymentconfig", deploymentConfig.Name).
-				WithValues("StateReplica mode", stateReplica.Name).
-				WithValues("Old Replica count", oldReplicaCount).
-				WithValues("New Replica count", stateReplica.Replicas).
-				Info("Deploymentconfig succesfully updated")
-			return nil
-		}
-		log.Info("Updating deployment failed due to a conflict! Retrying..")
-		// We need to get a newer version of the object from the client
-		var req reconcile.Request
-		req.NamespacedName.Namespace = deploymentConfig.Namespace
-		req.NamespacedName.Name = deploymentConfig.Name
-		deploymentConfig, err = resources.DeploymentConfigGetter(ctx, _client, req)
-		if err != nil {
-			log.Error(err, "Error getting refreshed deployment in conflict resolution")
-		}
-		return updateErr
 
-	})
-	if retryErr != nil {
-		log.Error(retryErr, "Unable to scale the deploymentconfig, err: %v")
+	stateReplica, err := resources.DeploymentConfigStateReplicas(state, deploymentConfig, optIn)
+	if err != nil {
+		log.Error(err, "Error getting the state replicas")
+		return err
 	}
+
+	allowed, err := quotas.ResourceQuotaCheckDC(ctx, deploymentConfig, stateReplica.Replicas, deploymentConfig.Namespace)
+	if err != nil {
+		log.Error(err, "Cannot calculate the resource quotas")
+		return err
+	}
+
+	log = ctrl.Log.
+		WithValues("Allowed", allowed)
+	log.Info("Quota Check")
+
+	if allowed {
+		err = resources.ScaleDeploymentConfig(ctx, _client, deploymentConfig, stateReplica)
+		if err != nil {
+			log.Error(err, "Error scaling the deploymentconfig")
+			return err
+		}
+	}
+
 	return nil
 
 }

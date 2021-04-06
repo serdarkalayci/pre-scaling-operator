@@ -20,7 +20,6 @@ import (
 	"github.com/containersol/prescale-operator/internal/reconciler"
 	"github.com/containersol/prescale-operator/internal/resources"
 	"github.com/containersol/prescale-operator/internal/states"
-	"github.com/containersol/prescale-operator/internal/validations"
 	"github.com/go-logr/logr"
 	ocv1 "github.com/openshift/api/apps/v1"
 
@@ -105,6 +104,6 @@ func (r *DeploymentConfigWatcher) Reconcile(ctx context.Context, req ctrl.Reques
 func (r *DeploymentConfigWatcher) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&ocv1.DeploymentConfig{}).
-		WithEventFilter(validations.PreFilter()).
+		// WithEventFilter(validations.PreFilter()).
 		Complete(r)
 }

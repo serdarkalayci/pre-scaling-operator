@@ -10,6 +10,7 @@ import (
 	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/pkg/utils/client"
 	"github.com/containersol/prescale-operator/pkg/utils/math"
+	ocv1 "github.com/openshift/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -62,6 +63,59 @@ func ResourceQuotaCheck(ctx context.Context, deployment v1.Deployment, replicas 
 	}
 
 	allowed, err = isAllowed(rq, resources.LimitsNeededDeployment(deployment, replicas))
+	if err != nil {
+		ctrl.Log.Error(err, "Cannot find namespace quotas")
+		return false, err
+	}
+
+	return allowed, nil
+}
+
+func ResourceQuotaCheckforNamespaceDC(ctx context.Context, deploymentconfigs ocv1.DeploymentConfigList, scaleReplicalist []sr.StateReplica, namespace string) (bool, error) {
+	var allowed bool
+
+	kubernetesclient, err := client.GetClientSet()
+	if err != nil {
+		return false, err
+	}
+
+	rq, err := resourceQuota(ctx, namespace, kubernetesclient)
+	if err != nil {
+		if strings.Contains(err.Error(), c.RQNotFound) {
+			ctrl.Log.Info("WARNING: No Resource Quotas found for this namespace")
+			return true, nil
+		}
+		return false, err
+	}
+
+	allowed, err = isAllowed(rq, resources.LimitsNeededDeploymentConfigList(deploymentconfigs, scaleReplicalist))
+	if err != nil {
+		ctrl.Log.Error(err, "Cannot find namespace quotas")
+		return false, err
+	}
+
+	return allowed, nil
+}
+
+func ResourceQuotaCheckDC(ctx context.Context, deploymentconfig ocv1.DeploymentConfig, replicas int32, namespace string) (bool, error) {
+
+	var allowed bool
+
+	kubernetesclient, err := client.GetClientSet()
+	if err != nil {
+		return false, err
+	}
+
+	rq, err := resourceQuota(ctx, namespace, kubernetesclient)
+	if err != nil {
+		if strings.Contains(err.Error(), c.RQNotFound) {
+			ctrl.Log.Info("WARNING: No Resource Quotas found for this namespace")
+			return true, nil
+		}
+		return false, err
+	}
+
+	allowed, err = isAllowed(rq, resources.LimitsNeededDeploymentConfig(deploymentconfig, replicas))
 	if err != nil {
 		ctrl.Log.Error(err, "Cannot find namespace quotas")
 		return false, err
