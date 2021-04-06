@@ -14,6 +14,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
+// +kubebuilder:rbac:groups="",resources=resourcequotas,verbs=list;
+
 func ResourceQuotaCheck(ctx context.Context, namespace string, limitsneeded corev1.ResourceList) (bool, error) {
 	var allowed bool
 

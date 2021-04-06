@@ -159,7 +159,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 			log.Info("No Update on deployment. Desired replica count already matches current.")
 			return nil
 		}
-		log.Info("Updating deploymentconfig replicas for state", "replicas", stateReplica.Replicas)
+		log.Info("Updating deployment replicas for state", "replicas", stateReplica.Replicas)
 		updateErr := DeploymentScaler(ctx, _client, deployment, stateReplica.Replicas)
 		if updateErr == nil {
 			log.WithValues("Deployment", deployment.Name).
