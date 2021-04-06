@@ -3,7 +3,6 @@ package validations
 import (
 	"reflect"
 
-	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/pkg/utils/annotations"
 	"github.com/containersol/prescale-operator/pkg/utils/labels"
 	ocv1 "github.com/openshift/api/apps/v1"
@@ -36,8 +35,8 @@ func PreFilter() predicate.Predicate {
 				return true
 			}
 			var replicasOld, replicasNew *int32
-			//TODO: make this generic
-			if c.OpenshiftCluster {
+			// Check for deployment of deploymentconfig
+			if reflect.TypeOf(e.ObjectNew) == reflect.TypeOf(&ocv1.DeploymentConfig{}) {
 				replicasOld = &e.ObjectOld.(*ocv1.DeploymentConfig).Spec.Replicas
 				replicasNew = &e.ObjectNew.(*ocv1.DeploymentConfig).Spec.Replicas
 			} else {
