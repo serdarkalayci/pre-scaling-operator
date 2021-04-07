@@ -74,3 +74,13 @@ func IsNegative(a corev1.ResourceList) []corev1.ResourceName {
 	}
 	return results
 }
+
+func IsZero(a corev1.ResourceList) bool {
+	zero := resource.MustParse("0")
+	for _, v := range a {
+		if v.Cmp(zero) != 0 {
+			return false
+		}
+	}
+	return true
+}

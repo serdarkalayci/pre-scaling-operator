@@ -113,3 +113,40 @@ func Test_resourceQuota(t *testing.T) {
 		})
 	}
 }
+
+func TestResourceQuotaCheck(t *testing.T) {
+	type args struct {
+		ctx          context.Context
+		namespace    string
+		limitsneeded corev1.ResourceList
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "TestZeroDefinedObjectResources",
+			args: args{
+				ctx:          context.TODO(),
+				namespace:    "default",
+				limitsneeded: map[corev1.ResourceName]resource.Quantity{},
+			},
+			want:    true,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ResourceQuotaCheck(tt.args.ctx, tt.args.namespace, tt.args.limitsneeded)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ResourceQuotaCheck() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("ResourceQuotaCheck() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

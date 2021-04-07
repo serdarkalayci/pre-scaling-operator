@@ -35,6 +35,11 @@ func ResourceQuotaCheck(ctx context.Context, namespace string, limitsneeded core
 		return false, err
 	}
 
+	if math.IsZero(limitsneeded) {
+		ctrl.Log.Info("WARNING: No Resource limits are specified in the target object")
+		return true, nil
+	}
+
 	allowed, err = isAllowed(rq, limitsneeded)
 	if err != nil {
 		ctrl.Log.Error(err, "Cannot find namespace quotas")

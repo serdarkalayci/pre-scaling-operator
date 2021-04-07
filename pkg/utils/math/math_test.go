@@ -193,3 +193,41 @@ func TestAdd(t *testing.T) {
 		})
 	}
 }
+
+func TestIsZero(t *testing.T) {
+	type args struct {
+		a corev1.ResourceList
+	}
+
+	CPU1 := resource.NewQuantity(500, resource.DecimalSI)
+
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "TestZero",
+			args: args{
+				a: map[corev1.ResourceName]resource.Quantity{},
+			},
+			want: true,
+		},
+		{
+			name: "TestNonZero",
+			args: args{
+				a: map[corev1.ResourceName]resource.Quantity{
+					corev1.ResourceCPU: *CPU1,
+				},
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsZero(tt.args.a); got != tt.want {
+				t.Errorf("IsZero() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
