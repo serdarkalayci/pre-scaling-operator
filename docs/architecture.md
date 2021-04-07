@@ -95,17 +95,17 @@ metadata:
   labels: 
     scaler/opt-in: true
   annotations:
-    scaler/type: autoscale # autoscale | scale-once 
+    scaler/allow-autoscaling: true # true | false 
     scaler/state-peak-replicas: 50
     scaler/state-bau-replicas: 15
     scaler/state-default-replicas: 15
 ```
 
-### Default Scaler Type
+### Allow Autoscaling
 
-The Scaler type will be defaulted to scale-once, to protect applications which are not ready, or mature enough to leverage autoscaling. 
+Autoscaling will be defaulted to false, to protect applications which are not ready, or mature enough to leverage autoscaling. 
 
-When an application is set to autoscale the application will scale freely using metrics, and be capable of using custom metrics with the normal HPA underlying. We will in this case only manage the minimum replica count.
+When autoscaling is enabled, the application will scale freely using metrics, and be capable of using custom metrics with the normal HPA underlying. We will in this case only manage the minimum replica count.
 
 ### Default Replica Count
 

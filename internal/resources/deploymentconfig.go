@@ -44,8 +44,8 @@ func DeploymentConfigGetter(ctx context.Context, _client client.Client, req ctrl
 //DeploymentConfigScaler scales the deploymentconfig to the desired replica number
 func DeploymentConfigScaler(ctx context.Context, _client client.Client, deploymentConfig v1.DeploymentConfig, replicas int32) error {
 
-	if v, found := deploymentConfig.GetAnnotations()["scaler/type"]; found {
-		if v == "autoscale" {
+	if v, found := deploymentConfig.GetAnnotations()["scaler/allow-autoscaling"]; found {
+		if v == "true" {
 			if replicas <= deploymentConfig.Spec.Replicas {
 				return nil
 			}

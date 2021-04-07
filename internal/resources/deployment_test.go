@@ -249,7 +249,7 @@ func TestDeploymentScaler(t *testing.T) {
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:        "foo",
-						Annotations: map[string]string{"scaler/type": "autoscale"},
+						Annotations: map[string]string{"scaler/allow-autoscaling": "true"},
 					},
 					Spec: v1.DeploymentSpec{
 						Replicas: new(int32),
