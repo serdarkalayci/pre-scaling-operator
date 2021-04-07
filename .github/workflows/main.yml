@@ -44,14 +44,6 @@ jobs:
           sudo mv /tmp/kubebuilder_2.3.1_${os}_${arch} /usr/local/kubebuilder
           export PATH=$PATH:/usr/local/kubebuilder/bin
 
-      - name: Setup OpenShift
-        uses: manusa/actions-setup-openshift@v1.1.2
-        with:
-          oc version: 'v3.11.0'
-          github token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Interact with the cluster
-        run: oc cluster status
-
       - name: Installing Prerequisites (KinD Cluster)
         uses: engineerd/setup-kind@v0.5.0
         with:
@@ -62,14 +54,27 @@ jobs:
           kubectl cluster-info --context kind-kind
           kind get kubeconfig --internal >$HOME/.kube/config
           kubectl get nodes
-
-      - name: Run tests
+ 
+      - name: Run tests for Kubernetes
         run: |
           make test
- 
+
       - name: Deleting KinD cluster
         if: ${{ always() }}
         run: kind delete cluster
+
+      - name: Setup OpenShift
+        uses: manusa/actions-setup-openshift@v1.1.2
+        with:
+          oc version: 'v3.11.0'
+          github token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Interact with the cluster
+        run: oc cluster status
+
+      - name: Run tests for Openshift
+        run: |
+          make test
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
