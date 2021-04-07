@@ -66,7 +66,7 @@ jobs:
       - name: Setup OpenShift
         uses: manusa/actions-setup-openshift@v1.1.2
         with:
-          oc version: 'v4.7.0'
+          oc version: 'v4.3.0'
           github token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Interact with the cluster
