@@ -77,7 +77,7 @@ jobs:
       #   run: oc cluster status
 
       - name: Cluster login
-        run: oc login -u kubeadmin -p ${{ env.OKD_PASSWORD }} https://api.prescaling-operator-dev.openshift.csol.cloud:6443
+        run: oc login -u kubeadmin -p ${{ env.OKD_PASSWORD }}  --insecure-skip-tls-verify https://api.prescaling-operator-dev.openshift.csol.cloud:6443
 
       - name: Run tests for Openshift
         run: |
