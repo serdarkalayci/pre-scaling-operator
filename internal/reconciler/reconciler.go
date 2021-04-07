@@ -48,9 +48,10 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 		return err
 	}
 
+	//Here we calculate the resource limits we need from all deployments combined
 	limitsneeded = resources.LimitsNeededDeploymentList(deployments, scaleReplicalist)
 
-	log.WithValues("env is", c.OpenshiftCluster).
+	log.WithValues("deploy to Openshift", c.OpenshiftCluster).
 		Info("Cluster")
 	if c.OpenshiftCluster {
 		deploymentConfigs, err = resources.DeploymentConfigLister(ctx, _client, namespace, c.OptInLabel)
@@ -66,10 +67,12 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 			return err
 		}
 
+		//In case of Openshift, we calculate the resource limits we need from all deploymentconfigs combined and we add it to the total number
 		limitsneeded = math.Add(limitsneeded, resources.LimitsNeededDeploymentConfigList(deploymentConfigs, scaleReplicalist))
 
 	}
 
+	// After we have calculated the resources needed from all workloads in a given namespace, we can determine if the scaling should be allowed to go through
 	allowed, err := quotas.ResourceQuotaCheck(ctx, namespace, limitsneeded)
 	if err != nil {
 		log.Error(err, "Cannot calculate the resource quotas")
@@ -92,9 +95,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 				continue
 			}
 		}
-	}
-	if c.OpenshiftCluster {
-		if allowed {
+		if c.OpenshiftCluster {
 			for i, deploymentConfig := range deploymentConfigs.Items {
 				log := ctrl.Log.
 					WithValues("deploymentconfig", deploymentConfig.Name).
@@ -106,6 +107,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 					continue
 				}
 			}
+
 		}
 	}
 

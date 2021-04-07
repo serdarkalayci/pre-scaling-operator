@@ -18,11 +18,11 @@ func Test_isAllowed(t *testing.T) {
 		limitsneeded corev1.ResourceList
 	}
 
-	CPU1 := resource.NewQuantity(1000, resource.DecimalSI)
+	HardCPU := resource.NewQuantity(1000, resource.DecimalSI)
 
-	CPU2 := resource.NewQuantity(200, resource.DecimalSI)
+	UsedCPU := resource.NewQuantity(200, resource.DecimalSI)
 
-	CPU3 := resource.NewQuantity(100, resource.DecimalSI)
+	NeededCPU := resource.NewQuantity(100, resource.DecimalSI)
 
 	tests := []struct {
 		name    string
@@ -31,7 +31,7 @@ func Test_isAllowed(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "TestingIsNegative",
+			name: "TestingNoAvailableResources",
 			args: args{
 				rq: &corev1.ResourceQuotaList{
 					TypeMeta: metav1.TypeMeta{},
@@ -42,20 +42,20 @@ func Test_isAllowed(t *testing.T) {
 							ObjectMeta: metav1.ObjectMeta{},
 							Spec: corev1.ResourceQuotaSpec{
 								Hard: map[corev1.ResourceName]resource.Quantity{
-									corev1.ResourceLimitsCPU: *CPU1,
+									corev1.ResourceLimitsCPU: *HardCPU,
 								},
 							},
 
 							Status: corev1.ResourceQuotaStatus{
 								Used: map[corev1.ResourceName]resource.Quantity{
-									corev1.ResourceLimitsCPU: *CPU2,
+									corev1.ResourceLimitsCPU: *UsedCPU,
 								},
 							},
 						},
 					},
 				},
 				limitsneeded: map[corev1.ResourceName]resource.Quantity{
-					corev1.ResourceCPU: *CPU3,
+					corev1.ResourceCPU: *NeededCPU,
 				},
 			},
 			want:    false,
@@ -90,7 +90,7 @@ func Test_resourceQuota(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "TestNoRQ",
+			name: "TestNoResourceQuotaPresent",
 			args: args{
 				ctx:              context.TODO(),
 				namespace:        "default",

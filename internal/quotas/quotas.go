@@ -16,7 +16,9 @@ import (
 
 // +kubebuilder:rbac:groups="",resources=resourcequotas,verbs=list;
 
+//ResourceQuotaCheck function first checks if there are resourceQuota objects present and then validates if the namespace has enough resources to scale
 func ResourceQuotaCheck(ctx context.Context, namespace string, limitsneeded corev1.ResourceList) (bool, error) {
+
 	var allowed bool
 
 	kubernetesclient, err := client.GetClientSet()
@@ -42,6 +44,7 @@ func ResourceQuotaCheck(ctx context.Context, namespace string, limitsneeded core
 	return allowed, nil
 }
 
+//This function will determine if we exceed the available resources in at least one resourcequota object
 func isAllowed(rq *corev1.ResourceQuotaList, limitsneeded corev1.ResourceList) (bool, error) {
 
 	var leftovers corev1.ResourceList
@@ -55,16 +58,16 @@ func isAllowed(rq *corev1.ResourceQuotaList, limitsneeded corev1.ResourceList) (
 			WithValues("Rq name", q.Name).
 			WithValues("Leftover resources", leftovers)
 		log.Info("Resource Quota")
-	}
 
-	checklimits := math.Subtract(leftovers, math.TranslateResourcesToQuotaResources(limitsneeded))
+		checklimits := math.Subtract(leftovers, math.TranslateResourcesToQuotaResources(limitsneeded))
 
-	log = ctrl.Log.
-		WithValues("Limits", checklimits)
-	log.Info("Final checks")
+		log = ctrl.Log.
+			WithValues("Limits", checklimits)
+		log.Info("Final checks")
 
-	if len(math.IsNegative(checklimits)) != 0 {
-		return false, nil
+		if len(math.IsNegative(checklimits)) != 0 {
+			return false, nil
+		}
 	}
 
 	return true, nil

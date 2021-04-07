@@ -414,7 +414,7 @@ func TestDeploymentConfigStateReplicasList(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "",
+			name: "TestOptedOutDeploymentConfig",
 			args: args{
 				state: states.State{Name: "foo"},
 				deploymentConfigs: v1.DeploymentConfigList{
@@ -469,7 +469,7 @@ func TestDeploymentConfigStateReplicasList(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "",
+			name: "TestAbsentReplicaState",
 			args: args{
 				state: states.State{
 					Name: "foo",
@@ -535,7 +535,7 @@ func TestLimitsNeededDeploymentConfig(t *testing.T) {
 		want corev1.ResourceList
 	}{
 		{
-			name: "",
+			name: "TestLimitsNeeded",
 			args: args{
 				deploymentConfig: v1.DeploymentConfig{
 					Spec: v1.DeploymentConfigSpec{
@@ -579,7 +579,7 @@ func TestLimitsNeededDeploymentConfigList(t *testing.T) {
 		want corev1.ResourceList
 	}{
 		{
-			name: "",
+			name: "TestLimitsNeededList",
 			args: args{
 				deploymentConfigs: v1.DeploymentConfigList{
 					TypeMeta: metav1.TypeMeta{},
@@ -657,7 +657,7 @@ func TestScaleDeploymentConfig(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "",
+			name: "TestScalingDeploymentConfig",
 			args: args{
 				ctx:     context.TODO(),
 				_client: fake.NewClientBuilder().Build(),
