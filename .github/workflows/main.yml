@@ -14,6 +14,7 @@ env:
   CR_PAT: ${{ secrets.CR_PAT }}
   DH_USER: ${{ secrets.DOCKERHUB_PUSH_USERNAME }}
   DH_TOKEN: ${{ secrets.DOCKERHUB_PUSH_PASS }}
+  OKD_PASSWORD: ${{ secrets.OKD_PASSWORD }}
 
 jobs:
   tests-and-build:
@@ -66,14 +67,17 @@ jobs:
       #   if: ${{ always() }}
       #   run: kind delete cluster
 
-      - name: Setup OpenShift
-        uses: manusa/actions-setup-openshift@v1.1.2
-        with:
-          oc version: 'v3.11.0'
-          github token: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Setup OpenShift
+      #   uses: manusa/actions-setup-openshift@v1.1.2
+      #   with:
+      #     oc version: 'v3.11.0'
+      #     github token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Interact with the cluster
-        run: oc cluster status
+      # - name: Interact with the cluster
+      #   run: oc cluster status
+
+      - name: Cluster login
+        run: oc login -u kubeadmin -p ${{ env.OKD_PASSWORD }} https://api.prescaling-operator-dev.openshift.csol.cloud:6443
 
       - name: Run tests for Openshift
         run: |
