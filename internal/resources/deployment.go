@@ -190,16 +190,14 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 
 func LimitsNeededDeployment(deployment v1.Deployment, replicas int32) corev1.ResourceList {
 
-	return math.Mul(replicas, deployment.Spec.Template.Spec.Containers[0].Resources.Limits)
+	return math.Mul(math.ReplicaCalc(replicas, *deployment.Spec.Replicas), deployment.Spec.Template.Spec.Containers[0].Resources.Limits)
 }
 
 func LimitsNeededDeploymentList(deployments v1.DeploymentList, scaleReplicalist []sr.StateReplica) corev1.ResourceList {
 
 	var limitsneeded corev1.ResourceList
 	for i, deployment := range deployments.Items {
-		replicachange := scaleReplicalist[i].Replicas - *deployment.Spec.Replicas
-		limitsneeded = math.Add(limitsneeded, math.Mul(replicachange, deployment.Spec.Template.Spec.Containers[0].Resources.Limits))
+		limitsneeded = math.Add(limitsneeded, math.Mul(math.ReplicaCalc(scaleReplicalist[i].Replicas, *deployment.Spec.Replicas), deployment.Spec.Template.Spec.Containers[0].Resources.Limits))
 	}
-
 	return limitsneeded
 }

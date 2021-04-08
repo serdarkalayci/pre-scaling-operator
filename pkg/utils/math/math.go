@@ -84,3 +84,14 @@ func IsZero(a corev1.ResourceList) bool {
 	}
 	return true
 }
+
+func ReplicaCalc(a, b int32) int32 {
+
+	c := a - b
+
+	if c == 0 {
+		return a
+	}
+
+	return c
+}

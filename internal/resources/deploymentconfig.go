@@ -188,17 +188,16 @@ func ScaleDeploymentConfig(ctx context.Context, _client client.Client, deploymen
 	return nil
 }
 
-func LimitsNeededDeploymentConfig(deploymentconfig v1.DeploymentConfig, replicas int32) corev1.ResourceList {
+func LimitsNeededDeploymentConfig(deploymentConfig v1.DeploymentConfig, replicas int32) corev1.ResourceList {
 
-	return math.Mul(replicas, deploymentconfig.Spec.Template.Spec.Containers[0].Resources.Limits)
+	return math.Mul(math.ReplicaCalc(replicas, deploymentConfig.Spec.Replicas), deploymentConfig.Spec.Template.Spec.Containers[0].Resources.Limits)
 }
 
-func LimitsNeededDeploymentConfigList(deployments v1.DeploymentConfigList, scaleReplicalist []sr.StateReplica) corev1.ResourceList {
+func LimitsNeededDeploymentConfigList(deploymentConfigs v1.DeploymentConfigList, scaleReplicalist []sr.StateReplica) corev1.ResourceList {
 
 	var limitsneeded corev1.ResourceList
-	for i, deployment := range deployments.Items {
-		replicachange := scaleReplicalist[i].Replicas - deployment.Spec.Replicas
-		limitsneeded = math.Add(limitsneeded, math.Mul(replicachange, deployment.Spec.Template.Spec.Containers[0].Resources.Limits))
+	for i, deploymentConfig := range deploymentConfigs.Items {
+		limitsneeded = math.Add(limitsneeded, math.Mul(math.ReplicaCalc(scaleReplicalist[i].Replicas, deploymentConfig.Spec.Replicas), deploymentConfig.Spec.Template.Spec.Containers[0].Resources.Limits))
 	}
 
 	return limitsneeded

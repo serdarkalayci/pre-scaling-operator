@@ -35,6 +35,10 @@ func ResourceQuotaCheck(ctx context.Context, namespace string, limitsneeded core
 		return false, err
 	}
 
+	if len(math.IsNegative(limitsneeded)) > 0 {
+		return true, nil
+	}
+
 	if math.IsZero(limitsneeded) {
 		ctrl.Log.Info("WARNING: No Resource limits are specified in the target object")
 		return true, nil

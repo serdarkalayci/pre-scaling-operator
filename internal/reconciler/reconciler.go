@@ -130,14 +130,10 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 		log.Error(err, "Error getting the state replicas")
 		return err
 	}
-	replicachange := stateReplica.Replicas - *deployment.Spec.Replicas
-	allowed := true
-	if replicachange != 0 {
-		allowed, err = quotas.ResourceQuotaCheck(ctx, deployment.Namespace, resources.LimitsNeededDeployment(deployment, replicachange))
-		if err != nil {
-			log.Error(err, "Cannot calculate the resource quotas")
-			return err
-		}
+	allowed, err := quotas.ResourceQuotaCheck(ctx, deployment.Namespace, resources.LimitsNeededDeployment(deployment, stateReplica.Replicas))
+	if err != nil {
+		log.Error(err, "Cannot calculate the resource quotas")
+		return err
 	}
 
 	log = ctrl.Log.
@@ -166,14 +162,10 @@ func ReconcileDeploymentConfig(ctx context.Context, _client client.Client, deplo
 		return err
 	}
 
-	replicachange := stateReplica.Replicas - deploymentConfig.Spec.Replicas
-	allowed := true
-	if replicachange != 0 {
-		allowed, err = quotas.ResourceQuotaCheck(ctx, deploymentConfig.Namespace, resources.LimitsNeededDeploymentConfig(deploymentConfig, replicachange))
-		if err != nil {
-			log.Error(err, "Cannot calculate the resource quotas")
-			return err
-		}
+	allowed, err := quotas.ResourceQuotaCheck(ctx, deploymentConfig.Namespace, resources.LimitsNeededDeploymentConfig(deploymentConfig, stateReplica.Replicas))
+	if err != nil {
+		log.Error(err, "Cannot calculate the resource quotas")
+		return err
 	}
 
 	log = ctrl.Log.
