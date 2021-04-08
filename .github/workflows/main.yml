@@ -14,6 +14,7 @@ env:
   CR_PAT: ${{ secrets.CR_PAT }}
   DH_USER: ${{ secrets.DOCKERHUB_PUSH_USERNAME }}
   DH_TOKEN: ${{ secrets.DOCKERHUB_PUSH_PASS }}
+  OKD_GITHUB_TOKEN: ${{ secrets.OKD_GITHUB_TOKEN }}
 
 jobs:
   tests-and-build:
@@ -44,7 +45,6 @@ jobs:
           sudo mv /tmp/kubebuilder_2.3.1_${os}_${arch} /usr/local/kubebuilder
           export PATH=$PATH:/usr/local/kubebuilder/bin
 
-
       - name: Installing Prerequisites (KinD Cluster)
         uses: engineerd/setup-kind@v0.5.0
         with:
@@ -55,14 +55,23 @@ jobs:
           kubectl cluster-info --context kind-kind
           kind get kubeconfig --internal >$HOME/.kube/config
           kubectl get nodes
-
-      - name: Run tests
+          kubectl create ns e2e-tests
+ 
+      - name: Run tests for Kubernetes
         run: |
           make test
- 
+
       - name: Deleting KinD cluster
         if: ${{ always() }}
         run: kind delete cluster
+
+      - name: OKD Cluster login
+        run: |
+          oc login https://api.prescaling-operator-dev.openshift.csol.cloud:6443 --token='${{ env.OKD_GITHUB_TOKEN }}' --insecure-skip-tls-verify
+
+      - name: Run tests for Openshift
+        run: |
+          make test
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
