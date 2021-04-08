@@ -3,7 +3,7 @@ on:
   pull_request:
   push:
     branches:
-      - test-okd-workflow
+      - main
   release:
     types:
       - edited
@@ -56,14 +56,10 @@ jobs:
           kind get kubeconfig --internal >$HOME/.kube/config
           kubectl get nodes
           kubectl create ns e2e-tests
-          kubectl config set-context --current --namespace=e2e-tests 
  
       - name: Run tests for Kubernetes
         run: |
           make test
-
-      - name: Interact with the cluster
-        run: kubectl get ns
 
       - name: Deleting KinD cluster
         if: ${{ always() }}
