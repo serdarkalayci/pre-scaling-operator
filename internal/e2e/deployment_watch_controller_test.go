@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	c "github.com/containersol/prescale-operator/internal"
+	"github.com/containersol/prescale-operator/internal/validations"
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
@@ -22,10 +22,9 @@ var _ = Describe("e2e Test for the Deployment Watch Controller", func() {
 	const interval = time.Millisecond * 200
 
 	var casenumber = 1
-
+	OpenshiftCluster, _ := validations.ClusterCheck()
 	var deployment v1.Deployment
 	var deploymentconfig ocv1.DeploymentConfig
-	//var clusterscalingstate *v1alpha1.ClusterScalingState
 
 	var key = types.NamespacedName{
 		Name:      "test",
@@ -37,8 +36,12 @@ var _ = Describe("e2e Test for the Deployment Watch Controller", func() {
 	})
 
 	AfterEach(func() {
-		// Tear down the deployment
-		Expect(k8sClient.Delete(context.Background(), &deployment)).Should(Succeed())
+		// Tear down the deployment or deploymentconfig
+		if OpenshiftCluster {
+			Expect(k8sClient.Delete(context.Background(), &deploymentconfig)).Should(Succeed())
+		} else {
+			Expect(k8sClient.Delete(context.Background(), &deployment)).Should(Succeed())
+		}
 
 		casenumber = casenumber + 1
 		time.Sleep(time.Second * 1)
@@ -51,7 +54,7 @@ var _ = Describe("e2e Test for the Deployment Watch Controller", func() {
 				fetchedDeployment := v1.Deployment{}
 				fetchedDeploymentConfig := ocv1.DeploymentConfig{}
 
-				if c.OpenshiftCluster {
+				if OpenshiftCluster {
 
 					deploymentconfig = *CreateDeploymentConfig(key, optinOld, casenumber)
 					Expect(k8sClient.Create(context.Background(), &deploymentconfig)).Should(Succeed())

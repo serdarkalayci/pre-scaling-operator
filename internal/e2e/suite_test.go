@@ -24,6 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	dc "github.com/openshift/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -38,6 +39,7 @@ import (
 	"github.com/containersol/prescale-operator/api/v1alpha1"
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
 	"github.com/containersol/prescale-operator/controllers"
+	"github.com/containersol/prescale-operator/internal/validations"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -74,6 +76,9 @@ var _ = BeforeSuite(func() {
 	cfg, err := testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
+
+	err = dc.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
 
 	err = scalingv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
@@ -125,6 +130,16 @@ var _ = BeforeSuite(func() {
 		Scheme: k8sManager.GetScheme(),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
+
+	OpenshiftCluster, _ := validations.ClusterCheck()
+	if OpenshiftCluster {
+		err = (&controllers.DeploymentConfigWatcher{
+			Client: k8sManager.GetClient(),
+			Log:    ctrl.Log.WithName("controllers").WithName("DeploymentConfigWatcher"),
+			Scheme: k8sManager.GetScheme(),
+		}).SetupWithManager(k8sManager)
+		Expect(err).ToNot(HaveOccurred())
+	}
 
 	go func() {
 		err = k8sManager.Start(ctrl.SetupSignalHandler())
