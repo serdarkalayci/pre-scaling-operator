@@ -231,3 +231,39 @@ func TestIsZero(t *testing.T) {
 		})
 	}
 }
+
+func TestReplicaCalc(t *testing.T) {
+	type args struct {
+		a int32
+		b int32
+	}
+	tests := []struct {
+		name string
+		args args
+		want int32
+	}{
+		{
+			name: "TestPositivePath",
+			args: args{
+				a: 5,
+				b: 3,
+			},
+			want: 2,
+		},
+		{
+			name: "TestZeroPath",
+			args: args{
+				a: 3,
+				b: 3,
+			},
+			want: 3,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ReplicaCalc(tt.args.a, tt.args.b); got != tt.want {
+				t.Errorf("ReplicaCalc() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

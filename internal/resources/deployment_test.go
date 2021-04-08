@@ -522,20 +522,22 @@ func TestLimitsNeededDeployment(t *testing.T) {
 			args: args{
 				deployment: v1.Deployment{
 					Spec: v1.DeploymentSpec{
+						Replicas: new(int32),
 						Template: corev1.PodTemplateSpec{
 							ObjectMeta: metav1.ObjectMeta{},
-							Spec: corev1.PodSpec{
-								Containers: []corev1.Container{
-									{
-										Resources: corev1.ResourceRequirements{
-											Limits: map[corev1.ResourceName]resource.Quantity{},
-										},
+							Spec: corev1.PodSpec{Containers: []corev1.Container{
+								{
+									Resources: corev1.ResourceRequirements{
+										Limits: map[corev1.ResourceName]resource.Quantity{},
 									},
 								},
 							},
+							},
 						},
 					},
-					Status: v1.DeploymentStatus{},
+					Status: v1.DeploymentStatus{
+						Replicas: 3,
+					},
 				},
 				replicas: 5,
 			},
@@ -570,6 +572,7 @@ func TestLimitsNeededDeploymentList(t *testing.T) {
 					Items: []v1.Deployment{
 						{
 							Spec: v1.DeploymentSpec{
+								Replicas: new(int32),
 								Template: corev1.PodTemplateSpec{
 									ObjectMeta: metav1.ObjectMeta{},
 									Spec: corev1.PodSpec{
@@ -583,10 +586,13 @@ func TestLimitsNeededDeploymentList(t *testing.T) {
 									},
 								},
 							},
-							Status: v1.DeploymentStatus{},
+							Status: v1.DeploymentStatus{
+								Replicas: 3,
+							},
 						},
 						{
 							Spec: v1.DeploymentSpec{
+								Replicas: new(int32),
 								Template: corev1.PodTemplateSpec{
 									ObjectMeta: metav1.ObjectMeta{},
 									Spec: corev1.PodSpec{
@@ -600,7 +606,9 @@ func TestLimitsNeededDeploymentList(t *testing.T) {
 									},
 								},
 							},
-							Status: v1.DeploymentStatus{},
+							Status: v1.DeploymentStatus{
+								Replicas: 3,
+							},
 						},
 					},
 				},
