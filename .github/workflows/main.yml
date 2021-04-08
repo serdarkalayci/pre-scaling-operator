@@ -69,7 +69,7 @@ jobs:
 
       - name: OKD Cluster login
         run: |
-          oc login https://api.prescaling-operator-dev.openshift.csol.cloud:6443 --token='${{ env.OKD_GITHUB_TOKEN }}'
+          oc login https://api.prescaling-operator-dev.openshift.csol.cloud:6443 --token='${{ env.OKD_GITHUB_TOKEN }}' --insecure-skip-tls-verify
 
       - name: Run tests for Openshift
         run: |
