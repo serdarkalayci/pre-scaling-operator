@@ -197,8 +197,8 @@ func LimitsNeededDeploymentConfigList(deployments v1.DeploymentConfigList, scale
 
 	var limitsneeded corev1.ResourceList
 	for i, deployment := range deployments.Items {
-
-		limitsneeded = math.Add(limitsneeded, math.Mul(scaleReplicalist[i].Replicas, deployment.Spec.Template.Spec.Containers[0].Resources.Limits))
+		replicachange := scaleReplicalist[i].Replicas - deployment.Spec.Replicas
+		limitsneeded = math.Add(limitsneeded, math.Mul(replicachange, deployment.Spec.Template.Spec.Containers[0].Resources.Limits))
 	}
 
 	return limitsneeded
