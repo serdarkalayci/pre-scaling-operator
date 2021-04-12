@@ -12,11 +12,12 @@ import (
 	ocv1 "github.com/openshift/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
-var _ = Describe("e2e Test for the Deployment Watch Controller", func() {
+var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 	const timeout = time.Second * 25
 	const interval = time.Millisecond * 200
@@ -25,6 +26,7 @@ var _ = Describe("e2e Test for the Deployment Watch Controller", func() {
 	OpenshiftCluster, _ := validations.ClusterCheck()
 	var deployment v1.Deployment
 	var deploymentconfig ocv1.DeploymentConfig
+	var rq corev1.ResourceQuota
 
 	var key = types.NamespacedName{
 		Name:      "test",
@@ -43,6 +45,7 @@ var _ = Describe("e2e Test for the Deployment Watch Controller", func() {
 			Expect(k8sClient.Delete(context.Background(), &deployment)).Should(Succeed())
 		}
 
+		Expect(k8sClient.Delete(context.Background(), &rq)).Should(Succeed())
 		casenumber = casenumber + 1
 		time.Sleep(time.Second * 1)
 	})
@@ -56,8 +59,13 @@ var _ = Describe("e2e Test for the Deployment Watch Controller", func() {
 
 				if OpenshiftCluster {
 
-					deploymentconfig = *CreateDeploymentConfig(key, optinOld, casenumber)
+					deploymentconfig = *CreateDeploymentConfigRQ(key, optinOld, casenumber)
+
 					Expect(k8sClient.Create(context.Background(), &deploymentconfig)).Should(Succeed())
+
+					rq = CreateRQ(key, casenumber)
+
+					Expect(k8sClient.Create(context.Background(), &rq)).Should(Succeed())
 
 					time.Sleep(time.Second * 2)
 
@@ -91,8 +99,12 @@ var _ = Describe("e2e Test for the Deployment Watch Controller", func() {
 
 				} else {
 
-					deployment = CreateDeployment(key, optinOld, casenumber)
+					deployment = CreateDeploymentRQ(key, optinOld, casenumber)
 					Expect(k8sClient.Create(context.Background(), &deployment)).Should(Succeed())
+
+					rq = CreateRQ(key, casenumber)
+
+					Expect(k8sClient.Create(context.Background(), &rq)).Should(Succeed())
 
 					time.Sleep(time.Second * 2)
 
@@ -154,6 +166,176 @@ var _ = Describe("e2e Test for the Deployment Watch Controller", func() {
 	})
 
 })
+
+func CreateDeploymentRQ(deploymentInfo types.NamespacedName, optInOld bool, casenumber int) v1.Deployment {
+	var replicaCount int32
+	if optInOld {
+		replicaCount = 3 // Deployment should start with "bau" in the test. Therefore 3
+	} else {
+		replicaCount = 1
+	}
+
+	var appName = "random-generator-1"
+	labels := map[string]string{
+		"app":           appName,
+		"scaler/opt-in": strconv.FormatBool(optInOld),
+	}
+
+	annotations := map[string]string{
+		"scaler/state-bau-replicas":     "3",
+		"scaler/state-default-replicas": "2",
+		"scaler/state-peak-replicas":    "7",
+	}
+
+	REQCPU := resource.NewQuantity(50, resource.DecimalSI)
+	REQMEM := resource.NewQuantity(50, resource.BinarySI)
+
+	LIMCPU := resource.NewQuantity(100, resource.DecimalSI)
+	LIMMEM := resource.NewQuantity(100, resource.BinarySI)
+
+	matchlabels := map[string]string{
+		"app": appName,
+	}
+	var deploymentname string
+	deploymentname = "case" + strconv.Itoa(casenumber)
+
+	dep := &v1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        deploymentname,
+			Namespace:   deploymentInfo.Namespace,
+			Labels:      labels,
+			Annotations: annotations,
+		},
+
+		Spec: v1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: matchlabels,
+			},
+			Replicas: &replicaCount,
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: matchlabels,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Image: "chriscmsoft/random-generator:latest",
+							Name:  deploymentInfo.Name,
+							Resources: corev1.ResourceRequirements{
+								Limits: map[corev1.ResourceName]resource.Quantity{
+									corev1.ResourceCPU:    *LIMCPU,
+									corev1.ResourceMemory: *LIMMEM,
+								},
+								Requests: map[corev1.ResourceName]resource.Quantity{
+									corev1.ResourceCPU:    *REQCPU,
+									corev1.ResourceMemory: *REQMEM,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	return *dep
+}
+
+func CreateDeploymentConfigRQ(deploymentInfo types.NamespacedName, optInOld bool, casenumber int) *ocv1.DeploymentConfig {
+	var replicaCount int32
+	if optInOld {
+		replicaCount = 3 // Deployment should start with "bau" in the test. Therefore 3
+	} else {
+		replicaCount = 1
+	}
+
+	REQCPU := resource.NewQuantity(50, resource.DecimalSI)
+	REQMEM := resource.NewQuantity(50, resource.BinarySI)
+
+	LIMCPU := resource.NewQuantity(100, resource.DecimalSI)
+	LIMMEM := resource.NewQuantity(100, resource.BinarySI)
+
+	var appName = "random-generator-1"
+	labels := map[string]string{
+		"app":           appName,
+		"scaler/opt-in": strconv.FormatBool(optInOld),
+	}
+
+	annotations := map[string]string{
+		"scaler/state-bau-replicas":     "3",
+		"scaler/state-default-replicas": "2",
+		"scaler/state-peak-replicas":    "7",
+	}
+
+	matchlabels := map[string]string{
+		"app": appName,
+	}
+	var deploymentname string
+	deploymentname = "case" + strconv.Itoa(casenumber)
+
+	deploymentConfig := &ocv1.DeploymentConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        deploymentname,
+			Namespace:   deploymentInfo.Namespace,
+			Labels:      labels,
+			Annotations: annotations,
+		},
+
+		Spec: ocv1.DeploymentConfigSpec{
+			Replicas: replicaCount,
+			Template: &corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: matchlabels,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Image: "chriscmsoft/random-generator:latest",
+							Name:  deploymentInfo.Name,
+							Resources: corev1.ResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{
+									corev1.ResourceCPU:    *REQCPU,
+									corev1.ResourceMemory: *REQMEM,
+								},
+								Limits: map[corev1.ResourceName]resource.Quantity{
+									corev1.ResourceCPU:    *LIMCPU,
+									corev1.ResourceMemory: *LIMMEM,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	return deploymentConfig
+}
+
+func CreateRQ(deploymentInfo types.NamespacedName, casenumber int) corev1.ResourceQuota {
+
+	HardLimCPU := resource.NewQuantity(450, resource.DecimalSI)
+	HardReqCPU := resource.NewQuantity(300, resource.DecimalSI)
+	HardLimMEM := resource.NewQuantity(450, resource.BinarySI)
+	HardReqMEM := resource.NewQuantity(300, resource.BinarySI)
+
+	rq := &corev1.ResourceQuota{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "case" + strconv.Itoa(casenumber),
+			Namespace: deploymentInfo.Namespace,
+		},
+		Spec: corev1.ResourceQuotaSpec{
+			Hard: map[corev1.ResourceName]resource.Quantity{
+				corev1.ResourceLimitsCPU:      *HardLimCPU,
+				corev1.ResourceLimitsMemory:   *HardLimMEM,
+				corev1.ResourceRequestsCPU:    *HardReqCPU,
+				corev1.ResourceRequestsMemory: *HardReqMEM,
+			},
+		},
+		Status: corev1.ResourceQuotaStatus{},
+	}
+
+	return *rq
+}
 
 func ChangeAnnotation(deployment v1.Deployment) v1.Deployment {
 	annotations := map[string]string{
@@ -220,111 +402,4 @@ func ChangeReplicasDC(deploymentconfig ocv1.DeploymentConfig) ocv1.DeploymentCon
 
 	deploymentconfig.Spec = spec2
 	return deploymentconfig
-}
-
-func CreateDeployment(deploymentInfo types.NamespacedName, optInOld bool, casenumber int) v1.Deployment {
-	var replicaCount int32
-	if optInOld {
-		replicaCount = 3 // Deployment should start with "bau" in the test. Therefore 3
-	} else {
-		replicaCount = 1
-	}
-
-	var appName = "random-generator-1"
-	labels := map[string]string{
-		"app":           appName,
-		"scaler/opt-in": strconv.FormatBool(optInOld),
-	}
-
-	annotations := map[string]string{
-		"scaler/state-bau-replicas":     "3",
-		"scaler/state-default-replicas": "2",
-		"scaler/state-peak-replicas":    "7",
-	}
-
-	matchlabels := map[string]string{
-		"app": appName,
-	}
-	var deploymentname string
-	deploymentname = "case" + strconv.Itoa(casenumber)
-
-	dep := &v1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        deploymentname,
-			Namespace:   deploymentInfo.Namespace,
-			Labels:      labels,
-			Annotations: annotations,
-		},
-
-		Spec: v1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: matchlabels,
-			},
-			Replicas: &replicaCount,
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: matchlabels,
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{{
-						Image: "chriscmsoft/random-generator:latest",
-						Name:  deploymentInfo.Name},
-					},
-				},
-			},
-		},
-	}
-	return *dep
-}
-
-func CreateDeploymentConfig(deploymentInfo types.NamespacedName, optInOld bool, casenumber int) *ocv1.DeploymentConfig {
-	var replicaCount int32
-	if optInOld {
-		replicaCount = 3 // Deployment should start with "bau" in the test. Therefore 3
-	} else {
-		replicaCount = 1
-	}
-
-	var appName = "random-generator-1"
-	labels := map[string]string{
-		"app":           appName,
-		"scaler/opt-in": strconv.FormatBool(optInOld),
-	}
-
-	annotations := map[string]string{
-		"scaler/state-bau-replicas":     "3",
-		"scaler/state-default-replicas": "2",
-		"scaler/state-peak-replicas":    "7",
-	}
-
-	matchlabels := map[string]string{
-		"app": appName,
-	}
-	var deploymentname string
-	deploymentname = "case" + strconv.Itoa(casenumber)
-
-	deploymentConfig := &ocv1.DeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        deploymentname,
-			Namespace:   deploymentInfo.Namespace,
-			Labels:      labels,
-			Annotations: annotations,
-		},
-
-		Spec: ocv1.DeploymentConfigSpec{
-			Replicas: replicaCount,
-			Template: &corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: matchlabels,
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{{
-						Image: "chriscmsoft/random-generator:latest",
-						Name:  deploymentInfo.Name},
-					},
-				},
-			},
-		},
-	}
-	return deploymentConfig
 }
