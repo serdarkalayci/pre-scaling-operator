@@ -20,7 +20,7 @@ import (
 var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 	const timeout = time.Second * 25
-	const interval = time.Millisecond * 200
+	const interval = time.Millisecond * 500
 
 	var casenumber = 1
 	OpenshiftCluster, _ := validations.ClusterCheck()
@@ -46,20 +46,21 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 		}
 
 		Expect(k8sClient.Delete(context.Background(), &rq)).Should(Succeed())
+
 		casenumber = casenumber + 1
-		time.Sleep(time.Second * 1)
+		time.Sleep(time.Second * 3)
 	})
 
 	Context("Deployment in place and modification test", func() {
 		When("a deployment is already in place", func() {
-			table.DescribeTable("And then the deployment gets modified..", func(annotationchange bool, replicachange bool, optinOld bool, optinNew bool, expectedReplicas int) {
+			table.DescribeTable("And then the deployment gets modified..", func(replicachange bool, expectedReplicas int) {
 				key.Name = "case" + strconv.Itoa(casenumber)
 				fetchedDeployment := v1.Deployment{}
 				fetchedDeploymentConfig := ocv1.DeploymentConfig{}
 
 				if OpenshiftCluster {
 
-					deploymentconfig = *CreateDeploymentConfigRQ(key, optinOld, casenumber)
+					deploymentconfig = *CreateDeploymentConfigRQ(key, casenumber)
 
 					Expect(k8sClient.Create(context.Background(), &deploymentconfig)).Should(Succeed())
 
@@ -74,15 +75,9 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 						return fetchedDeploymentConfig
 					}, timeout, interval).Should(Not(BeNil()))
 
-					if annotationchange {
-						fetchedDeploymentConfig = ChangeAnnotationDC(fetchedDeploymentConfig)
-					}
-
 					if replicachange {
 						fetchedDeploymentConfig = ChangeReplicasDC(fetchedDeploymentConfig)
 					}
-
-					fetchedDeploymentConfig = ChangeOptInDC(fetchedDeploymentConfig, optinNew)
 
 					// Update with the new changes
 					By("Then a deployment is updated")
@@ -99,7 +94,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 				} else {
 
-					deployment = CreateDeploymentRQ(key, optinOld, casenumber)
+					deployment = CreateDeploymentRQ(key, casenumber)
 					Expect(k8sClient.Create(context.Background(), &deployment)).Should(Succeed())
 
 					rq = CreateRQ(key, casenumber)
@@ -113,15 +108,9 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 						return fetchedDeployment
 					}, timeout, interval).Should(Not(BeNil()))
 
-					if annotationchange {
-						fetchedDeployment = ChangeAnnotation(fetchedDeployment)
-					}
-
 					if replicachange {
 						fetchedDeployment = ChangeReplicas(fetchedDeployment)
 					}
-
-					fetchedDeployment = ChangeOptIn(fetchedDeployment, optinNew)
 
 					// Update with the new changes
 					By("Then a deployment is updated")
@@ -145,44 +134,44 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 				// bau Annoation (if changed) will change to :4
 				// Replica change (that needs to be rectified): 5
 				// Structure:  ("Description of the case" , annotationchange, replicachange, oldoptin, newoptin, expectedReplicas)
-				table.Entry("CASE 1  | Should scale to 4 | Annotation has changed. ", true, true, true, true, 4),
-				table.Entry("CASE 2  | Should scale to 2 | Deployment has been disabled, fallback to default annotation", true, true, true, false, 2),
-				table.Entry("CASE 3  | Should scale to 4 | Deployment opted in and annotation changed", true, true, false, true, 4),
-				table.Entry("CASE 4  | Should be at 5    | Deployment opted out. Will go to modified replica count (5)", true, true, false, false, 5),
-				table.Entry("CASE 5  | Should scale to 4 | Annotation has been modified.", true, false, true, true, 4),
-				table.Entry("CASE 6  | Should scale to 2 | Deployment has been disabled fallback to default annotation", true, false, true, false, 2),
-				table.Entry("CASE 7  | Should scale to 4 | Deployment opted in and annotation changed.", true, false, false, true, 4),
-				table.Entry("CASE 8  | Should be at 1    | Deployment opted out", true, false, false, false, 1),
-				table.Entry("CASE 9  | Should scale to 3 | Replica count has been modified. Rectify back to 'bau'", false, true, true, true, 3),
-				table.Entry("CASE 10 | Should scale to 2 | Deployment has been disabled fallback to default annotation", false, true, true, false, 2),
-				table.Entry("CASE 11 | Should scale to 3 | Deployment opted in. Scale to 'bau'", false, true, false, true, 3),
-				table.Entry("CASE 12 | Should be at 5    | Deployment opted out. Will go to modified replica count (5)", false, true, false, false, 5),
-				table.Entry("CASE 13 | Stay at Bau  	 | Something else on the deployment changed. Don't do anything", false, false, true, true, 3),
-				table.Entry("CASE 14 | Should scale to 2 | Deployment has been disabled fallback to default annotation", false, false, true, false, 2),
-				table.Entry("CASE 15 | Should scale to 3 | Deployment opted in. Scale to 'bau'", false, false, false, true, 3),
-				table.Entry("CASE 16 | Should be at 1    | Nothing happend", false, false, false, false, 1),
+				table.Entry("CASE 1  | Should not scale to 5 | Quota has exceeded. ", false, 1),
+				table.Entry("CASE 2  | Should scale to 3 | Enough Quota to scale down.", false, 3),
+				table.Entry("CASE 3  | Should be at 3 | Same replicas, no change.", false, 3),
+				table.Entry("CASE 4  | Should scale to 3 | Enough quota to scale up", false, 3),
 			)
 		})
 	})
 
 })
 
-func CreateDeploymentRQ(deploymentInfo types.NamespacedName, optInOld bool, casenumber int) v1.Deployment {
+func CreateDeploymentRQ(deploymentInfo types.NamespacedName, casenumber int) v1.Deployment {
 	var replicaCount int32
-	if optInOld {
-		replicaCount = 3 // Deployment should start with "bau" in the test. Therefore 3
-	} else {
+	var stateReplica string
+
+	if casenumber == 1 {
 		replicaCount = 1
+	} else if casenumber == 2 {
+		replicaCount = 4
+	} else if casenumber == 3 {
+		replicaCount = 3
+	} else {
+		replicaCount = 2
+	}
+
+	if casenumber == 1 {
+		stateReplica = "10"
+	} else {
+		stateReplica = "3"
 	}
 
 	var appName = "random-generator-1"
 	labels := map[string]string{
 		"app":           appName,
-		"scaler/opt-in": strconv.FormatBool(optInOld),
+		"scaler/opt-in": "true",
 	}
 
 	annotations := map[string]string{
-		"scaler/state-bau-replicas":     "3",
+		"scaler/state-bau-replicas":     stateReplica,
 		"scaler/state-default-replicas": "2",
 		"scaler/state-peak-replicas":    "7",
 	}
@@ -240,12 +229,24 @@ func CreateDeploymentRQ(deploymentInfo types.NamespacedName, optInOld bool, case
 	return *dep
 }
 
-func CreateDeploymentConfigRQ(deploymentInfo types.NamespacedName, optInOld bool, casenumber int) *ocv1.DeploymentConfig {
+func CreateDeploymentConfigRQ(deploymentInfo types.NamespacedName, casenumber int) *ocv1.DeploymentConfig {
 	var replicaCount int32
-	if optInOld {
-		replicaCount = 3 // Deployment should start with "bau" in the test. Therefore 3
-	} else {
+	var stateReplica string
+
+	if casenumber == 1 {
 		replicaCount = 1
+	} else if casenumber == 2 {
+		replicaCount = 4
+	} else if casenumber == 3 {
+		replicaCount = 3
+	} else {
+		replicaCount = 2
+	}
+
+	if casenumber == 1 {
+		stateReplica = "5"
+	} else {
+		stateReplica = "3"
 	}
 
 	REQCPU := resource.NewQuantity(50, resource.DecimalSI)
@@ -257,11 +258,11 @@ func CreateDeploymentConfigRQ(deploymentInfo types.NamespacedName, optInOld bool
 	var appName = "random-generator-1"
 	labels := map[string]string{
 		"app":           appName,
-		"scaler/opt-in": strconv.FormatBool(optInOld),
+		"scaler/opt-in": "true",
 	}
 
 	annotations := map[string]string{
-		"scaler/state-bau-replicas":     "3",
+		"scaler/state-bau-replicas":     stateReplica,
 		"scaler/state-default-replicas": "2",
 		"scaler/state-peak-replicas":    "7",
 	}
@@ -335,52 +336,6 @@ func CreateRQ(deploymentInfo types.NamespacedName, casenumber int) corev1.Resour
 	}
 
 	return *rq
-}
-
-func ChangeAnnotation(deployment v1.Deployment) v1.Deployment {
-	annotations := map[string]string{
-		"scaler/state-bau-replicas":     "4", // That reflects the annotation change and will change replica # to 4
-		"scaler/state-default-replicas": "2",
-		"scaler/state-peak-replicas":    "7",
-	}
-
-	deployment.Annotations = annotations
-
-	return deployment
-}
-
-func ChangeAnnotationDC(deploymentconfig ocv1.DeploymentConfig) ocv1.DeploymentConfig {
-	annotations := map[string]string{
-		"scaler/state-bau-replicas":     "4", // That reflects the annotation change and will change replica # to 4
-		"scaler/state-default-replicas": "2",
-		"scaler/state-peak-replicas":    "7",
-	}
-
-	deploymentconfig.Annotations = annotations
-
-	return deploymentconfig
-}
-
-func ChangeOptIn(deployment v1.Deployment, optIn bool) v1.Deployment {
-
-	labels := map[string]string{
-		"app":           "random-generator-1",
-		"scaler/opt-in": strconv.FormatBool(optIn),
-	}
-
-	deployment.Labels = labels
-	return deployment
-}
-
-func ChangeOptInDC(deploymentconfig ocv1.DeploymentConfig, optIn bool) ocv1.DeploymentConfig {
-
-	labels := map[string]string{
-		"app":           "random-generator-1",
-		"scaler/opt-in": strconv.FormatBool(optIn),
-	}
-
-	deploymentconfig.Labels = labels
-	return deploymentconfig
 }
 
 // This covers the case when someone external simply edits the replica count. Depending on the opt-in the operator needs to rectify this.
