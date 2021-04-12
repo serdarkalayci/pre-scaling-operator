@@ -7,6 +7,7 @@ import (
 	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/quotas"
 	"github.com/containersol/prescale-operator/internal/resources"
+	"github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
 	"github.com/containersol/prescale-operator/pkg/utils/math"
 	ocv1 "github.com/openshift/api/apps/v1"
@@ -20,6 +21,8 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 	var objectsToReconcile int
 	var deploymentConfigs ocv1.DeploymentConfigList
+
+	var scaleReplicalistDC []state_replicas.StateReplica
 	var limitsneeded corev1.ResourceList
 
 	log := ctrl.Log.
@@ -54,6 +57,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	log.WithValues("deploy to Openshift", c.OpenshiftCluster).
 		Info("Cluster")
 	if c.OpenshiftCluster {
+
 		deploymentConfigs, err = resources.DeploymentConfigLister(ctx, _client, namespace, c.OptInLabel)
 		if err != nil {
 			log.Error(err, "Cannot list deploymentConfigs in namespace")
@@ -61,14 +65,15 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 		}
 		objectsToReconcile = objectsToReconcile + len(deploymentConfigs.Items)
 
-		scaleReplicalist, err := resources.DeploymentConfigStateReplicasList(finalState, deploymentConfigs)
+		scaleReplicalistDC, err = resources.DeploymentConfigStateReplicasList(finalState, deploymentConfigs)
+
 		if err != nil {
 			log.Error(err, "Cannot fetch replicas of all opted-in deploymentconfigs")
 			return err
 		}
 
 		//In case of Openshift, we calculate the resource limits we need from all deploymentconfigs combined and we add it to the total number
-		limitsneeded = math.Add(limitsneeded, resources.LimitsNeededDeploymentConfigList(deploymentConfigs, scaleReplicalist))
+		limitsneeded = math.Add(limitsneeded, resources.LimitsNeededDeploymentConfigList(deploymentConfigs, scaleReplicalistDC))
 
 	}
 
@@ -101,7 +106,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 					WithValues("deploymentconfig", deploymentConfig.Name).
 					WithValues("namespace", deploymentConfig.Namespace)
 
-				err := resources.ScaleDeploymentConfig(ctx, _client, deploymentConfig, scaleReplicalist[i])
+				err := resources.ScaleDeploymentConfig(ctx, _client, deploymentConfig, scaleReplicalistDC[i])
 				if err != nil {
 					log.Error(err, "Error scaling the deploymentconfig")
 					continue
