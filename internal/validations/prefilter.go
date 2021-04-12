@@ -20,48 +20,22 @@ func PreFilter() predicate.Predicate {
 			deploymentName := e.ObjectNew.GetName()
 			var oldoptin, newoptin, replicaChange, annotationchange bool
 
-			var annotationsnew, annotationsold map[string]string
-
 			oldoptin = labels.GetLabelValue(e.ObjectOld.GetLabels(), "scaler/opt-in")
 			newoptin = labels.GetLabelValue(e.ObjectNew.GetLabels(), "scaler/opt-in")
 
-			// Both optin are false, there is no case where we need to reconcile
-			if !oldoptin && !newoptin {
+			// Deployment opted out. Don't do anything
+			if !newoptin {
 				return false
 			}
 
-			// optinLabel has changed, we need to reconcile in any case
-			if oldoptin != newoptin {
-				return true
-			}
-			var replicasOld, replicasNew *int32
-			// Check for deployment of deploymentconfig
-			if reflect.TypeOf(e.ObjectNew) == reflect.TypeOf(&ocv1.DeploymentConfig{}) {
-				replicasOld = &e.ObjectOld.(*ocv1.DeploymentConfig).Spec.Replicas
-				replicasNew = &e.ObjectNew.(*ocv1.DeploymentConfig).Spec.Replicas
-			} else {
-				replicasOld = e.ObjectOld.(*v1.Deployment).Spec.Replicas
-				replicasNew = e.ObjectNew.(*v1.Deployment).Spec.Replicas
-			}
-
-			// Check if replicas count has changed
-			if *replicasOld != *replicasNew {
-				replicaChange = true
-			}
-
-			// Check for changes in relevant annotations.
-			annotationsnew = annotations.FilterByKeyPrefix("scaler", e.ObjectNew.GetAnnotations())
-			annotationsold = annotations.FilterByKeyPrefix("scaler", e.ObjectOld.GetAnnotations())
-
-			eq := reflect.DeepEqual(annotationsnew, annotationsold)
-
-			if !eq {
-				annotationchange = true
-			}
+			replicaChange = AssesReplicaChange(e)
+			annotationchange = AssessAnnotationChange(e)
 
 			// eval if we need to reconcile.
-			// (a || b) && c && d
-			if (annotationchange || replicaChange) && newoptin && oldoptin {
+			if !annotationchange && !replicaChange && newoptin && oldoptin {
+				// Something else on the deployment has changed. Don't reconcile.
+				return false
+			} else {
 				log := ctrl.Log.
 					WithValues("Annotationchange", annotationchange).
 					WithValues("Replicachange", replicaChange).
@@ -70,8 +44,6 @@ func PreFilter() predicate.Predicate {
 				log.Info("Reconciling for deployment " + deploymentName)
 				return true
 			}
-			// don't reconcile at all
-			return false
 
 		},
 		CreateFunc: func(e event.CreateEvent) bool {
@@ -89,4 +61,35 @@ func PreFilter() predicate.Predicate {
 			return false
 		},
 	}
+}
+
+func AssessAnnotationChange(e event.UpdateEvent) bool {
+	// Check for changes in relevant annotations.
+	var annotationsnew, annotationsold map[string]string
+	annotationsnew = annotations.FilterByKeyPrefix("scaler", e.ObjectNew.GetAnnotations())
+	annotationsold = annotations.FilterByKeyPrefix("scaler", e.ObjectOld.GetAnnotations())
+
+	eq := reflect.DeepEqual(annotationsnew, annotationsold)
+
+	if !eq {
+		return true
+	}
+	return false
+}
+
+func AssesReplicaChange(e event.UpdateEvent) bool {
+	var replicasOld, replicasNew *int32
+	if reflect.TypeOf(e.ObjectNew) == reflect.TypeOf(&ocv1.DeploymentConfig{}) {
+		replicasOld = &e.ObjectOld.(*ocv1.DeploymentConfig).Spec.Replicas
+		replicasNew = &e.ObjectNew.(*ocv1.DeploymentConfig).Spec.Replicas
+	} else {
+		replicasOld = e.ObjectOld.(*v1.Deployment).Spec.Replicas
+		replicasNew = e.ObjectNew.(*v1.Deployment).Spec.Replicas
+	}
+
+	// Check if replicas count has changed
+	if *replicasOld != *replicasNew {
+		return true
+	}
+	return false
 }

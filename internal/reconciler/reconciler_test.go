@@ -137,7 +137,7 @@ func TestReconcileDeployment(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := ReconcileDeployment(tt.args.ctx, tt.args._client, tt.args.deployment, tt.args.state, tt.args.optIn); (err != nil) != tt.wantErr {
+			if err := ReconcileDeployment(tt.args.ctx, tt.args._client, tt.args.deployment, tt.args.state); (err != nil) != tt.wantErr {
 				t.Errorf("ReconcileDeployment() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -353,7 +353,7 @@ func TestReconcileDeploymentConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := ReconcileDeploymentConfig(tt.args.ctx, tt.args._client, tt.args.deploymentConfig, tt.args.state, tt.args.optIn); (err != nil) != tt.wantErr {
+			if err := ReconcileDeploymentConfig(tt.args.ctx, tt.args._client, tt.args.deploymentConfig, tt.args.state); (err != nil) != tt.wantErr {
 				t.Errorf("ReconcileDeploymentConfig() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
