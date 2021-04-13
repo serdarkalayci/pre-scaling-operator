@@ -67,7 +67,7 @@ func DeploymentOptinLabel(deployment v1.Deployment) (bool, error) {
 	return validations.OptinLabelExists(deployment.GetLabels())
 }
 
-func DeploymentStateReplicas(state states.State, deployment v1.Deployment, optIn bool) (sr.StateReplica, error) {
+func DeploymentStateReplicas(state states.State, deployment v1.Deployment) (sr.StateReplica, error) {
 	log := ctrl.Log.
 		WithValues("deployment", deployment.Name).
 		WithValues("namespace", deployment.Namespace)
@@ -79,11 +79,6 @@ func DeploymentStateReplicas(state states.State, deployment v1.Deployment, optIn
 		return sr.StateReplica{}, err
 	}
 	// Now we have all the state settings, we can set the replicas for the deployment accordingly
-	if !optIn {
-		// the deployment opted out. We need to set back to default.
-		log.Info("The deployment opted out. Will scale back to default")
-		state.Name = c.DefaultReplicaAnnotation
-	}
 	stateReplica, err := stateReplicas.GetState(state.Name)
 	if err != nil {
 		// TODO here we should do priority filtering, and go down one level of priority to find the lowest set one.

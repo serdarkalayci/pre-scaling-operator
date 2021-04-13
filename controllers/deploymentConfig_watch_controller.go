@@ -14,11 +14,8 @@ package controllers
 
 import (
 	"context"
-	"strings"
 
-	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/reconciler"
-	"github.com/containersol/prescale-operator/internal/resources"
 	"github.com/containersol/prescale-operator/internal/states"
 	"github.com/containersol/prescale-operator/internal/validations"
 	"github.com/go-logr/logr"
@@ -65,18 +62,7 @@ func (r *DeploymentConfigWatcher) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-	// The first thing we need to do is determine if the deploymentconfig has the opt-in label and if it's set to true
-	// If neither of these conditions is met, then we won't reconcile.
-	optinLabel, err := resources.DeploymentConfigOptinLabel(deploymentconfig)
-	if err != nil {
-		if strings.Contains(err.Error(), c.LabelNotFound) {
-			return ctrl.Result{}, nil
-		}
-		log.Error(err, "Failed to validate the opt-in label")
-		return ctrl.Result{}, err
-	}
-
-	// Next step after we are certain that we have an object to reconcile, we need to get the state definitions
+	//We are certain that we have an object to reconcile, we need to get the state definitions
 	stateDefinitions, err := states.GetClusterScalingStateDefinitions(ctx, r.Client)
 	if err != nil {
 		log.Error(err, "Failed to get ClusterStateDefinitions")
@@ -91,7 +77,7 @@ func (r *DeploymentConfigWatcher) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	// After we have the deploymentconfig and state data, we are ready to reconcile the deploymentconfig
-	err = reconciler.ReconcileDeploymentConfig(ctx, r.Client, deploymentconfig, finalState, optinLabel)
+	err = reconciler.ReconcileDeploymentConfig(ctx, r.Client, deploymentconfig, finalState)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

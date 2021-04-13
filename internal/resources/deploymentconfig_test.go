@@ -335,7 +335,6 @@ func TestDeploymentConfigStateReplicas(t *testing.T) {
 	type args struct {
 		state            states.State
 		deploymentConfig v1.DeploymentConfig
-		optIn            bool
 	}
 	tests := []struct {
 		name    string
@@ -355,42 +354,14 @@ func TestDeploymentConfigStateReplicas(t *testing.T) {
 						APIVersion: "apps.openshift.io/v1",
 					},
 				},
-				optIn: false,
 			},
 			want:    sr.StateReplica{},
 			wantErr: true,
 		},
-		{
-			name: "TestFooAnnotation",
-			args: args{
-				state: states.State{
-					Name: "foo",
-				},
-				deploymentConfig: v1.DeploymentConfig{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "DeploymentConfig",
-						APIVersion: "apps.openshift.io/v1",
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "bar",
-						Annotations: map[string]string{
-							"scaler/state-foo-replicas":     "5",
-							"scaler/state-default-replicas": "3",
-						},
-					},
-				},
-				optIn: false,
-			},
-			want: sr.StateReplica{
-				Name:     "default",
-				Replicas: 3,
-			},
-			wantErr: false,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := DeploymentConfigStateReplicas(tt.args.state, tt.args.deploymentConfig, tt.args.optIn)
+			got, err := DeploymentConfigStateReplicas(tt.args.state, tt.args.deploymentConfig)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DeploymentConfigStateReplicas() error = %v, wantErr %v", err, tt.wantErr)
 				return

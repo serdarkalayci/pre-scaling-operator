@@ -124,13 +124,12 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	return nil
 }
 
-func ReconcileDeployment(ctx context.Context, _client client.Client, deployment v1.Deployment, state states.State, optIn bool) error {
-
+func ReconcileDeployment(ctx context.Context, _client client.Client, deployment v1.Deployment, state states.State) error {
 	log := ctrl.Log.
 		WithValues("deployment", deployment.Name).
 		WithValues("namespace", deployment.Namespace)
 
-	stateReplica, err := resources.DeploymentStateReplicas(state, deployment, optIn)
+	stateReplica, err := resources.DeploymentStateReplicas(state, deployment)
 	if err != nil {
 		log.Error(err, "Error getting the state replicas")
 		return err
@@ -156,12 +155,12 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 	return nil
 }
 
-func ReconcileDeploymentConfig(ctx context.Context, _client client.Client, deploymentConfig ocv1.DeploymentConfig, state states.State, optIn bool) error {
+func ReconcileDeploymentConfig(ctx context.Context, _client client.Client, deploymentConfig ocv1.DeploymentConfig, state states.State) error {
 	log := ctrl.Log.
 		WithValues("deploymentconfig", deploymentConfig.Name).
 		WithValues("namespace", deploymentConfig.Namespace)
 
-	stateReplica, err := resources.DeploymentConfigStateReplicas(state, deploymentConfig, optIn)
+	stateReplica, err := resources.DeploymentConfigStateReplicas(state, deploymentConfig)
 	if err != nil {
 		log.Error(err, "Error getting the state replicas")
 		return err

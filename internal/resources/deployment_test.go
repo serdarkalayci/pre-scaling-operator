@@ -316,7 +316,6 @@ func TestDeploymentStateReplicas(t *testing.T) {
 	type args struct {
 		state      states.State
 		deployment v1.Deployment
-		optIn      bool
 	}
 	tests := []struct {
 		name    string
@@ -336,42 +335,14 @@ func TestDeploymentStateReplicas(t *testing.T) {
 						APIVersion: "apps/v1",
 					},
 				},
-				optIn: false,
 			},
 			want:    sr.StateReplica{},
 			wantErr: true,
 		},
-		{
-			name: "TestFooAnnotation",
-			args: args{
-				state: states.State{
-					Name: "foo",
-				},
-				deployment: v1.Deployment{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "Deployment",
-						APIVersion: "apps/v1",
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "bar",
-						Annotations: map[string]string{
-							"scaler/state-foo-replicas":     "5",
-							"scaler/state-default-replicas": "3",
-						},
-					},
-				},
-				optIn: false,
-			},
-			want: sr.StateReplica{
-				Name:     "default",
-				Replicas: 3,
-			},
-			wantErr: false,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := DeploymentStateReplicas(tt.args.state, tt.args.deployment, tt.args.optIn)
+			got, err := DeploymentStateReplicas(tt.args.state, tt.args.deployment)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DeploymentStateReplicas() error = %v, wantErr %v", err, tt.wantErr)
 				return

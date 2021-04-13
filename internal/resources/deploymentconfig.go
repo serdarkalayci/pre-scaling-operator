@@ -67,7 +67,7 @@ func DeploymentConfigOptinLabel(deploymentConfig v1.DeploymentConfig) (bool, err
 	return validations.OptinLabelExists(deploymentConfig.GetLabels())
 }
 
-func DeploymentConfigStateReplicas(state states.State, deployment v1.DeploymentConfig, optIn bool) (sr.StateReplica, error) {
+func DeploymentConfigStateReplicas(state states.State, deployment v1.DeploymentConfig) (sr.StateReplica, error) {
 	log := ctrl.Log.
 		WithValues("deploymentconfig", deployment.Name).
 		WithValues("namespace", deployment.Namespace)
@@ -79,11 +79,7 @@ func DeploymentConfigStateReplicas(state states.State, deployment v1.DeploymentC
 		return sr.StateReplica{}, err
 	}
 	// Now we have all the state settings, we can set the replicas for the deploymentconfig accordingly
-	if !optIn {
-		// the deploymentconfig opted out. We need to set back to default.
-		log.Info("The deploymentconfig opted out. Will scale back to default")
-		state.Name = c.DefaultReplicaAnnotation
-	}
+
 	stateReplica, err := stateReplicas.GetState(state.Name)
 	if err != nil {
 		// TODO here we should do priority filtering, and go down one level of priority to find the lowest set one.
