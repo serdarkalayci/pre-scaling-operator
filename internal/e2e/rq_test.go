@@ -26,14 +26,19 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 	OpenshiftCluster, _ := validations.ClusterCheck()
 	var deployment v1.Deployment
 	var deploymentconfig ocv1.DeploymentConfig
+	var namespace corev1.Namespace
 	var rq corev1.ResourceQuota
 
 	var key = types.NamespacedName{
 		Name:      "test",
-		Namespace: "e2e-tests",
+		Namespace: "e2e-tests" + strconv.Itoa(casenumber),
 	}
 
 	BeforeEach(func() {
+
+		namespace = CreateNS(key, casenumber)
+
+		Expect(k8sClient.Create(context.Background(), &namespace)).Should(Succeed())
 
 	})
 
@@ -47,8 +52,16 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 		Expect(k8sClient.Delete(context.Background(), &rq)).Should(Succeed())
 
+		Expect(k8sClient.Delete(context.Background(), &namespace)).Should(Succeed())
+
 		casenumber = casenumber + 1
-		time.Sleep(time.Second * 60)
+
+		key = types.NamespacedName{
+			Name:      "test",
+			Namespace: "e2e-tests" + strconv.Itoa(casenumber),
+		}
+
+		time.Sleep(time.Second * 3)
 	})
 
 	Context("Deployment in place and modification test", func() {
@@ -358,4 +371,18 @@ func CreateRQ(deploymentInfo types.NamespacedName, casenumber int) corev1.Resour
 	}
 
 	return *rq
+}
+
+func CreateNS(deploymentInfo types.NamespacedName, casenumber int) corev1.Namespace {
+
+	ns := &corev1.Namespace{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "e2e-tests" + strconv.Itoa(casenumber),
+		},
+		Spec:   corev1.NamespaceSpec{},
+		Status: corev1.NamespaceStatus{},
+	}
+
+	return *ns
 }
