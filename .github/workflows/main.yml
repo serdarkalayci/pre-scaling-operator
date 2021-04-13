@@ -3,7 +3,7 @@ on:
   pull_request:
   push:
     branches:
-      - main
+      - watchers-quota-check
   release:
     types:
       - edited
