@@ -19,7 +19,7 @@ import (
 
 var _ = Describe("e2e Test for the main operator functionalities", func() {
 
-	const timeout = time.Second * 25
+	const timeout = time.Second * 60
 	const interval = time.Millisecond * 500
 
 	var casenumber = 1
@@ -48,19 +48,20 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 		Expect(k8sClient.Delete(context.Background(), &rq)).Should(Succeed())
 
 		casenumber = casenumber + 1
-		time.Sleep(time.Second * 3)
+		time.Sleep(time.Second * 60)
 	})
 
 	Context("Deployment in place and modification test", func() {
 		When("a deployment is already in place", func() {
-			table.DescribeTable("And then the deployment gets modified..", func(replicachange bool, expectedReplicas int) {
+			table.DescribeTable("And then the deployment gets modified..", func(expectedReplicas int) {
 				key.Name = "case" + strconv.Itoa(casenumber)
 				fetchedDeployment := v1.Deployment{}
 				fetchedDeploymentConfig := ocv1.DeploymentConfig{}
+				optin := "false"
 
 				if OpenshiftCluster {
 
-					deploymentconfig = *CreateDeploymentConfigRQ(key, casenumber)
+					deploymentconfig = CreateDeploymentConfigRQ(key, optin, casenumber)
 
 					Expect(k8sClient.Create(context.Background(), &deploymentconfig)).Should(Succeed())
 
@@ -75,9 +76,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 						return fetchedDeploymentConfig
 					}, timeout, interval).Should(Not(BeNil()))
 
-					if replicachange {
-						fetchedDeploymentConfig = ChangeReplicasDC(fetchedDeploymentConfig)
-					}
+					fetchedDeploymentConfig = ChangeOptInDC(fetchedDeploymentConfig, "true")
 
 					// Update with the new changes
 					By("Then a deployment is updated")
@@ -108,9 +107,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 						return fetchedDeployment
 					}, timeout, interval).Should(Not(BeNil()))
 
-					if replicachange {
-						fetchedDeployment = ChangeReplicas(fetchedDeployment)
-					}
+					fetchedDeployment = ChangeOptIn(fetchedDeployment, "true")
 
 					// Update with the new changes
 					By("Then a deployment is updated")
@@ -127,41 +124,57 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 				}
 
 			},
-
-				// Default Replica Count from test if oldoptin = true: 3
-				// Default Replica Count from test if oldoptin = false: 1
-				// Default fallback annotation count: 2
-				// bau Annoation (if changed) will change to :4
-				// Replica change (that needs to be rectified): 5
-				// Structure:  ("Description of the case" , annotationchange, replicachange, oldoptin, newoptin, expectedReplicas)
-				table.Entry("CASE 1  | Should not scale to 5 | Quota has exceeded. ", false, 1),
-				table.Entry("CASE 2  | Should scale to 3 | Enough Quota to scale down.", false, 3),
-				table.Entry("CASE 3  | Should be at 3 | Same replicas, no change.", false, 3),
-				table.Entry("CASE 4  | Should scale to 3 | Enough quota to scale up", false, 3),
+				// Structure:  ("Description of the case" , expectedReplicas)
+				table.Entry("CASE 1  | Should scale to 3 | Enough Quota to scale down.", 2),
+				table.Entry("CASE 2  | Should not scale to 5 | Quota has exceeded. ", 1),
+				table.Entry("CASE 3  | Should be at 3 | Same replicas, no change.", 2),
+				table.Entry("CASE 4  | Should scale to 3 | Enough quota to scale up", 2),
 			)
 		})
 	})
 
 })
 
+func ChangeOptInDC(deploymentconfig ocv1.DeploymentConfig, optIn string) ocv1.DeploymentConfig {
+
+	labels := map[string]string{
+		"deployment-config.name": "random-generator-1",
+		"scaler/opt-in":          optIn,
+	}
+
+	deploymentconfig.Labels = labels
+	return deploymentconfig
+}
+
+func ChangeOptIn(deployment v1.Deployment, optIn string) v1.Deployment {
+
+	labels := map[string]string{
+		"app":           "random-generator-1",
+		"scaler/opt-in": optIn,
+	}
+
+	deployment.Labels = labels
+	return deployment
+}
+
 func CreateDeploymentRQ(deploymentInfo types.NamespacedName, casenumber int) v1.Deployment {
 	var replicaCount int32
 	var stateReplica string
 
 	if casenumber == 1 {
-		replicaCount = 1
-	} else if casenumber == 2 {
-		replicaCount = 4
-	} else if casenumber == 3 {
 		replicaCount = 3
-	} else {
+	} else if casenumber == 2 {
+		replicaCount = 1
+	} else if casenumber == 3 {
 		replicaCount = 2
+	} else {
+		replicaCount = 1
 	}
 
-	if casenumber == 1 {
-		stateReplica = "10"
+	if casenumber == 2 {
+		stateReplica = "8"
 	} else {
-		stateReplica = "3"
+		stateReplica = "2"
 	}
 
 	var appName = "random-generator-1"
@@ -176,11 +189,10 @@ func CreateDeploymentRQ(deploymentInfo types.NamespacedName, casenumber int) v1.
 		"scaler/state-peak-replicas":    "7",
 	}
 
-	REQCPU := resource.NewQuantity(50, resource.DecimalSI)
-	REQMEM := resource.NewQuantity(50, resource.BinarySI)
-
-	LIMCPU := resource.NewQuantity(100, resource.DecimalSI)
-	LIMMEM := resource.NewQuantity(100, resource.BinarySI)
+	REQCPU, _ := resource.ParseQuantity("50m")
+	LIMCPU, _ := resource.ParseQuantity("100m")
+	REQMEM, _ := resource.ParseQuantity("50Mi")
+	LIMMEM, _ := resource.ParseQuantity("100Mi")
 
 	matchlabels := map[string]string{
 		"app": appName,
@@ -212,12 +224,12 @@ func CreateDeploymentRQ(deploymentInfo types.NamespacedName, casenumber int) v1.
 							Name:  deploymentInfo.Name,
 							Resources: corev1.ResourceRequirements{
 								Limits: map[corev1.ResourceName]resource.Quantity{
-									corev1.ResourceCPU:    *LIMCPU,
-									corev1.ResourceMemory: *LIMMEM,
+									corev1.ResourceCPU:    LIMCPU,
+									corev1.ResourceMemory: LIMMEM,
 								},
 								Requests: map[corev1.ResourceName]resource.Quantity{
-									corev1.ResourceCPU:    *REQCPU,
-									corev1.ResourceMemory: *REQMEM,
+									corev1.ResourceCPU:    REQCPU,
+									corev1.ResourceMemory: REQMEM,
 								},
 							},
 						},
@@ -229,36 +241,35 @@ func CreateDeploymentRQ(deploymentInfo types.NamespacedName, casenumber int) v1.
 	return *dep
 }
 
-func CreateDeploymentConfigRQ(deploymentInfo types.NamespacedName, casenumber int) *ocv1.DeploymentConfig {
+func CreateDeploymentConfigRQ(deploymentInfo types.NamespacedName, optin string, casenumber int) ocv1.DeploymentConfig {
 	var replicaCount int32
 	var stateReplica string
 
 	if casenumber == 1 {
-		replicaCount = 1
-	} else if casenumber == 2 {
-		replicaCount = 4
-	} else if casenumber == 3 {
 		replicaCount = 3
-	} else {
+	} else if casenumber == 2 {
+		replicaCount = 1
+	} else if casenumber == 3 {
 		replicaCount = 2
-	}
-
-	if casenumber == 1 {
-		stateReplica = "5"
 	} else {
-		stateReplica = "3"
+		replicaCount = 1
 	}
 
-	REQCPU := resource.NewQuantity(50, resource.DecimalSI)
-	REQMEM := resource.NewQuantity(50, resource.BinarySI)
+	if casenumber == 2 {
+		stateReplica = "8"
+	} else {
+		stateReplica = "2"
+	}
 
-	LIMCPU := resource.NewQuantity(100, resource.DecimalSI)
-	LIMMEM := resource.NewQuantity(100, resource.BinarySI)
+	REQCPU, _ := resource.ParseQuantity("50m")
+	LIMCPU, _ := resource.ParseQuantity("100m")
+	REQMEM, _ := resource.ParseQuantity("50Mi")
+	LIMMEM, _ := resource.ParseQuantity("100Mi")
 
 	var appName = "random-generator-1"
 	labels := map[string]string{
-		"app":           appName,
-		"scaler/opt-in": "true",
+		"deployment-config.name": appName,
+		"scaler/opt-in":          optin,
 	}
 
 	annotations := map[string]string{
@@ -268,7 +279,7 @@ func CreateDeploymentConfigRQ(deploymentInfo types.NamespacedName, casenumber in
 	}
 
 	matchlabels := map[string]string{
-		"app": appName,
+		"deployment-config.name": appName,
 	}
 	var deploymentname string
 	deploymentname = "case" + strconv.Itoa(casenumber)
@@ -280,9 +291,21 @@ func CreateDeploymentConfigRQ(deploymentInfo types.NamespacedName, casenumber in
 			Labels:      labels,
 			Annotations: annotations,
 		},
-
 		Spec: ocv1.DeploymentConfigSpec{
 			Replicas: replicaCount,
+			Selector: matchlabels,
+			Strategy: ocv1.DeploymentStrategy{
+				Resources: corev1.ResourceRequirements{
+					Requests: map[corev1.ResourceName]resource.Quantity{
+						corev1.ResourceCPU:    REQCPU,
+						corev1.ResourceMemory: REQMEM,
+					},
+					Limits: map[corev1.ResourceName]resource.Quantity{
+						corev1.ResourceCPU:    LIMCPU,
+						corev1.ResourceMemory: LIMMEM,
+					},
+				},
+			},
 			Template: &corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: matchlabels,
@@ -294,12 +317,12 @@ func CreateDeploymentConfigRQ(deploymentInfo types.NamespacedName, casenumber in
 							Name:  deploymentInfo.Name,
 							Resources: corev1.ResourceRequirements{
 								Requests: map[corev1.ResourceName]resource.Quantity{
-									corev1.ResourceCPU:    *REQCPU,
-									corev1.ResourceMemory: *REQMEM,
+									corev1.ResourceCPU:    REQCPU,
+									corev1.ResourceMemory: REQMEM,
 								},
 								Limits: map[corev1.ResourceName]resource.Quantity{
-									corev1.ResourceCPU:    *LIMCPU,
-									corev1.ResourceMemory: *LIMMEM,
+									corev1.ResourceCPU:    LIMCPU,
+									corev1.ResourceMemory: LIMMEM,
 								},
 							},
 						},
@@ -308,15 +331,15 @@ func CreateDeploymentConfigRQ(deploymentInfo types.NamespacedName, casenumber in
 			},
 		},
 	}
-	return deploymentConfig
+	return *deploymentConfig
 }
 
 func CreateRQ(deploymentInfo types.NamespacedName, casenumber int) corev1.ResourceQuota {
 
-	HardLimCPU := resource.NewQuantity(450, resource.DecimalSI)
-	HardReqCPU := resource.NewQuantity(300, resource.DecimalSI)
-	HardLimMEM := resource.NewQuantity(450, resource.BinarySI)
-	HardReqMEM := resource.NewQuantity(300, resource.BinarySI)
+	HardLimCPU, _ := resource.ParseQuantity("450m")
+	HardReqCPU, _ := resource.ParseQuantity("300m")
+	HardLimMEM, _ := resource.ParseQuantity("450Mi")
+	HardReqMEM, _ := resource.ParseQuantity("300Mi")
 
 	rq := &corev1.ResourceQuota{
 		TypeMeta: metav1.TypeMeta{},
@@ -326,35 +349,13 @@ func CreateRQ(deploymentInfo types.NamespacedName, casenumber int) corev1.Resour
 		},
 		Spec: corev1.ResourceQuotaSpec{
 			Hard: map[corev1.ResourceName]resource.Quantity{
-				corev1.ResourceLimitsCPU:      *HardLimCPU,
-				corev1.ResourceLimitsMemory:   *HardLimMEM,
-				corev1.ResourceRequestsCPU:    *HardReqCPU,
-				corev1.ResourceRequestsMemory: *HardReqMEM,
+				corev1.ResourceLimitsCPU:      HardLimCPU,
+				corev1.ResourceLimitsMemory:   HardLimMEM,
+				corev1.ResourceRequestsCPU:    HardReqCPU,
+				corev1.ResourceRequestsMemory: HardReqMEM,
 			},
 		},
-		Status: corev1.ResourceQuotaStatus{},
 	}
 
 	return *rq
-}
-
-// This covers the case when someone external simply edits the replica count. Depending on the opt-in the operator needs to rectify this.
-func ChangeReplicas(deployment v1.Deployment) v1.Deployment {
-	var replicas int32 = 5
-
-	spec2 := deployment.Spec
-	spec2.Replicas = &replicas
-
-	deployment.Spec = spec2
-	return deployment
-}
-
-func ChangeReplicasDC(deploymentconfig ocv1.DeploymentConfig) ocv1.DeploymentConfig {
-	var replicas int32 = 5
-
-	spec2 := deploymentconfig.Spec
-	spec2.Replicas = replicas
-
-	deploymentconfig.Spec = spec2
-	return deploymentconfig
 }
