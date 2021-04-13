@@ -17,7 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-var _ = Describe("e2e Test for the main operator functionalities", func() {
+var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 
 	const timeout = time.Second * 60
 	const interval = time.Millisecond * 500
@@ -31,12 +31,12 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 	var key = types.NamespacedName{
 		Name:      "test",
-		Namespace: "e2e-tests" + strconv.Itoa(casenumber),
+		Namespace: "e2e-tests-resourcequotas" + strconv.Itoa(casenumber),
 	}
 
 	BeforeEach(func() {
 
-		namespace = CreateNS(key, casenumber)
+		namespace = ReqCreateNS(key, casenumber)
 
 		Expect(k8sClient.Create(context.Background(), &namespace)).Should(Succeed())
 
@@ -58,10 +58,10 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 		key = types.NamespacedName{
 			Name:      "test",
-			Namespace: "e2e-tests" + strconv.Itoa(casenumber),
+			Namespace: "e2e-tests-resourcequotas" + strconv.Itoa(casenumber),
 		}
 
-		time.Sleep(time.Second * 3)
+		time.Sleep(time.Second * 1)
 	})
 
 	Context("Deployment in place and modification test", func() {
@@ -89,7 +89,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 						return fetchedDeploymentConfig
 					}, timeout, interval).Should(Not(BeNil()))
 
-					fetchedDeploymentConfig = ChangeOptInDC(fetchedDeploymentConfig, "true")
+					fetchedDeploymentConfig = ReqChangeOptInDC(fetchedDeploymentConfig, "true")
 
 					// Update with the new changes
 					By("Then a deployment is updated")
@@ -120,7 +120,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 						return fetchedDeployment
 					}, timeout, interval).Should(Not(BeNil()))
 
-					fetchedDeployment = ChangeOptIn(fetchedDeployment, "true")
+					fetchedDeployment = ReqChangeOptIn(fetchedDeployment, "true")
 
 					// Update with the new changes
 					By("Then a deployment is updated")
@@ -148,7 +148,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 })
 
-func ChangeOptInDC(deploymentconfig ocv1.DeploymentConfig, optIn string) ocv1.DeploymentConfig {
+func ReqChangeOptInDC(deploymentconfig ocv1.DeploymentConfig, optIn string) ocv1.DeploymentConfig {
 
 	labels := map[string]string{
 		"deployment-config.name": "random-generator-1",
@@ -159,7 +159,7 @@ func ChangeOptInDC(deploymentconfig ocv1.DeploymentConfig, optIn string) ocv1.De
 	return deploymentconfig
 }
 
-func ChangeOptIn(deployment v1.Deployment, optIn string) v1.Deployment {
+func ReqChangeOptIn(deployment v1.Deployment, optIn string) v1.Deployment {
 
 	labels := map[string]string{
 		"app":           "random-generator-1",
@@ -373,12 +373,12 @@ func CreateRQ(deploymentInfo types.NamespacedName, casenumber int) corev1.Resour
 	return *rq
 }
 
-func CreateNS(deploymentInfo types.NamespacedName, casenumber int) corev1.Namespace {
+func ReqCreateNS(deploymentInfo types.NamespacedName, casenumber int) corev1.Namespace {
 
 	ns := &corev1.Namespace{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-tests" + strconv.Itoa(casenumber),
+			Name: "e2e-tests-resourcequotas" + strconv.Itoa(casenumber),
 		},
 		Spec:   corev1.NamespaceSpec{},
 		Status: corev1.NamespaceStatus{},
