@@ -16,22 +16,27 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-var _ = Describe("e2e Test for the Deployment Watch Controller", func() {
+var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 	const timeout = time.Second * 25
 	const interval = time.Millisecond * 200
 
 	var casenumber = 1
+	var namespace corev1.Namespace
 	OpenshiftCluster, _ := validations.ClusterCheck()
 	var deployment v1.Deployment
 	var deploymentconfig ocv1.DeploymentConfig
 
 	var key = types.NamespacedName{
 		Name:      "test",
-		Namespace: "e2e-tests",
+		Namespace: "e2e-tests-workloadwatchers" + strconv.Itoa(casenumber),
 	}
 
 	BeforeEach(func() {
+
+		namespace = CreateNS(key)
+
+		Expect(k8sClient.Create(context.Background(), &namespace)).Should(Succeed())
 
 	})
 
@@ -43,7 +48,15 @@ var _ = Describe("e2e Test for the Deployment Watch Controller", func() {
 			Expect(k8sClient.Delete(context.Background(), &deployment)).Should(Succeed())
 		}
 
+		Expect(k8sClient.Delete(context.Background(), &namespace)).Should(Succeed())
+
 		casenumber = casenumber + 1
+
+		key = types.NamespacedName{
+			Name:      "test",
+			Namespace: "e2e-tests-workloadwatchers" + strconv.Itoa(casenumber),
+		}
+
 		time.Sleep(time.Second * 1)
 	})
 
@@ -327,4 +340,18 @@ func CreateDeploymentConfig(deploymentInfo types.NamespacedName, optInOld bool, 
 		},
 	}
 	return deploymentConfig
+}
+
+func CreateNS(deploymentInfo types.NamespacedName) corev1.Namespace {
+
+	ns := &corev1.Namespace{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: deploymentInfo.Namespace,
+		},
+		Spec:   corev1.NamespaceSpec{},
+		Status: corev1.NamespaceStatus{},
+	}
+
+	return *ns
 }

@@ -22,3 +22,10 @@ spec:
         - name: random-generator
           imagePullPolicy: Always
           image: chriscmsoft/random-generator:latest
+          resources:
+            requests:
+              cpu: "40m"
+              memory: "60Mi"
+            limits:
+              cpu: "100m"
+              memory: "80Mi"
