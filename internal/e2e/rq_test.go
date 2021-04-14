@@ -40,6 +40,12 @@ var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 
 		Expect(k8sClient.Create(context.Background(), &namespace)).Should(Succeed())
 
+		rq = CreateRQ(key, casenumber)
+
+		Expect(k8sClient.Create(context.Background(), &rq)).Should(Succeed())
+
+		time.Sleep(time.Second * 5)
+
 	})
 
 	AfterEach(func() {
@@ -78,10 +84,6 @@ var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 
 					Expect(k8sClient.Create(context.Background(), &deploymentconfig)).Should(Succeed())
 
-					rq = CreateRQ(key, casenumber)
-
-					Expect(k8sClient.Create(context.Background(), &rq)).Should(Succeed())
-
 					time.Sleep(time.Second * 2)
 
 					Eventually(func() ocv1.DeploymentConfig {
@@ -108,10 +110,6 @@ var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 
 					deployment = CreateDeploymentRQ(key, casenumber)
 					Expect(k8sClient.Create(context.Background(), &deployment)).Should(Succeed())
-
-					rq = CreateRQ(key, casenumber)
-
-					Expect(k8sClient.Create(context.Background(), &rq)).Should(Succeed())
 
 					time.Sleep(time.Second * 2)
 
