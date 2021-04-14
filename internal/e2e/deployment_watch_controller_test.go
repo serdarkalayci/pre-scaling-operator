@@ -44,7 +44,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 		Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
 
-		namespace = CreateNS(key, casenumber)
+		namespace = CreateNS(key)
 
 		Expect(k8sClient.Create(context.Background(), &namespace)).Should(Succeed())
 
@@ -355,12 +355,12 @@ func CreateDeploymentConfig(deploymentInfo types.NamespacedName, optInOld bool, 
 	return deploymentConfig
 }
 
-func CreateNS(deploymentInfo types.NamespacedName, casenumber int) corev1.Namespace {
+func CreateNS(deploymentInfo types.NamespacedName) corev1.Namespace {
 
 	ns := &corev1.Namespace{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-tests-workloadwatchers" + strconv.Itoa(casenumber),
+			Name: deploymentInfo.Namespace,
 		},
 		Spec:   corev1.NamespaceSpec{},
 		Status: corev1.NamespaceStatus{},

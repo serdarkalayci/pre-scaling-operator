@@ -46,7 +46,7 @@ var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 
 		Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
 
-		namespace = ReqCreateNS(key, casenumber)
+		namespace = ReqCreateNS(key)
 
 		Expect(k8sClient.Create(context.Background(), &namespace)).Should(Succeed())
 
@@ -151,10 +151,10 @@ var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 
 			},
 				// Structure:  ("Description of the case" , expectedReplicas)
-				table.Entry("CASE 1  | Should scale to 3 | Enough Quota to scale down.", 2),
-				table.Entry("CASE 2  | Should not scale to 5 | Quota has exceeded. ", 1),
-				table.Entry("CASE 3  | Should be at 3 | Same replicas, no change.", 2),
-				table.Entry("CASE 4  | Should scale to 3 | Enough quota to scale up", 2),
+				table.Entry("CASE 1  | Should scale down from 3 to 2 | Enough Quota to scale down.", 2),
+				table.Entry("CASE 2  | Should not scale to 5 and stay at 1 | Quota has exceeded. ", 1),
+				table.Entry("CASE 3  | Should stay at 2 | Same replicas, no change.", 2),
+				table.Entry("CASE 4  | Should scale from 3 to 4 | Enough quota to scale up", 4),
 			)
 		})
 	})
@@ -194,11 +194,13 @@ func CreateDeploymentRQ(deploymentInfo types.NamespacedName, casenumber int) v1.
 	} else if casenumber == 3 {
 		replicaCount = 2
 	} else {
-		replicaCount = 1
+		replicaCount = 3
 	}
 
 	if casenumber == 2 {
 		stateReplica = "8"
+	} else if casenumber == 4 {
+		stateReplica = "4"
 	} else {
 		stateReplica = "2"
 	}
@@ -278,11 +280,13 @@ func CreateDeploymentConfigRQ(deploymentInfo types.NamespacedName, optin string,
 	} else if casenumber == 3 {
 		replicaCount = 2
 	} else {
-		replicaCount = 1
+		replicaCount = 3
 	}
 
 	if casenumber == 2 {
 		stateReplica = "8"
+	} else if casenumber == 4 {
+		stateReplica = "4"
 	} else {
 		stateReplica = "2"
 	}
@@ -386,12 +390,12 @@ func CreateRQ(deploymentInfo types.NamespacedName, casenumber int) corev1.Resour
 	return *rq
 }
 
-func ReqCreateNS(deploymentInfo types.NamespacedName, casenumber int) corev1.Namespace {
+func ReqCreateNS(deploymentInfo types.NamespacedName) corev1.Namespace {
 
 	ns := &corev1.Namespace{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "e2e-tests-resourcequotas" + strconv.Itoa(casenumber),
+			Name: deploymentInfo.Namespace,
 		},
 		Spec:   corev1.NamespaceSpec{},
 		Status: corev1.NamespaceStatus{},
