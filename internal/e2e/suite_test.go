@@ -17,7 +17,6 @@ limitations under the License.
 package controllers
 
 import (
-	"context"
 	"path/filepath"
 	"testing"
 	"time"
@@ -50,9 +49,6 @@ var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
 var k8sManager ctrl.Manager
-
-var css *v1alpha1.ClusterScalingState = CreateClusterScalingState()
-var cssd *v1alpha1.ClusterScalingStateDefinition = CreateClusterScalingStateDefinition()
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -149,26 +145,12 @@ var _ = BeforeSuite(func() {
 	k8sClient = k8sManager.GetClient()
 	Expect(k8sClient).NotTo(BeNil())
 
-	Expect(k8sClient.Create(context.Background(), css)).Should(Succeed())
-
-	Expect(k8sClient.Create(context.Background(), cssd)).Should(Succeed())
-
 	// Give some time to startup
 	time.Sleep(time.Second * 15)
 
 }, 60)
 
-var _ = AfterSuite(func() {
-	By("tearing down the test environment")
-	Expect(k8sClient.Delete(context.Background(), cssd)).Should(Succeed())
-	Expect(k8sClient.Delete(context.Background(), css)).Should(Succeed())
-
-	err := testEnv.Stop()
-	Expect(err).NotTo(HaveOccurred())
-
-})
-
-func CreateClusterScalingState() *v1alpha1.ClusterScalingState {
+func CreateClusterScalingState() v1alpha1.ClusterScalingState {
 
 	scalingState := &v1alpha1.ClusterScalingState{
 		TypeMeta: metav1.TypeMeta{
@@ -183,10 +165,10 @@ func CreateClusterScalingState() *v1alpha1.ClusterScalingState {
 		},
 	}
 
-	return scalingState
+	return *scalingState
 }
 
-func CreateClusterScalingStateDefinition() *v1alpha1.ClusterScalingStateDefinition {
+func CreateClusterScalingStateDefinition() v1alpha1.ClusterScalingStateDefinition {
 
 	states := []v1alpha1.States{
 		{
@@ -211,5 +193,5 @@ func CreateClusterScalingStateDefinition() *v1alpha1.ClusterScalingStateDefiniti
 		Spec: states,
 	}
 
-	return scalingState
+	return *scalingState
 }

@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/containersol/prescale-operator/api/v1alpha1"
 	"github.com/containersol/prescale-operator/internal/validations"
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/extensions/table"
@@ -26,6 +27,8 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 	OpenshiftCluster, _ := validations.ClusterCheck()
 	var deployment v1.Deployment
 	var deploymentconfig ocv1.DeploymentConfig
+	var css v1alpha1.ClusterScalingState
+	var cssd v1alpha1.ClusterScalingStateDefinition
 
 	var key = types.NamespacedName{
 		Name:      "test",
@@ -33,6 +36,13 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 	}
 
 	BeforeEach(func() {
+
+		css = CreateClusterScalingState()
+		cssd = CreateClusterScalingStateDefinition()
+
+		Expect(k8sClient.Create(context.Background(), &cssd)).Should(Succeed())
+
+		Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
 
 		namespace = CreateNS(key, casenumber)
 
@@ -49,6 +59,9 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 		}
 
 		Expect(k8sClient.Delete(context.Background(), &namespace)).Should(Succeed())
+
+		Expect(k8sClient.Delete(context.Background(), &css)).Should(Succeed())
+		Expect(k8sClient.Delete(context.Background(), &cssd)).Should(Succeed())
 
 		casenumber = casenumber + 1
 
