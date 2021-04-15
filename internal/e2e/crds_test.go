@@ -19,25 +19,27 @@ import (
 
 var _ = Describe("e2e Test for the crd controllers", func() {
 
-	const timeout = time.Second * 20
-	const interval = time.Millisecond * 500
+	const (
+		timeout  = time.Second * 20
+		interval = time.Millisecond * 500
+	)
 
-	var casenumber = 1
+	var (
+		casenumber           = 1
+		deploymentconfigList []ocv1.DeploymentConfig
+		deploymentList       []v1.Deployment
+		css                  v1alpha1.ClusterScalingState
+		ss                   v1alpha1.ScalingState
+		cssd                 v1alpha1.ClusterScalingStateDefinition
+		namespaceList        []corev1.Namespace
+
+		key = types.NamespacedName{
+			Name:      "test",
+			Namespace: "e2e-tests-crds" + strconv.Itoa(casenumber),
+		}
+	)
+
 	OpenshiftCluster, _ := validations.ClusterCheck()
-	var deploymentconfig1 ocv1.DeploymentConfig
-	var deploymentconfig2 ocv1.DeploymentConfig
-	var deployment1 v1.Deployment
-	var deployment2 v1.Deployment
-	var namespace1 corev1.Namespace
-	var namespace2 corev1.Namespace
-	var css v1alpha1.ClusterScalingState
-	var ss v1alpha1.ScalingState
-	var cssd v1alpha1.ClusterScalingStateDefinition
-
-	var key = types.NamespacedName{
-		Name:      "test",
-		Namespace: "e2e-tests-crds" + strconv.Itoa(casenumber),
-	}
 
 	BeforeEach(func() {
 
@@ -45,57 +47,43 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 
 		Expect(k8sClient.Create(context.Background(), &cssd)).Should(Succeed())
 
-		namespace1 = CrdCreateNS(key, "1")
-		namespace2 = CrdCreateNS(key, "2")
+		namespaceList = createMultipleNamespaces(key.Namespace, 2)
 
-		Expect(k8sClient.Create(context.Background(), &namespace1)).Should(Succeed())
-		Expect(k8sClient.Create(context.Background(), &namespace2)).Should(Succeed())
-
-		key = types.NamespacedName{
-			Name:      "test",
-			Namespace: namespace1.Name,
+		for _, ns := range namespaceList {
+			Expect(k8sClient.Create(context.Background(), &ns)).Should(Succeed())
 		}
 
 		if OpenshiftCluster {
-			deploymentconfig1 = CreateDeploymentConfigRQ(key, "true", casenumber, "1")
-			deploymentconfig2 = CreateDeploymentConfigRQ(key, "false", casenumber, "2")
 
-			Expect(k8sClient.Create(context.Background(), &deploymentconfig1)).Should(Succeed())
-			Expect(k8sClient.Create(context.Background(), &deploymentconfig2)).Should(Succeed())
-		} else {
-			deployment1 = CreateDeploymentRQ(key, "true", casenumber, "1")
-			deployment2 = CreateDeploymentRQ(key, "false", casenumber, "2")
+			for _, ns := range namespaceList {
 
-			Expect(k8sClient.Create(context.Background(), &deployment1)).Should(Succeed())
-			Expect(k8sClient.Create(context.Background(), &deployment2)).Should(Succeed())
-		}
+				deploymentconfigList = createMultipleDeploymentConfigs(ns.Name, 2, casenumber)
 
-		key = types.NamespacedName{
-			Name:      "test",
-			Namespace: namespace2.Name,
-		}
-
-		if OpenshiftCluster {
-			deploymentconfig1 = CreateDeploymentConfigRQ(key, "false", casenumber, "1")
-			deploymentconfig2 = CreateDeploymentConfigRQ(key, "true", casenumber, "2")
-
-			Expect(k8sClient.Create(context.Background(), &deploymentconfig1)).Should(Succeed())
-			Expect(k8sClient.Create(context.Background(), &deploymentconfig2)).Should(Succeed())
+				for _, deploymentconfig := range deploymentconfigList {
+					Expect(k8sClient.Create(context.Background(), &deploymentconfig)).Should(Succeed())
+				}
+			}
 
 		} else {
-			deployment1 = CreateDeploymentRQ(key, "false", casenumber, "1")
-			deployment2 = CreateDeploymentRQ(key, "true", casenumber, "2")
 
-			Expect(k8sClient.Create(context.Background(), &deployment1)).Should(Succeed())
-			Expect(k8sClient.Create(context.Background(), &deployment2)).Should(Succeed())
+			for _, ns := range namespaceList {
+
+				deploymentList = createMultipleDeployments(ns.Name, 2, casenumber)
+
+				for _, deployment := range deploymentList {
+					Expect(k8sClient.Create(context.Background(), &deployment)).Should(Succeed())
+				}
+			}
+
 		}
 
 	})
 
 	AfterEach(func() {
 
-		Expect(k8sClient.Delete(context.Background(), &namespace1)).Should(Succeed())
-		Expect(k8sClient.Delete(context.Background(), &namespace2)).Should(Succeed())
+		for _, ns := range namespaceList {
+			Expect(k8sClient.Delete(context.Background(), &ns)).Should(Succeed())
+		}
 
 		if casenumber == 1 {
 			Expect(k8sClient.Delete(context.Background(), &css)).Should(Succeed())
@@ -110,32 +98,23 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 
 		casenumber = casenumber + 1
 
-		key = types.NamespacedName{
-			Name:      "test",
-			Namespace: "e2e-tests-crds" + strconv.Itoa(casenumber),
-		}
+		key.Namespace = "e2e-tests-crds" + strconv.Itoa(casenumber)
 
 		time.Sleep(time.Second * 1)
 	})
 
 	Context("Deployment in place and modification test", func() {
 		When("a deployment is already in place", func() {
-			table.DescribeTable("And then the deployment gets modified..", func(expectedReplicas1 int, expectedReplicas2 int, expectedReplicas3 int, expectedReplicas4 int) {
-				key.Name = "case" + strconv.Itoa(casenumber)
-				fetchedDeploymentConfig1 := ocv1.DeploymentConfig{}
-				fetchedDeploymentConfig2 := ocv1.DeploymentConfig{}
-				fetchedDeploymentConfig3 := ocv1.DeploymentConfig{}
-				fetchedDeploymentConfig4 := ocv1.DeploymentConfig{}
-				fetchedDeployment1 := v1.Deployment{}
-				fetchedDeployment2 := v1.Deployment{}
-				fetchedDeployment3 := v1.Deployment{}
-				fetchedDeployment4 := v1.Deployment{}
+			table.DescribeTable("And then the deployment gets modified..", func(expectedReplicas []int) {
+
+				fetchedDeploymentConfigList := []ocv1.DeploymentConfig{}
+				fetchedDeploymentList := []v1.Deployment{}
 
 				if casenumber == 1 {
 					css = CreateClusterScalingState("bau")
 					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
 				} else if casenumber == 2 {
-					ss = CreateScalingState("peak", namespace1.Name)
+					ss = CreateScalingState("peak", namespaceList[0].Name)
 					Expect(k8sClient.Create(context.Background(), &ss)).Should(Succeed())
 				} else if casenumber == 3 {
 					css = CreateClusterScalingState("bau")
@@ -143,7 +122,7 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 
 					time.Sleep(time.Second * 10)
 
-					ss = CreateScalingState("peak", namespace1.Name)
+					ss = CreateScalingState("peak", namespaceList[0].Name)
 					Expect(k8sClient.Create(context.Background(), &ss)).Should(Succeed())
 				} else {
 					css = CreateClusterScalingState("peak")
@@ -151,7 +130,7 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 
 					time.Sleep(time.Second * 10)
 
-					ss = CreateScalingState("bau", namespace2.Name)
+					ss = CreateScalingState("bau", namespaceList[1].Name)
 					Expect(k8sClient.Create(context.Background(), &ss)).Should(Succeed())
 				}
 
@@ -159,196 +138,123 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 
 				if OpenshiftCluster {
 
-					key.Name = "case" + strconv.Itoa(casenumber) + "-" + "1"
+					for _, ns := range namespaceList {
+						for _, dc := range deploymentconfigList {
+							Eventually(func() ocv1.DeploymentConfig {
+								k8sClient.Get(context.Background(), updateKey(ns.Name, dc.Name, key), &dc)
+								return dc
+							}, timeout, interval).Should(Not(BeNil()))
 
-					key.Namespace = "e2e-tests-crds" + strconv.Itoa(casenumber) + "-" + "1"
-
-					Eventually(func() ocv1.DeploymentConfig {
-						k8sClient.Get(context.Background(), key, &fetchedDeploymentConfig1)
-						return fetchedDeploymentConfig1
-					}, timeout, interval).Should(Not(BeNil()))
-
-					key.Name = "case" + strconv.Itoa(casenumber) + "-" + "2"
-
-					Eventually(func() ocv1.DeploymentConfig {
-						k8sClient.Get(context.Background(), key, &fetchedDeploymentConfig2)
-						return fetchedDeploymentConfig2
-					}, timeout, interval).Should(Not(BeNil()))
-
-					key.Name = "case" + strconv.Itoa(casenumber) + "-" + "1"
-
-					key.Namespace = "e2e-tests-crds" + strconv.Itoa(casenumber) + "-" + "2"
-
-					Eventually(func() ocv1.DeploymentConfig {
-						k8sClient.Get(context.Background(), key, &fetchedDeploymentConfig3)
-						return fetchedDeploymentConfig3
-					}, timeout, interval).Should(Not(BeNil()))
-
-					key.Name = "case" + strconv.Itoa(casenumber) + "-" + "2"
-
-					Eventually(func() ocv1.DeploymentConfig {
-						k8sClient.Get(context.Background(), key, &fetchedDeploymentConfig4)
-						return fetchedDeploymentConfig4
-					}, timeout, interval).Should(Not(BeNil()))
+							fetchedDeploymentConfigList = append(fetchedDeploymentConfigList, dc)
+						}
+					}
 
 					time.Sleep(time.Second * 2)
 
-					key.Name = "case" + strconv.Itoa(casenumber) + "-" + "1"
-
-					key.Namespace = "e2e-tests-crds" + strconv.Itoa(casenumber) + "-" + "1"
-					Eventually(func() int32 {
-						k8sClient.Get(context.Background(), key, &fetchedDeploymentConfig1)
-						return fetchedDeploymentConfig1.Spec.Replicas
-					}, timeout, interval).Should(Equal(int32(expectedReplicas1)))
-
-					key.Name = "case" + strconv.Itoa(casenumber) + "-" + "2"
-
-					Eventually(func() int32 {
-						k8sClient.Get(context.Background(), key, &fetchedDeploymentConfig2)
-						return fetchedDeploymentConfig2.Spec.Replicas
-					}, timeout, interval).Should(Equal(int32(expectedReplicas2)))
-
-					key.Name = "case" + strconv.Itoa(casenumber) + "-" + "1"
-
-					key.Namespace = "e2e-tests-crds" + strconv.Itoa(casenumber) + "-" + "2"
-
-					Eventually(func() int32 {
-						k8sClient.Get(context.Background(), key, &fetchedDeploymentConfig3)
-						return fetchedDeploymentConfig3.Spec.Replicas
-					}, timeout, interval).Should(Equal(int32(expectedReplicas3)))
-
-					key.Name = "case" + strconv.Itoa(casenumber) + "-" + "2"
-
-					Eventually(func() int32 {
-						k8sClient.Get(context.Background(), key, &fetchedDeploymentConfig4)
-						return fetchedDeploymentConfig4.Spec.Replicas
-					}, timeout, interval).Should(Equal(int32(expectedReplicas4)))
+					for k := 0; k < len(fetchedDeploymentConfigList); k++ {
+						Eventually(func() int32 {
+							k8sClient.Get(context.Background(), updateKey(fetchedDeploymentConfigList[k].Name, fetchedDeploymentConfigList[k].Namespace, key), &fetchedDeploymentConfigList[k])
+							return fetchedDeploymentConfigList[k].Spec.Replicas
+						}, timeout, interval).Should(Equal(int32(expectedReplicas[k])))
+					}
 
 				} else {
 
-					key.Name = "case" + strconv.Itoa(casenumber) + "-" + "1"
+					for _, ns := range namespaceList {
+						for _, dep := range deploymentList {
+							Eventually(func() v1.Deployment {
+								k8sClient.Get(context.Background(), updateKey(ns.Name, dep.Name, key), &dep)
+								return dep
+							}, timeout, interval).Should(Not(BeNil()))
 
-					key.Namespace = "e2e-tests-crds" + strconv.Itoa(casenumber) + "-" + "1"
+							fetchedDeploymentList = append(fetchedDeploymentList, dep)
+						}
 
-					Eventually(func() v1.Deployment {
-						k8sClient.Get(context.Background(), key, &fetchedDeployment1)
-						return fetchedDeployment1
-					}, timeout, interval).Should(Not(BeNil()))
-
-					key.Name = "case" + strconv.Itoa(casenumber) + "-" + "2"
-
-					Eventually(func() v1.Deployment {
-						k8sClient.Get(context.Background(), key, &fetchedDeployment2)
-						return fetchedDeployment2
-					}, timeout, interval).Should(Not(BeNil()))
-
-					key.Name = "case" + strconv.Itoa(casenumber) + "-" + "1"
-
-					key.Namespace = "e2e-tests-crds" + strconv.Itoa(casenumber) + "-" + "2"
-
-					Eventually(func() v1.Deployment {
-						k8sClient.Get(context.Background(), key, &fetchedDeployment3)
-						return fetchedDeployment3
-					}, timeout, interval).Should(Not(BeNil()))
-
-					key.Name = "case" + strconv.Itoa(casenumber) + "-" + "2"
-
-					Eventually(func() v1.Deployment {
-						k8sClient.Get(context.Background(), key, &fetchedDeployment4)
-						return fetchedDeployment4
-					}, timeout, interval).Should(Not(BeNil()))
+					}
 
 					time.Sleep(time.Second * 2)
 
-					key.Name = "case" + strconv.Itoa(casenumber) + "-" + "1"
+					for k := 0; k < len(fetchedDeploymentList); k++ {
+						Eventually(func() int32 {
+							k8sClient.Get(context.Background(), updateKey(fetchedDeploymentList[k].Namespace, fetchedDeploymentList[k].Name, key), &fetchedDeploymentList[k])
+							return *fetchedDeploymentList[k].Spec.Replicas
+						}, timeout, interval).Should(Equal(int32(expectedReplicas[k])))
+					}
 
-					key.Namespace = "e2e-tests-crds" + strconv.Itoa(casenumber) + "-" + "1"
-					Eventually(func() int32 {
-						k8sClient.Get(context.Background(), key, &fetchedDeployment1)
-						return *fetchedDeployment1.Spec.Replicas
-					}, timeout, interval).Should(Equal(int32(expectedReplicas1)))
-
-					key.Name = "case" + strconv.Itoa(casenumber) + "-" + "2"
-
-					Eventually(func() int32 {
-						k8sClient.Get(context.Background(), key, &fetchedDeployment2)
-						return *fetchedDeployment2.Spec.Replicas
-					}, timeout, interval).Should(Equal(int32(expectedReplicas2)))
-
-					key.Name = "case" + strconv.Itoa(casenumber) + "-" + "1"
-
-					key.Namespace = "e2e-tests-crds" + strconv.Itoa(casenumber) + "-" + "2"
-
-					Eventually(func() int32 {
-						k8sClient.Get(context.Background(), key, &fetchedDeployment3)
-						return *fetchedDeployment3.Spec.Replicas
-					}, timeout, interval).Should(Equal(int32(expectedReplicas3)))
-
-					key.Name = "case" + strconv.Itoa(casenumber) + "-" + "2"
-
-					Eventually(func() int32 {
-						k8sClient.Get(context.Background(), key, &fetchedDeployment4)
-						return *fetchedDeployment4.Spec.Replicas
-					}, timeout, interval).Should(Equal(int32(expectedReplicas4)))
 				}
 
 			},
 				// Structure:  ("Description of the case" , expectedReplicas)
-				table.Entry("CASE 1  | Apply a CSS and affect only opted-in applications", 2, 1, 1, 2),
-				table.Entry("CASE 2  | Apply a SS on one namespace", 4, 1, 1, 1),
-				table.Entry("CASE 3  | Apply SS with higher prio than an existing CSS", 4, 1, 1, 2),
-				table.Entry("CASE 4  | Apply CSS with higher prio than an existing SS", 4, 1, 1, 4),
+				table.Entry("CASE 1  | Apply a CSS and affect only opted-in applications", []int{2, 1, 2, 1}),
+				table.Entry("CASE 2  | Apply a SS on one namespace", []int{4, 1, 1, 1}),
+				table.Entry("CASE 3  | Apply SS with higher prio than an existing CSS", []int{4, 1, 2, 1}),
+				table.Entry("CASE 4  | Apply CSS with higher prio than an existing SS", []int{4, 1, 4, 1}),
 			)
 		})
 	})
 
 })
 
-func CreateDeploymentRQ(deploymentInfo types.NamespacedName, optin string, casenumber int, name string) v1.Deployment {
-	var replicaCount int32
+func createMultipleDeployments(namespaceName string, numberOfDCs, casenumber int) []v1.Deployment {
 
-	replicaCount = 1
+	var deps []v1.Deployment
+	var optin bool
 
-	var appName = "random-generator-1"
-	labels := map[string]string{
-		"app":           appName,
-		"scaler/opt-in": optin,
+	for i := 1; i <= numberOfDCs; i++ {
+		optin = !optin
+		deployment := defineDeployment(namespaceName, strconv.FormatBool(optin), casenumber, i)
+		deps = append(deps, deployment)
+
 	}
+	return deps
+}
 
-	annotations := map[string]string{
-		"scaler/state-bau-replicas":     "2",
-		"scaler/state-default-replicas": "1",
-		"scaler/state-peak-replicas":    "4",
-	}
+func updateKey(namespaceName, name string, key types.NamespacedName) types.NamespacedName {
 
-	matchlabels := map[string]string{
-		"app": appName,
-	}
-	var deploymentname string
-	deploymentname = "case" + strconv.Itoa(casenumber) + "-" + name
+	key.Name = name
+	key.Namespace = namespaceName
+
+	return key
+
+}
+
+func defineDeployment(namespaceName string, optin string, casenumber int, number int) v1.Deployment {
+
+	var replicaCount int32 = 1
 
 	dep := &v1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        deploymentname,
-			Namespace:   deploymentInfo.Namespace,
-			Labels:      labels,
-			Annotations: annotations,
+			Name:      "case" + strconv.Itoa(casenumber) + "-" + strconv.Itoa(number),
+			Namespace: namespaceName,
+			Labels: map[string]string{
+				"app":           "random-generator-1",
+				"scaler/opt-in": optin,
+			},
+			Annotations: map[string]string{
+				"scaler/state-bau-replicas":     "2",
+				"scaler/state-default-replicas": "1",
+				"scaler/state-peak-replicas":    "4",
+			},
 		},
 
 		Spec: v1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
-				MatchLabels: matchlabels,
+				MatchLabels: map[string]string{
+					"app": "random-generator-1",
+				},
 			},
 			Replicas: &replicaCount,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: matchlabels,
+					Labels: map[string]string{
+						"app": "random-generator-1",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
 							Image: "chriscmsoft/random-generator:latest",
-							Name:  deploymentInfo.Name,
+							Name:  "test",
 						},
 					},
 				},
@@ -358,48 +264,52 @@ func CreateDeploymentRQ(deploymentInfo types.NamespacedName, optin string, casen
 	return *dep
 }
 
-func CreateDeploymentConfigRQ(deploymentInfo types.NamespacedName, optin string, casenumber int, name string) ocv1.DeploymentConfig {
-	var replicaCount int32
+func createMultipleDeploymentConfigs(namespaceName string, numberOfDCs, casenumber int) []ocv1.DeploymentConfig {
 
-	replicaCount = 1
+	var dcs []ocv1.DeploymentConfig
+	var optin bool
 
-	var appName = "random-generator-1" + "-" + name
-	labels := map[string]string{
-		"deployment-config.name": appName,
-		"scaler/opt-in":          optin,
+	for i := 1; i <= numberOfDCs; i++ {
+		optin = !optin
+		deploymentconfig := defineDeploymentConfig(namespaceName, strconv.FormatBool(optin), casenumber, i)
+		dcs = append(dcs, deploymentconfig)
+
 	}
+	return dcs
+}
 
-	annotations := map[string]string{
-		"scaler/state-bau-replicas":     "2",
-		"scaler/state-default-replicas": "1",
-		"scaler/state-peak-replicas":    "4",
-	}
-
-	matchlabels := map[string]string{
-		"deployment-config.name": appName,
-	}
-	var deploymentname string
-	deploymentname = "case" + strconv.Itoa(casenumber) + "-" + name
+func defineDeploymentConfig(namespaceName string, optin string, casenumber int, number int) ocv1.DeploymentConfig {
 
 	deploymentConfig := &ocv1.DeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        deploymentname,
-			Namespace:   deploymentInfo.Namespace,
-			Labels:      labels,
-			Annotations: annotations,
+			Name:      "case" + strconv.Itoa(casenumber) + "-" + strconv.Itoa(number),
+			Namespace: namespaceName,
+			Labels: map[string]string{
+				"deployment-config.name": "random-generator-1",
+				"scaler/opt-in":          optin,
+			},
+			Annotations: map[string]string{
+				"scaler/state-bau-replicas":     "2",
+				"scaler/state-default-replicas": "1",
+				"scaler/state-peak-replicas":    "4",
+			},
 		},
 		Spec: ocv1.DeploymentConfigSpec{
-			Replicas: replicaCount,
-			Selector: matchlabels,
+			Replicas: 1,
+			Selector: map[string]string{
+				"deployment-config.name": "random-generator-1",
+			},
 			Template: &corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: matchlabels,
+					Labels: map[string]string{
+						"deployment-config.name": "random-generator-1",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
 							Image: "chriscmsoft/random-generator:latest",
-							Name:  deploymentInfo.Name,
+							Name:  "test",
 						},
 					},
 				},
@@ -409,16 +319,29 @@ func CreateDeploymentConfigRQ(deploymentInfo types.NamespacedName, optin string,
 	return *deploymentConfig
 }
 
-func CrdCreateNS(deploymentInfo types.NamespacedName, number string) corev1.Namespace {
+func defineNS(namespaceName string, number int) corev1.Namespace {
 
 	ns := &corev1.Namespace{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: deploymentInfo.Namespace + "-" + number,
+			Name: namespaceName + "-" + strconv.Itoa(number),
 		},
 		Spec:   corev1.NamespaceSpec{},
 		Status: corev1.NamespaceStatus{},
 	}
 
 	return *ns
+}
+
+func createMultipleNamespaces(namespaceName string, numberOfNamespaces int) []corev1.Namespace {
+
+	var ns []corev1.Namespace
+
+	for i := 1; i <= numberOfNamespaces; i++ {
+		{
+			namespace := defineNS(namespaceName, i)
+			ns = append(ns, namespace)
+		}
+	}
+	return ns
 }
