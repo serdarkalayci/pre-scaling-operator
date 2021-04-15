@@ -150,7 +150,7 @@ var _ = BeforeSuite(func() {
 
 }, 60)
 
-func CreateClusterScalingState() v1alpha1.ClusterScalingState {
+func CreateClusterScalingState(state string) v1alpha1.ClusterScalingState {
 
 	scalingState := &v1alpha1.ClusterScalingState{
 		TypeMeta: metav1.TypeMeta{
@@ -161,7 +161,26 @@ func CreateClusterScalingState() v1alpha1.ClusterScalingState {
 			Name: "clusterscalingstate-sample",
 		},
 		Spec: v1alpha1.ClusterScalingStateSpec{
-			State: "bau",
+			State: state,
+		},
+	}
+
+	return *scalingState
+}
+
+func CreateScalingState(state, namespace string) v1alpha1.ScalingState {
+
+	scalingState := &v1alpha1.ScalingState{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ScalingState",
+			APIVersion: "scaling.prescale.com/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "scalingstate-sample",
+			Namespace: namespace,
+		},
+		Spec: v1alpha1.ScalingStateSpec{
+			State: state,
 		},
 	}
 
@@ -172,8 +191,13 @@ func CreateClusterScalingStateDefinition() v1alpha1.ClusterScalingStateDefinitio
 
 	states := []v1alpha1.States{
 		{
+			Name:        "peak",
+			Description: "Business critical",
+			Priority:    1,
+		},
+		{
 			Name:        "marketing",
-			Description: "marketing run",
+			Description: "Marketing run",
 			Priority:    5,
 		},
 		{
