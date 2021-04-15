@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/containersol/prescale-operator/api/v1alpha1"
 	"github.com/containersol/prescale-operator/internal/validations"
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/extensions/table"
@@ -28,6 +29,8 @@ var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 	var deploymentconfig ocv1.DeploymentConfig
 	var namespace corev1.Namespace
 	var rq corev1.ResourceQuota
+	var css v1alpha1.ClusterScalingState
+	var cssd v1alpha1.ClusterScalingStateDefinition
 
 	var key = types.NamespacedName{
 		Name:      "test",
@@ -36,15 +39,19 @@ var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 
 	BeforeEach(func() {
 
-		namespace = ReqCreateNS(key)
+		css = CreateClusterScalingState("bau")
+		cssd = CreateClusterScalingStateDefinition()
 
+		Expect(k8sClient.Create(context.Background(), &cssd)).Should(Succeed())
+		Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
+
+		namespace = createNSforRQtest(key)
 		Expect(k8sClient.Create(context.Background(), &namespace)).Should(Succeed())
 
-		rq = CreateRQ(key, casenumber)
-
+		rq = createRQ(key, casenumber)
 		Expect(k8sClient.Create(context.Background(), &rq)).Should(Succeed())
 
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Second * 10)
 
 	})
 
@@ -57,8 +64,9 @@ var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 		}
 
 		Expect(k8sClient.Delete(context.Background(), &rq)).Should(Succeed())
-
 		Expect(k8sClient.Delete(context.Background(), &namespace)).Should(Succeed())
+		Expect(k8sClient.Delete(context.Background(), &css)).Should(Succeed())
+		Expect(k8sClient.Delete(context.Background(), &cssd)).Should(Succeed())
 
 		casenumber = casenumber + 1
 
@@ -76,11 +84,12 @@ var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 				key.Name = "case" + strconv.Itoa(casenumber)
 				fetchedDeployment := v1.Deployment{}
 				fetchedDeploymentConfig := ocv1.DeploymentConfig{}
-				optin := "false"
+
+				replicaCount, stateReplica := caseSpecifics(casenumber)
 
 				if OpenshiftCluster {
 
-					deploymentconfig = CreateDeploymentConfigRQ(key, optin, casenumber)
+					deploymentconfig = createDeploymentConfigforRQtest(key, "false", casenumber, replicaCount, stateReplica)
 
 					Expect(k8sClient.Create(context.Background(), &deploymentconfig)).Should(Succeed())
 
@@ -91,7 +100,7 @@ var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 						return fetchedDeploymentConfig
 					}, timeout, interval).Should(Not(BeNil()))
 
-					fetchedDeploymentConfig = ReqChangeOptInDC(fetchedDeploymentConfig, "true")
+					fetchedDeploymentConfig = changeOptInDCforRQtest(fetchedDeploymentConfig, "true")
 
 					// Update with the new changes
 					By("Then a deployment is updated")
@@ -108,7 +117,7 @@ var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 
 				} else {
 
-					deployment = CreateDeploymentRQ(key, casenumber)
+					deployment = createDeploymentforRQtest(key, "false", casenumber, replicaCount, stateReplica)
 					Expect(k8sClient.Create(context.Background(), &deployment)).Should(Succeed())
 
 					time.Sleep(time.Second * 2)
@@ -118,7 +127,7 @@ var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 						return fetchedDeployment
 					}, timeout, interval).Should(Not(BeNil()))
 
-					fetchedDeployment = ReqChangeOptIn(fetchedDeployment, "true")
+					fetchedDeployment = changeOptInforRQtest(fetchedDeployment, "true")
 
 					// Update with the new changes
 					By("Then a deployment is updated")
@@ -146,89 +155,60 @@ var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 
 })
 
-func ReqChangeOptInDC(deploymentconfig ocv1.DeploymentConfig, optIn string) ocv1.DeploymentConfig {
+func changeOptInDCforRQtest(deploymentconfig ocv1.DeploymentConfig, optIn string) ocv1.DeploymentConfig {
 
-	labels := map[string]string{
+	deploymentconfig.Labels = map[string]string{
 		"deployment-config.name": "random-generator-1",
 		"scaler/opt-in":          optIn,
 	}
 
-	deploymentconfig.Labels = labels
 	return deploymentconfig
 }
 
-func ReqChangeOptIn(deployment v1.Deployment, optIn string) v1.Deployment {
+func changeOptInforRQtest(deployment v1.Deployment, optIn string) v1.Deployment {
 
-	labels := map[string]string{
+	deployment.Labels = map[string]string{
 		"app":           "random-generator-1",
 		"scaler/opt-in": optIn,
 	}
 
-	deployment.Labels = labels
 	return deployment
 }
 
-func CreateDeploymentRQ(deploymentInfo types.NamespacedName, casenumber int) v1.Deployment {
-	var replicaCount int32
-	var stateReplica string
-
-	if casenumber == 1 {
-		replicaCount = 3
-	} else if casenumber == 2 {
-		replicaCount = 1
-	} else if casenumber == 3 {
-		replicaCount = 2
-	} else {
-		replicaCount = 3
-	}
-
-	if casenumber == 2 {
-		stateReplica = "8"
-	} else if casenumber == 4 {
-		stateReplica = "4"
-	} else {
-		stateReplica = "2"
-	}
-
-	var appName = "random-generator-1"
-	labels := map[string]string{
-		"app":           appName,
-		"scaler/opt-in": "true",
-	}
-
-	annotations := map[string]string{
-		"scaler/state-bau-replicas":     stateReplica,
-		"scaler/state-default-replicas": "2",
-		"scaler/state-peak-replicas":    "7",
-	}
+func createDeploymentforRQtest(deploymentInfo types.NamespacedName, optin string, casenumber int, replicaCount int32, stateReplica string) v1.Deployment {
 
 	REQCPU, _ := resource.ParseQuantity("50m")
 	LIMCPU, _ := resource.ParseQuantity("100m")
 	REQMEM, _ := resource.ParseQuantity("50Mi")
 	LIMMEM, _ := resource.ParseQuantity("100Mi")
 
-	matchlabels := map[string]string{
-		"app": appName,
-	}
-	var deploymentname string
-	deploymentname = "case" + strconv.Itoa(casenumber)
-
 	dep := &v1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        deploymentname,
-			Namespace:   deploymentInfo.Namespace,
-			Labels:      labels,
-			Annotations: annotations,
+			Name:      "case" + strconv.Itoa(casenumber),
+			Namespace: deploymentInfo.Namespace,
+			Labels: map[string]string{
+				"app":           "random-generator-1",
+				"scaler/opt-in": optin,
+			},
+			Annotations: map[string]string{
+				"scaler/state-bau-replicas":     stateReplica,
+				"scaler/state-default-replicas": "2",
+				"scaler/state-peak-replicas":    "7",
+			},
 		},
 
 		Spec: v1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
-				MatchLabels: matchlabels,
+				MatchLabels: map[string]string{
+					"app": "random-generator-1",
+				},
 			},
 			Replicas: &replicaCount,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: matchlabels,
+					Labels: map[string]string{
+						"app": "random-generator-1",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -254,61 +234,32 @@ func CreateDeploymentRQ(deploymentInfo types.NamespacedName, casenumber int) v1.
 	return *dep
 }
 
-func CreateDeploymentConfigRQ(deploymentInfo types.NamespacedName, optin string, casenumber int) ocv1.DeploymentConfig {
-	var replicaCount int32
-	var stateReplica string
-
-	if casenumber == 1 {
-		replicaCount = 3
-	} else if casenumber == 2 {
-		replicaCount = 1
-	} else if casenumber == 3 {
-		replicaCount = 2
-	} else {
-		replicaCount = 3
-	}
-
-	if casenumber == 2 {
-		stateReplica = "8"
-	} else if casenumber == 4 {
-		stateReplica = "4"
-	} else {
-		stateReplica = "2"
-	}
+func createDeploymentConfigforRQtest(deploymentInfo types.NamespacedName, optin string, casenumber int, replicaCount int32, stateReplica string) ocv1.DeploymentConfig {
 
 	REQCPU, _ := resource.ParseQuantity("50m")
 	LIMCPU, _ := resource.ParseQuantity("100m")
 	REQMEM, _ := resource.ParseQuantity("50Mi")
 	LIMMEM, _ := resource.ParseQuantity("100Mi")
 
-	var appName = "random-generator-1"
-	labels := map[string]string{
-		"deployment-config.name": appName,
-		"scaler/opt-in":          optin,
-	}
-
-	annotations := map[string]string{
-		"scaler/state-bau-replicas":     stateReplica,
-		"scaler/state-default-replicas": "2",
-		"scaler/state-peak-replicas":    "7",
-	}
-
-	matchlabels := map[string]string{
-		"deployment-config.name": appName,
-	}
-	var deploymentname string
-	deploymentname = "case" + strconv.Itoa(casenumber)
-
 	deploymentConfig := &ocv1.DeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        deploymentname,
-			Namespace:   deploymentInfo.Namespace,
-			Labels:      labels,
-			Annotations: annotations,
+			Name:      "case" + strconv.Itoa(casenumber),
+			Namespace: deploymentInfo.Namespace,
+			Labels: map[string]string{
+				"deployment-config.name": "random-generator-1",
+				"scaler/opt-in":          optin,
+			},
+			Annotations: map[string]string{
+				"scaler/state-bau-replicas":     stateReplica,
+				"scaler/state-default-replicas": "2",
+				"scaler/state-peak-replicas":    "7",
+			},
 		},
 		Spec: ocv1.DeploymentConfigSpec{
 			Replicas: replicaCount,
-			Selector: matchlabels,
+			Selector: map[string]string{
+				"deployment-config.name": "random-generator-1",
+			},
 			Strategy: ocv1.DeploymentStrategy{
 				Resources: corev1.ResourceRequirements{
 					Requests: map[corev1.ResourceName]resource.Quantity{
@@ -323,7 +274,9 @@ func CreateDeploymentConfigRQ(deploymentInfo types.NamespacedName, optin string,
 			},
 			Template: &corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: matchlabels,
+					Labels: map[string]string{
+						"deployment-config.name": "random-generator-1",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -349,7 +302,7 @@ func CreateDeploymentConfigRQ(deploymentInfo types.NamespacedName, optin string,
 	return *deploymentConfig
 }
 
-func CreateRQ(deploymentInfo types.NamespacedName, casenumber int) corev1.ResourceQuota {
+func createRQ(deploymentInfo types.NamespacedName, casenumber int) corev1.ResourceQuota {
 
 	HardLimCPU, _ := resource.ParseQuantity("450m")
 	HardReqCPU, _ := resource.ParseQuantity("300m")
@@ -375,7 +328,7 @@ func CreateRQ(deploymentInfo types.NamespacedName, casenumber int) corev1.Resour
 	return *rq
 }
 
-func ReqCreateNS(deploymentInfo types.NamespacedName) corev1.Namespace {
+func createNSforRQtest(deploymentInfo types.NamespacedName) corev1.Namespace {
 
 	ns := &corev1.Namespace{
 		TypeMeta: metav1.TypeMeta{},
@@ -387,4 +340,30 @@ func ReqCreateNS(deploymentInfo types.NamespacedName) corev1.Namespace {
 	}
 
 	return *ns
+}
+
+func caseSpecifics(casenumber int) (int32, string) {
+
+	var replicaCount int32
+	var stateReplica string
+
+	if casenumber == 1 {
+		replicaCount = 3
+	} else if casenumber == 2 {
+		replicaCount = 1
+	} else if casenumber == 3 {
+		replicaCount = 2
+	} else {
+		replicaCount = 3
+	}
+
+	if casenumber == 2 {
+		stateReplica = "8"
+	} else if casenumber == 4 {
+		stateReplica = "4"
+	} else {
+		stateReplica = "2"
+	}
+
+	return replicaCount, stateReplica
 }

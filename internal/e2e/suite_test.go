@@ -17,7 +17,6 @@ limitations under the License.
 package controllers
 
 import (
-	"context"
 	"path/filepath"
 	"testing"
 	"time"
@@ -50,9 +49,6 @@ var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
 var k8sManager ctrl.Manager
-
-var css *v1alpha1.ClusterScalingState = CreateClusterScalingState()
-var cssd *v1alpha1.ClusterScalingStateDefinition = CreateClusterScalingStateDefinition()
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -149,26 +145,12 @@ var _ = BeforeSuite(func() {
 	k8sClient = k8sManager.GetClient()
 	Expect(k8sClient).NotTo(BeNil())
 
-	Expect(k8sClient.Create(context.Background(), css)).Should(Succeed())
-
-	Expect(k8sClient.Create(context.Background(), cssd)).Should(Succeed())
-
 	// Give some time to startup
 	time.Sleep(time.Second * 15)
 
 }, 60)
 
-var _ = AfterSuite(func() {
-	By("tearing down the test environment")
-	Expect(k8sClient.Delete(context.Background(), cssd)).Should(Succeed())
-	Expect(k8sClient.Delete(context.Background(), css)).Should(Succeed())
-
-	err := testEnv.Stop()
-	Expect(err).NotTo(HaveOccurred())
-
-})
-
-func CreateClusterScalingState() *v1alpha1.ClusterScalingState {
+func CreateClusterScalingState(state string) v1alpha1.ClusterScalingState {
 
 	scalingState := &v1alpha1.ClusterScalingState{
 		TypeMeta: metav1.TypeMeta{
@@ -179,19 +161,43 @@ func CreateClusterScalingState() *v1alpha1.ClusterScalingState {
 			Name: "clusterscalingstate-sample",
 		},
 		Spec: v1alpha1.ClusterScalingStateSpec{
-			State: "bau",
+			State: state,
 		},
 	}
 
-	return scalingState
+	return *scalingState
 }
 
-func CreateClusterScalingStateDefinition() *v1alpha1.ClusterScalingStateDefinition {
+func CreateScalingState(state, namespace string) v1alpha1.ScalingState {
+
+	scalingState := &v1alpha1.ScalingState{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ScalingState",
+			APIVersion: "scaling.prescale.com/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "scalingstate-sample",
+			Namespace: namespace,
+		},
+		Spec: v1alpha1.ScalingStateSpec{
+			State: state,
+		},
+	}
+
+	return *scalingState
+}
+
+func CreateClusterScalingStateDefinition() v1alpha1.ClusterScalingStateDefinition {
 
 	states := []v1alpha1.States{
 		{
+			Name:        "peak",
+			Description: "Business critical",
+			Priority:    1,
+		},
+		{
 			Name:        "marketing",
-			Description: "marketing run",
+			Description: "Marketing run",
 			Priority:    5,
 		},
 		{
@@ -211,5 +217,5 @@ func CreateClusterScalingStateDefinition() *v1alpha1.ClusterScalingStateDefiniti
 		Spec: states,
 	}
 
-	return scalingState
+	return *scalingState
 }

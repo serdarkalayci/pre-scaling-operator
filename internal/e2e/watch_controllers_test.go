@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/containersol/prescale-operator/api/v1alpha1"
 	"github.com/containersol/prescale-operator/internal/validations"
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/extensions/table"
@@ -26,6 +27,8 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 	OpenshiftCluster, _ := validations.ClusterCheck()
 	var deployment v1.Deployment
 	var deploymentconfig ocv1.DeploymentConfig
+	var css v1alpha1.ClusterScalingState
+	var cssd v1alpha1.ClusterScalingStateDefinition
 
 	var key = types.NamespacedName{
 		Name:      "test",
@@ -34,7 +37,14 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 	BeforeEach(func() {
 
-		namespace = CreateNS(key)
+		css = CreateClusterScalingState("bau")
+		cssd = CreateClusterScalingStateDefinition()
+
+		Expect(k8sClient.Create(context.Background(), &cssd)).Should(Succeed())
+
+		Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
+
+		namespace = createNS(key)
 
 		Expect(k8sClient.Create(context.Background(), &namespace)).Should(Succeed())
 
@@ -49,6 +59,9 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 		}
 
 		Expect(k8sClient.Delete(context.Background(), &namespace)).Should(Succeed())
+
+		Expect(k8sClient.Delete(context.Background(), &css)).Should(Succeed())
+		Expect(k8sClient.Delete(context.Background(), &cssd)).Should(Succeed())
 
 		casenumber = casenumber + 1
 
@@ -69,7 +82,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 				if OpenshiftCluster {
 
-					deploymentconfig = *CreateDeploymentConfig(key, optinOld, casenumber)
+					deploymentconfig = *createDeploymentConfig(key, optinOld, casenumber)
 					Expect(k8sClient.Create(context.Background(), &deploymentconfig)).Should(Succeed())
 
 					time.Sleep(time.Second * 2)
@@ -80,14 +93,14 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 					}, timeout, interval).Should(Not(BeNil()))
 
 					if annotationchange {
-						fetchedDeploymentConfig = ChangeAnnotationDC(fetchedDeploymentConfig)
+						fetchedDeploymentConfig = changeAnnotationDC(fetchedDeploymentConfig)
 					}
 
 					if replicachange {
-						fetchedDeploymentConfig = ChangeReplicasDC(fetchedDeploymentConfig)
+						fetchedDeploymentConfig = changeReplicasDC(fetchedDeploymentConfig)
 					}
 
-					fetchedDeploymentConfig = ChangeOptInDC(fetchedDeploymentConfig, optinNew)
+					fetchedDeploymentConfig = changeOptInDC(fetchedDeploymentConfig, optinNew)
 
 					// Update with the new changes
 					By("Then a deployment is updated")
@@ -104,7 +117,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 				} else {
 
-					deployment = CreateDeployment(key, optinOld, casenumber)
+					deployment = createDeployment(key, optinOld, casenumber)
 					Expect(k8sClient.Create(context.Background(), &deployment)).Should(Succeed())
 
 					time.Sleep(time.Second * 2)
@@ -115,14 +128,14 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 					}, timeout, interval).Should(Not(BeNil()))
 
 					if annotationchange {
-						fetchedDeployment = ChangeAnnotation(fetchedDeployment)
+						fetchedDeployment = changeAnnotation(fetchedDeployment)
 					}
 
 					if replicachange {
-						fetchedDeployment = ChangeReplicas(fetchedDeployment)
+						fetchedDeployment = changeReplicas(fetchedDeployment)
 					}
 
-					fetchedDeployment = ChangeOptIn(fetchedDeployment, optinNew)
+					fetchedDeployment = changeOptIn(fetchedDeployment, optinNew)
 
 					// Update with the new changes
 					By("Then a deployment is updated")
@@ -168,74 +181,66 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 })
 
-func ChangeAnnotation(deployment v1.Deployment) v1.Deployment {
-	annotations := map[string]string{
+func changeAnnotation(deployment v1.Deployment) v1.Deployment {
+
+	deployment.Annotations = map[string]string{
 		"scaler/state-bau-replicas":     "4", // That reflects the annotation change and will change replica # to 4
 		"scaler/state-default-replicas": "2",
 		"scaler/state-peak-replicas":    "7",
 	}
-
-	deployment.Annotations = annotations
 
 	return deployment
 }
 
-func ChangeAnnotationDC(deploymentconfig ocv1.DeploymentConfig) ocv1.DeploymentConfig {
-	annotations := map[string]string{
+func changeAnnotationDC(deploymentconfig ocv1.DeploymentConfig) ocv1.DeploymentConfig {
+
+	deploymentconfig.Annotations = map[string]string{
 		"scaler/state-bau-replicas":     "4", // That reflects the annotation change and will change replica # to 4
 		"scaler/state-default-replicas": "2",
 		"scaler/state-peak-replicas":    "7",
 	}
-
-	deploymentconfig.Annotations = annotations
 
 	return deploymentconfig
 }
 
-func ChangeOptIn(deployment v1.Deployment, optIn bool) v1.Deployment {
+func changeOptIn(deployment v1.Deployment, optIn bool) v1.Deployment {
 
-	labels := map[string]string{
+	deployment.Labels = map[string]string{
 		"app":           "random-generator-1",
 		"scaler/opt-in": strconv.FormatBool(optIn),
 	}
-
-	deployment.Labels = labels
 	return deployment
 }
 
-func ChangeOptInDC(deploymentconfig ocv1.DeploymentConfig, optIn bool) ocv1.DeploymentConfig {
+func changeOptInDC(deploymentconfig ocv1.DeploymentConfig, optIn bool) ocv1.DeploymentConfig {
 
-	labels := map[string]string{
+	deploymentconfig.Labels = map[string]string{
 		"app":           "random-generator-1",
 		"scaler/opt-in": strconv.FormatBool(optIn),
 	}
-
-	deploymentconfig.Labels = labels
 	return deploymentconfig
 }
 
 // This covers the case when someone external simply edits the replica count. Depending on the opt-in the operator needs to rectify this.
-func ChangeReplicas(deployment v1.Deployment) v1.Deployment {
+func changeReplicas(deployment v1.Deployment) v1.Deployment {
+
 	var replicas int32 = 5
 
-	spec2 := deployment.Spec
-	spec2.Replicas = &replicas
+	deployment.Spec.Replicas = &replicas
 
-	deployment.Spec = spec2
 	return deployment
 }
 
-func ChangeReplicasDC(deploymentconfig ocv1.DeploymentConfig) ocv1.DeploymentConfig {
+func changeReplicasDC(deploymentconfig ocv1.DeploymentConfig) ocv1.DeploymentConfig {
+
 	var replicas int32 = 5
 
-	spec2 := deploymentconfig.Spec
-	spec2.Replicas = replicas
+	deploymentconfig.Spec.Replicas = replicas
 
-	deploymentconfig.Spec = spec2
 	return deploymentconfig
 }
 
-func CreateDeployment(deploymentInfo types.NamespacedName, optInOld bool, casenumber int) v1.Deployment {
+func createDeployment(deploymentInfo types.NamespacedName, optInOld bool, casenumber int) v1.Deployment {
 	var replicaCount int32
 	if optInOld {
 		replicaCount = 3 // Deployment should start with "bau" in the test. Therefore 3
@@ -243,40 +248,33 @@ func CreateDeployment(deploymentInfo types.NamespacedName, optInOld bool, casenu
 		replicaCount = 1
 	}
 
-	var appName = "random-generator-1"
-	labels := map[string]string{
-		"app":           appName,
-		"scaler/opt-in": strconv.FormatBool(optInOld),
-	}
-
-	annotations := map[string]string{
-		"scaler/state-bau-replicas":     "3",
-		"scaler/state-default-replicas": "2",
-		"scaler/state-peak-replicas":    "7",
-	}
-
-	matchlabels := map[string]string{
-		"app": appName,
-	}
-	var deploymentname string
-	deploymentname = "case" + strconv.Itoa(casenumber)
-
 	dep := &v1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        deploymentname,
-			Namespace:   deploymentInfo.Namespace,
-			Labels:      labels,
-			Annotations: annotations,
+			Name:      "case" + strconv.Itoa(casenumber),
+			Namespace: deploymentInfo.Namespace,
+			Labels: map[string]string{
+				"app":           "random-generator-1",
+				"scaler/opt-in": strconv.FormatBool(optInOld),
+			},
+			Annotations: map[string]string{
+				"scaler/state-bau-replicas":     "3",
+				"scaler/state-default-replicas": "2",
+				"scaler/state-peak-replicas":    "7",
+			},
 		},
 
 		Spec: v1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
-				MatchLabels: matchlabels,
+				MatchLabels: map[string]string{
+					"app": "random-generator-1",
+				},
 			},
 			Replicas: &replicaCount,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: matchlabels,
+					Labels: map[string]string{
+						"app": "random-generator-1",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
@@ -290,7 +288,7 @@ func CreateDeployment(deploymentInfo types.NamespacedName, optInOld bool, casenu
 	return *dep
 }
 
-func CreateDeploymentConfig(deploymentInfo types.NamespacedName, optInOld bool, casenumber int) *ocv1.DeploymentConfig {
+func createDeploymentConfig(deploymentInfo types.NamespacedName, optInOld bool, casenumber int) *ocv1.DeploymentConfig {
 	var replicaCount int32
 	if optInOld {
 		replicaCount = 3 // Deployment should start with "bau" in the test. Therefore 3
@@ -298,37 +296,28 @@ func CreateDeploymentConfig(deploymentInfo types.NamespacedName, optInOld bool, 
 		replicaCount = 1
 	}
 
-	var appName = "random-generator-1"
-	labels := map[string]string{
-		"app":           appName,
-		"scaler/opt-in": strconv.FormatBool(optInOld),
-	}
-
-	annotations := map[string]string{
-		"scaler/state-bau-replicas":     "3",
-		"scaler/state-default-replicas": "2",
-		"scaler/state-peak-replicas":    "7",
-	}
-
-	matchlabels := map[string]string{
-		"app": appName,
-	}
-	var deploymentname string
-	deploymentname = "case" + strconv.Itoa(casenumber)
-
 	deploymentConfig := &ocv1.DeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        deploymentname,
-			Namespace:   deploymentInfo.Namespace,
-			Labels:      labels,
-			Annotations: annotations,
+			Name:      "case" + strconv.Itoa(casenumber),
+			Namespace: deploymentInfo.Namespace,
+			Labels: map[string]string{
+				"app":           "random-generator-1",
+				"scaler/opt-in": strconv.FormatBool(optInOld),
+			},
+			Annotations: map[string]string{
+				"scaler/state-bau-replicas":     "3",
+				"scaler/state-default-replicas": "2",
+				"scaler/state-peak-replicas":    "7",
+			},
 		},
 
 		Spec: ocv1.DeploymentConfigSpec{
 			Replicas: replicaCount,
 			Template: &corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: matchlabels,
+					Labels: map[string]string{
+						"app": "random-generator-1",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
@@ -342,7 +331,7 @@ func CreateDeploymentConfig(deploymentInfo types.NamespacedName, optInOld bool, 
 	return deploymentConfig
 }
 
-func CreateNS(deploymentInfo types.NamespacedName) corev1.Namespace {
+func createNS(deploymentInfo types.NamespacedName) corev1.Namespace {
 
 	ns := &corev1.Namespace{
 		TypeMeta: metav1.TypeMeta{},
