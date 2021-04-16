@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	c "github.com/containersol/prescale-operator/internal"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	dc "github.com/openshift/api/apps/v1"
@@ -127,8 +128,9 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	OpenshiftCluster, _ := validations.ClusterCheck()
-	if OpenshiftCluster {
+	//OpenshiftCluster, _ := validations.ClusterCheck()
+	c.OpenshiftCluster, err = validations.ClusterCheck()
+	if c.OpenshiftCluster {
 		err = (&controllers.DeploymentConfigWatcher{
 			Client: k8sManager.GetClient(),
 			Log:    ctrl.Log.WithName("controllers").WithName("DeploymentConfigWatcher"),
