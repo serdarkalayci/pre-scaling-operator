@@ -40,7 +40,7 @@ with your code, go ahead and open a Pull Request.
 ## Pull Request Process
 
 Most of the code is written in Go. Please run your code
-through `go test` or `go test` prior to opening a PR.
+through `make test` or `go test` prior to opening a PR.
 
 On opening a PR, a GitHub action will execute the test suite against the new code. All code is
 required to pass the tests, and new code must be accompanied by new tests. 
@@ -49,7 +49,7 @@ All PRs have to be reviewed and signed off by another developer before being mer
 branch. This review will likely ask for some changes to the code - please don't be alarmed or upset
 at this; it is expected that all PRs will need tweaks and a normal part of the process.
 
-Be aware that all Trow code is released under the [Apache 2.0 licence](LICENSE).
+Be aware that all Pre-scaling Operator code is released under the [Apache 2.0 licence](LICENSE).
 
 ### Thanks
 

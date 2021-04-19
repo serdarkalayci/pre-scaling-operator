@@ -109,6 +109,4 @@ When autoscaling is enabled, the application will scale freely using metrics, an
 
 ### Default Replica Count
 
-An application should define a default replica count using scaler/state-default-replicas to return to, when no specific state can be determined. 
-
-The default annotation will also automatically be set by the Scaler when the application is opted in and scaled for the first time, if no default exists in annotations. This protects applications which have not set a default from returning to 1 replica.
+An application should define a default replica count using scaler/state-default-replicas. This is treated as a regular state and can be used to direct the application to scale back to the user-defined default state.

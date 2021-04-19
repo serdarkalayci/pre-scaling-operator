@@ -35,6 +35,8 @@ but should support the distributions resources which use the `.spec.replicas` fi
 Immediate Support
 * Deployment
 * DeploymentConfig
+
+To be added in the future:
 * Statefulset
 * ReplicaSet
 

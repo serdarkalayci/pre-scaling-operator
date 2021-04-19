@@ -33,9 +33,11 @@ The operator can be installed by executing `make deploy IMG=<image:tag>`. This w
 Please check the `/docs` folder for documentation related to the architecture of the PreScale Operator 
 
 ## Tests
-There is a reasonably large test suite, which can be run with `make test`. This suite includes several unit tests and multiple e2e tests. We have used Ginkgo to create the e2e tests which can be executed against a real cluster or a fake one. By default, the e2e tests will expect connection to an actual cluster. Currently, we don't have an easy switch between those two and the only way to achieve this is to change the `useCluster` flag in `internal/e2e/suite_test.go`.
+There is a reasonably large test suite, which can be run with `make test`. This suite includes several unit tests and multiple e2e tests. We have used Ginkgo to create the e2e tests which can be executed against a real cluster or a fake one. By default, the e2e tests will expect connection to an actual cluster. 
 With every PR or merge to main branch, all tests are run in our Github workflow to ensure that everything is properly tested.
 
+## Release
+To apply directly a release you can directly apply the pre-generated manifest bundle in the release directory.
 
 ## Contributing
 Please take a look at [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to help out. See also the

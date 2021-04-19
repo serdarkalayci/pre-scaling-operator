@@ -1,0 +1,482 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: pre-scaling-operator-system
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.4.1
+  creationTimestamp: null
+  name: clusterscalingstatedefinitions.scaling.prescale.com
+spec:
+  group: scaling.prescale.com
+  names:
+    kind: ClusterScalingStateDefinition
+    listKind: ClusterScalingStateDefinitionList
+    plural: clusterscalingstatedefinitions
+    singular: clusterscalingstatedefinition
+  scope: Cluster
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ClusterScalingStateDefinition is the Schema for the clusterscalingstatedefinitions API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            items:
+              description: States defines the of desired states fields of ClusterScalingStateDefinition
+              properties:
+                description:
+                  description: Use description to describe the state
+                  type: string
+                name:
+                  description: Use name to define the cluster state name
+                  type: string
+                priority:
+                  description: Use priority to mark one state more important than another. Priority 1 is "higher" priority than priority 10
+                  format: int32
+                  type: integer
+              required:
+              - name
+              - priority
+              type: object
+            type: array
+          status:
+            description: ClusterScalingStateDefinitionStatus defines the observed state of ClusterScalingStateDefinition
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.4.1
+  creationTimestamp: null
+  name: clusterscalingstates.scaling.prescale.com
+spec:
+  group: scaling.prescale.com
+  names:
+    kind: ClusterScalingState
+    listKind: ClusterScalingStateList
+    plural: clusterscalingstates
+    singular: clusterscalingstate
+  scope: Cluster
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ClusterScalingState is the Schema for the clusterscalingstates API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ClusterScalingStateSpec defines the desired state of ClusterScalingState
+            properties:
+              state:
+                description: The State field represents the desired state for the cluster
+                type: string
+            required:
+            - state
+            type: object
+          status:
+            description: ClusterScalingStateStatus defines the observed state of ClusterScalingState
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.4.1
+  creationTimestamp: null
+  name: scalingstates.scaling.prescale.com
+spec:
+  group: scaling.prescale.com
+  names:
+    kind: ScalingState
+    listKind: ScalingStateList
+    plural: scalingstates
+    singular: scalingstate
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ScalingState is the Schema for the scalingstates API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ScalingStateSpec defines the desired state of ScalingState
+            properties:
+              state:
+                description: // The State field represents the desired state for the namespace
+                type: string
+            required:
+            - state
+            type: object
+          status:
+            description: ScalingStateStatus defines the observed state of ScalingState
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pre-scaling-operator-leader-election-role
+  namespace: pre-scaling-operator-system
+rules:
+- apiGroups:
+  - ""
+  - coordination.k8s.io
+  resources:
+  - configmaps
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: pre-scaling-operator-manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - resourcequotas
+  verbs:
+  - list
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.openshift.io
+  resources:
+  - deploymentconfigs
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - scaling.prescale.com
+  resources:
+  - clusterscalingstatedefinitions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - scaling.prescale.com
+  resources:
+  - clusterscalingstatedefinitions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - scaling.prescale.com
+  resources:
+  - clusterscalingstatedefinitions/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - scaling.prescale.com
+  resources:
+  - clusterscalingstates
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - scaling.prescale.com
+  resources:
+  - clusterscalingstates/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - scaling.prescale.com
+  resources:
+  - clusterscalingstates/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - scaling.prescale.com
+  resources:
+  - scalingstates
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - scaling.prescale.com
+  resources:
+  - scalingstates/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - scaling.prescale.com
+  resources:
+  - scalingstates/status
+  verbs:
+  - get
+  - patch
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pre-scaling-operator-metrics-reader
+rules:
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pre-scaling-operator-proxy-role
+rules:
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pre-scaling-operator-leader-election-rolebinding
+  namespace: pre-scaling-operator-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: pre-scaling-operator-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: pre-scaling-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: pre-scaling-operator-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: pre-scaling-operator-manager-role
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: pre-scaling-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: pre-scaling-operator-proxy-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: pre-scaling-operator-proxy-role
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: pre-scaling-operator-system
+---
+apiVersion: v1
+data:
+  controller_manager_config.yaml: |
+    apiVersion: controller-runtime.sigs.k8s.io/v1alpha1
+    kind: ControllerManagerConfig
+    health:
+      healthProbeBindAddress: :8081
+    metrics:
+      bindAddress: 127.0.0.1:8080
+    webhook:
+      port: 9443
+    leaderElection:
+      leaderElect: true
+      resourceName: 14b492ce.prescale.com
+kind: ConfigMap
+metadata:
+  name: pre-scaling-operator-manager-config
+  namespace: pre-scaling-operator-system
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: pre-scaling-operator-controller-manager-metrics-service
+  namespace: pre-scaling-operator-system
+spec:
+  ports:
+  - name: https
+    port: 8443
+    targetPort: https
+  selector:
+    control-plane: controller-manager
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: pre-scaling-operator-controller-manager
+  namespace: pre-scaling-operator-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+    spec:
+      containers:
+      - args:
+        - --secure-listen-address=0.0.0.0:8443
+        - --upstream=http://127.0.0.1:8080/
+        - --logtostderr=true
+        - --v=10
+        image: gcr.io/kubebuilder/kube-rbac-proxy:v0.5.0
+        name: kube-rbac-proxy
+        ports:
+        - containerPort: 8443
+          name: https
+      - args:
+        - --health-probe-bind-address=:8081
+        - --metrics-bind-address=127.0.0.1:8080
+        - --leader-elect
+        command:
+        - /manager
+        image: containersol/pre-scaling-operator:ci
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: manager
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 100m
+            memory: 30Mi
+          requests:
+            cpu: 100m
+            memory: 20Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+      terminationGracePeriodSeconds: 10
