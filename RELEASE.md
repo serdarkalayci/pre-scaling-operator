@@ -8,7 +8,7 @@ We don't have a release frequency yet. Once the operator becomes more widely use
 
 | release series | date of first pre-release (year-month-day) | release shepherd                            |
 |----------------|--------------------------------------------|---------------------------------------------|
-| v1.0           | 2021-04-19                                 | Andreas Krivas (GitHub: @andreas131989) |
+| v1.0.0         | 2021-04-19                                 | Andreas Krivas (GitHub: @andreas131989) |
 
 
 ## Release shepherd responsibilities
