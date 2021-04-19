@@ -18,14 +18,16 @@ package controllers
 
 import (
 	"context"
-	"k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
+	"github.com/containersol/prescale-operator/internal/reconciler"
+	"github.com/containersol/prescale-operator/internal/states"
 )
 
 // ClusterScalingStateDefinitionReconciler reconciles a ClusterScalingStateDefinition object
@@ -53,23 +55,31 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 		WithValues("reconciler kind", "ClusterScalingStatesDefinition").
 		WithValues("reconciler object", req.Name)
 
-	// cssd here stand for ClusterScalingStateDefinitino
-	cssd := &scalingv1alpha1.ClusterScalingStateDefinition{}
-	err := r.Get(ctx, req.NamespacedName, cssd)
+	clusterStateDefinitions, err := states.GetClusterScalingStateDefinitions(ctx, r.Client)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			// Request object not found, could have been deleted after reconcile request.
-			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
-			// Return and don't requeue
-			log.Info("ClusterScalingStateDefinition resource not found. Ignoring since object must be deleted.")
-			return ctrl.Result{}, nil
-		}
-		// Error reading the object - requeue the request.
-		log.Error(err, "Failed to get ClusterScalingStateDefinition")
+		// If we encounter an error trying to retrieve the state definitions,
+		// we will not be able to compute anything else.
+		log.Error(err, "Failed to get ClusterStateDefinitions")
 		return ctrl.Result{}, err
 	}
 
 	log.Info("Reconciling")
+	namespaces := corev1.NamespaceList{}
+	err = r.Client.List(ctx, &namespaces)
+	if err != nil {
+		log.Error(err, "Cannot list namespaces")
+		return ctrl.Result{}, err
+	}
+
+	for _, namespace := range namespaces.Items {
+
+		err = reconciler.ReconcileNamespace(ctx, r.Client, namespace.Name, clusterStateDefinitions, states.State{})
+
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
+	}
 
 	return ctrl.Result{}, nil
 }

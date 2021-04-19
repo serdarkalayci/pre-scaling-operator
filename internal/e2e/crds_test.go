@@ -85,7 +85,7 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 			Expect(k8sClient.Delete(context.Background(), &ns)).Should(Succeed())
 		}
 
-		if casenumber == 1 {
+		if casenumber == 1 || casenumber == 6 {
 			Expect(k8sClient.Delete(context.Background(), &css)).Should(Succeed())
 		} else if casenumber == 2 {
 			Expect(k8sClient.Delete(context.Background(), &ss)).Should(Succeed())
@@ -124,6 +124,39 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 
 					ss = CreateScalingState("peak", namespaceList[0].Name)
 					Expect(k8sClient.Create(context.Background(), &ss)).Should(Succeed())
+				} else if casenumber == 5 {
+					css = CreateClusterScalingState("bau")
+					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
+
+					time.Sleep(time.Second * 10)
+
+					ss = CreateScalingState("peak", namespaceList[0].Name)
+					Expect(k8sClient.Create(context.Background(), &ss)).Should(Succeed())
+
+					// get the cssd back to modify
+					cssdList := &v1alpha1.ClusterScalingStateDefinitionList{}
+					Eventually(func() v1alpha1.ClusterScalingStateDefinitionList {
+						k8sClient.List(context.Background(), cssdList)
+						return *cssdList
+					}, timeout, interval).Should(Not(BeNil()))
+
+					cssdMofified := getModifiedClusterScalingStateDefinition(cssdList.Items[0], false, true)
+					Expect(k8sClient.Update(context.Background(), &cssdMofified)).Should(Succeed())
+				} else if casenumber == 6 {
+					css = CreateClusterScalingState("peak")
+					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
+
+					time.Sleep(time.Second * 10)
+
+					// get the cssd back to modify
+					cssdList := &v1alpha1.ClusterScalingStateDefinitionList{}
+					Eventually(func() v1alpha1.ClusterScalingStateDefinitionList {
+						k8sClient.List(context.Background(), cssdList)
+						return *cssdList
+					}, timeout, interval).Should(Not(BeNil()))
+
+					cssdMofified := getModifiedClusterScalingStateDefinition(cssdList.Items[0], true, false)
+					Expect(k8sClient.Update(context.Background(), &cssdMofified)).Should(Succeed())
 				} else {
 					css = CreateClusterScalingState("peak")
 					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
@@ -189,6 +222,8 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 				table.Entry("CASE 2  | Apply a SS on one namespace", []int{4, 1, 1, 1}),
 				table.Entry("CASE 3  | Apply SS with higher prio than an existing CSS", []int{4, 1, 2, 1}),
 				table.Entry("CASE 4  | Apply CSS with higher prio than an existing SS", []int{4, 1, 4, 1}),
+				table.Entry("CASE 5  | Swap Prio in CSSD", []int{2, 1, 2, 1}),
+				table.Entry("CASE 6  | Remove states in CSSD", []int{4, 1, 4, 1}),
 			)
 		})
 	})

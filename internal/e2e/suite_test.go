@@ -221,3 +221,47 @@ func CreateClusterScalingStateDefinition() v1alpha1.ClusterScalingStateDefinitio
 
 	return *scalingState
 }
+
+func returnModifiedStates(state1name string, state2name string, state1prio int32, state2prio int32) []v1alpha1.States {
+	return []v1alpha1.States{
+		{
+			Name:        state1name,
+			Description: "Test State 1",
+			Priority:    state1prio,
+		},
+		{
+			Name:        state2name,
+			Description: "Test State 2",
+			Priority:    state2prio,
+		},
+	}
+}
+
+func getModifiedClusterScalingStateDefinition(cssd v1alpha1.ClusterScalingStateDefinition, changeName bool, changePrio bool) v1alpha1.ClusterScalingStateDefinition {
+
+	var statename1 string
+	var statename2 string
+	var priostate1 int32
+	var priostate2 int32
+
+	if changeName {
+		statename1 = "mode1"
+		statename2 = "mode2"
+	} else {
+		statename1 = "bau"
+		statename2 = "peak"
+	}
+
+	if changePrio {
+		priostate1 = 1
+		priostate2 = 10
+	} else {
+		priostate1 = 10
+		priostate2 = 1
+	}
+
+	states := returnModifiedStates(statename1, statename2, priostate1, priostate2)
+	cssd.Spec = states
+
+	return cssd
+}
