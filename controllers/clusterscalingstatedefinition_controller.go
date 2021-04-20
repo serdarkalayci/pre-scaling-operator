@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -26,6 +27,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/containersol/prescale-operator/api/v1alpha1"
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
 	"github.com/containersol/prescale-operator/internal/reconciler"
 	"github.com/containersol/prescale-operator/internal/states"
@@ -54,6 +56,9 @@ type ClusterScalingStateDefinitionReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.7.0/pkg/reconcile
 func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	var nsQuotaExceededList []string
+	var finalStateList []string
+	var finalStateNSList []string
 	log := r.Log.
 		WithValues("reconciler kind", "ClusterScalingStatesDefinition").
 		WithValues("reconciler object", req.Name)
@@ -76,13 +81,28 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 
 	for _, namespace := range namespaces.Items {
 
-		_, err := reconciler.ReconcileNamespace(ctx, r.Client, namespace.Name, clusterStateDefinitions, states.State{})
-
+		nsQuotaExceeded, state, err := reconciler.ReconcileNamespace(ctx, r.Client, namespace.Name, clusterStateDefinitions, states.State{})
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 
+		if nsQuotaExceeded.QuotaExceeded != "" {
+			nsQuotaExceededList = append(nsQuotaExceededList, nsQuotaExceeded.QuotaExceeded)
+		}
+
+		finalStateNSList = append(finalStateNSList, namespace.Name)
+		finalStateList = append(finalStateList, state)
+
 	}
+
+	cssd := &v1alpha1.ClusterScalingStateDefinition{}
+	err = r.Get(ctx, req.NamespacedName, cssd)
+
+	if len(nsQuotaExceededList) != 0 {
+		r.Recorder.Event(cssd, "Warning", "QuotaExceeded", fmt.Sprintf("Exceeded for %d namespaces. Namely: %s", len(nsQuotaExceededList), nsQuotaExceededList))
+	}
+
+	r.Recorder.Event(cssd, "Normal", "CreatedFinalStates", fmt.Sprintf("The final state for %s namespaces are %s", finalStateNSList, finalStateList))
 
 	return ctrl.Result{}, nil
 }

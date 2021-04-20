@@ -17,10 +17,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State) (string, error) {
+type NamespaceEvents struct {
+	QuotaExceeded string
+}
+
+func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State) (NamespaceEvents, string, error) {
 
 	var objectsToReconcile int
 	var deploymentConfigs ocv1.DeploymentConfigList
+	var nsEvents NamespaceEvents
 
 	var scaleReplicalistDC []state_replicas.StateReplica
 	var limitsneeded corev1.ResourceList
@@ -33,7 +38,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	finalState, err := GetAppliedState(ctx, _client, namespace, stateDefinitions, clusterState)
 	if err != nil {
 		log.Error(err, "Cannot determine applied state for namespace")
-		return "", err
+		return nsEvents, finalState.Name, err
 	}
 
 	// We now need to look for objects (currently supported deployments and deploymentConfigs) which are opted in,
@@ -41,14 +46,14 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	deployments, err := resources.DeploymentLister(ctx, _client, namespace, c.OptInLabel)
 	if err != nil {
 		log.Error(err, "Cannot list deployments in namespace")
-		return "", err
+		return nsEvents, finalState.Name, err
 	}
 	objectsToReconcile = objectsToReconcile + len(deployments.Items)
 
 	scaleReplicalist, err := resources.DeploymentStateReplicasList(finalState, deployments)
 	if err != nil {
 		log.Error(err, "Cannot fetch replicas of all opted-in deployments")
-		return "", err
+		return nsEvents, finalState.Name, err
 	}
 
 	//Here we calculate the resource limits we need from all deployments combined
@@ -61,7 +66,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 		deploymentConfigs, err = resources.DeploymentConfigLister(ctx, _client, namespace, c.OptInLabel)
 		if err != nil {
 			log.Error(err, "Cannot list deploymentConfigs in namespace")
-			return "", err
+			return nsEvents, finalState.Name, err
 		}
 		objectsToReconcile = objectsToReconcile + len(deploymentConfigs.Items)
 
@@ -69,7 +74,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 		if err != nil {
 			log.Error(err, "Cannot fetch replicas of all opted-in deploymentconfigs")
-			return "", err
+			return nsEvents, finalState.Name, err
 		}
 
 		//In case of Openshift, we calculate the resource limits we need from all deploymentconfigs combined and we add it to the total number
@@ -81,7 +86,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	allowed, err := quotas.ResourceQuotaCheck(ctx, namespace, limitsneeded)
 	if err != nil {
 		log.Error(err, "Cannot calculate the resource quotas")
-		return "", err
+		return nsEvents, finalState.Name, err
 	}
 
 	log = ctrl.Log.
@@ -112,18 +117,17 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 					continue
 				}
 			}
-
 		}
 	} else {
-		return namespace, err
+		nsEvents.QuotaExceeded = namespace
 	}
 
 	if objectsToReconcile == 0 {
 		log.Info("No objects to reconcile. Doing Nothing.")
-		return "", nil
+		return nsEvents, finalState.Name, err
 	}
 
-	return "", nil
+	return nsEvents, finalState.Name, err
 }
 
 func ReconcileDeployment(ctx context.Context, _client client.Client, deployment v1.Deployment, state states.State) error {

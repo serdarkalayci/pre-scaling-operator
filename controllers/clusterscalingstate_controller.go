@@ -58,6 +58,8 @@ type ClusterScalingStateReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.7.0/pkg/reconcile
 func (r *ClusterScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var nsQuotaExceededList []string
+	var finalStateList []string
+	var finalStateNSList []string
 	log := r.Log.
 		WithValues("reconciler kind", "ClusterScalingState").
 		WithValues("reconciler object", req.Name)
@@ -79,21 +81,28 @@ func (r *ClusterScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.
 
 	for _, namespace := range namespaces.Items {
 
-		nsQuotaExceeded, err := reconciler.ReconcileNamespace(ctx, r.Client, namespace.Name, clusterStateDefinitions, states.State{})
+		nsQuotaExceeded, state, err := reconciler.ReconcileNamespace(ctx, r.Client, namespace.Name, clusterStateDefinitions, states.State{})
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 
-		if nsQuotaExceeded != "" {
-			nsQuotaExceededList = append(nsQuotaExceededList, nsQuotaExceeded)
+		if nsQuotaExceeded.QuotaExceeded != "" {
+			nsQuotaExceededList = append(nsQuotaExceededList, nsQuotaExceeded.QuotaExceeded)
 		}
+
+		finalStateNSList = append(finalStateNSList, namespace.Name)
+		finalStateList = append(finalStateList, state)
+
 	}
 
+	css := &v1alpha1.ClusterScalingState{}
+	err = r.Get(ctx, req.NamespacedName, css)
+
 	if len(nsQuotaExceededList) != 0 {
-		css := &v1alpha1.ClusterScalingState{}
-		err = r.Get(ctx, req.NamespacedName, css)
 		r.Recorder.Event(css, "Warning", "QuotaExceeded", fmt.Sprintf("Exceeded for %d namespaces. Namely: %s", len(nsQuotaExceededList), nsQuotaExceededList))
 	}
+
+	r.Recorder.Event(css, "Normal", "CreatedFinalStates", fmt.Sprintf("The final state for %s namespaces are %s", finalStateNSList, finalStateList))
 
 	log.Info("Reconciliation loop completed successfully")
 

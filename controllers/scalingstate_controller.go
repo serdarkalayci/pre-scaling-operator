@@ -69,17 +69,20 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
-	nsQuotaExceeded, err := reconciler.ReconcileNamespace(ctx, r.Client, req.Namespace, clusterStateDefinitions, states.State{})
+	nsQuotaExceeded, state, err := reconciler.ReconcileNamespace(ctx, r.Client, req.Namespace, clusterStateDefinitions, states.State{})
 
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if nsQuotaExceeded != "" {
-		ss := &v1alpha1.ScalingState{}
-		err = r.Get(ctx, req.NamespacedName, ss)
-		r.Recorder.Event(ss, "Warning", "QuotaExceeded", fmt.Sprintf("Exceeded for namespace %s", nsQuotaExceeded))
+	ss := &v1alpha1.ScalingState{}
+	err = r.Get(ctx, req.NamespacedName, ss)
+
+	if nsQuotaExceeded.QuotaExceeded != "" {
+		r.Recorder.Event(ss, "Warning", "QuotaExceeded", fmt.Sprintf("Exceeded for namespace %s", nsQuotaExceeded.QuotaExceeded))
 	}
+
+	r.Recorder.Event(ss, "Normal", "CreatedFinalState", fmt.Sprintf("The final state for this namespace is %s", state))
 
 	log.Info("Reconciliation loop completed successfully")
 
