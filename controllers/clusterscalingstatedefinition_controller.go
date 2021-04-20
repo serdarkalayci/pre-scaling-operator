@@ -22,6 +22,7 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -33,13 +34,15 @@ import (
 // ClusterScalingStateDefinitionReconciler reconciles a ClusterScalingStateDefinition object
 type ClusterScalingStateDefinitionReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log      logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=scaling.prescale.com,resources=clusterscalingstatedefinitions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=scaling.prescale.com,resources=clusterscalingstatedefinitions/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=scaling.prescale.com,resources=clusterscalingstatedefinitions/finalizers,verbs=update
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -73,7 +76,7 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 
 	for _, namespace := range namespaces.Items {
 
-		err = reconciler.ReconcileNamespace(ctx, r.Client, namespace.Name, clusterStateDefinitions, states.State{})
+		_, err := reconciler.ReconcileNamespace(ctx, r.Client, namespace.Name, clusterStateDefinitions, states.State{})
 
 		if err != nil {
 			return ctrl.Result{}, err

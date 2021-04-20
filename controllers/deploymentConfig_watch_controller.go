@@ -22,6 +22,7 @@ import (
 	ocv1 "github.com/openshift/api/apps/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,12 +34,14 @@ import (
 // DeploymentConfigWatcher reconciles a ScalingState object
 type DeploymentConfigWatcher struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log      logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=list;watch;
 // +kubebuilder:rbac:groups=apps.openshift.io,resources=deploymentconfigs,verbs=get;list;watch;patch;update;
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // WatchForDeploymentConfigs creates watcher for the deploymentconfig objects
 func (r *DeploymentConfigWatcher) WatchForDeploymentConfigs(client client.Client, c controller.Controller) error {

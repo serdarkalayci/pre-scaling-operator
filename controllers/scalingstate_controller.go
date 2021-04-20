@@ -18,28 +18,33 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/containersol/prescale-operator/internal/reconciler"
 	"github.com/containersol/prescale-operator/internal/states"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/containersol/prescale-operator/api/v1alpha1"
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
 )
 
 // ScalingStateReconciler reconciles a ScalingState object
 type ScalingStateReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log      logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=scaling.prescale.com,resources=scalingstates,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=scaling.prescale.com,resources=scalingstates/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=scaling.prescale.com,resources=scalingstates/finalizers,verbs=update
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -64,10 +69,16 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
-	err = reconciler.ReconcileNamespace(ctx, r.Client, req.Namespace, clusterStateDefinitions, states.State{})
+	nsQuotaExceeded, err := reconciler.ReconcileNamespace(ctx, r.Client, req.Namespace, clusterStateDefinitions, states.State{})
 
 	if err != nil {
 		return ctrl.Result{}, err
+	}
+
+	if nsQuotaExceeded != "" {
+		ss := &v1alpha1.ScalingState{}
+		err = r.Get(ctx, req.NamespacedName, ss)
+		r.Recorder.Event(ss, "Warning", "QuotaExceeded", fmt.Sprintf("Exceeded for namespace %s", nsQuotaExceeded))
 	}
 
 	log.Info("Reconciliation loop completed successfully")
