@@ -31,6 +31,12 @@ func PreFilter() predicate.Predicate {
 			replicaChange = AssesReplicaChange(e)
 			annotationchange = AssessAnnotationChange(e)
 
+			// don't reconcile if the stepscale annotation is present.
+			stepScaleActive := AssessStepScaleAnnotation(e)
+			if stepScaleActive {
+				return false
+			}
+
 			// eval if we need to reconcile.
 			if !annotationchange && !replicaChange && newoptin && oldoptin {
 				// Something else on the deployment has changed. Don't reconcile.
@@ -65,9 +71,8 @@ func PreFilter() predicate.Predicate {
 
 func AssessAnnotationChange(e event.UpdateEvent) bool {
 	// Check for changes in relevant annotations.
-	var annotationsnew, annotationsold map[string]string
-	annotationsnew = annotations.FilterByKeyPrefix("scaler", e.ObjectNew.GetAnnotations())
-	annotationsold = annotations.FilterByKeyPrefix("scaler", e.ObjectOld.GetAnnotations())
+	annotationsnew := annotations.FilterByKeyPrefix("scaler", e.ObjectNew.GetAnnotations())
+	annotationsold := annotations.FilterByKeyPrefix("scaler", e.ObjectOld.GetAnnotations())
 
 	eq := reflect.DeepEqual(annotationsnew, annotationsold)
 
@@ -92,4 +97,12 @@ func AssesReplicaChange(e event.UpdateEvent) bool {
 		return true
 	}
 	return false
+}
+
+func AssessStepScaleAnnotation(e event.UpdateEvent) bool {
+	annotationsold := annotations.FilterByKeyPrefix("scaler/step-scale-active", e.ObjectOld.GetAnnotations())
+	if len(annotationsold) == 0 {
+		return false
+	}
+	return true
 }

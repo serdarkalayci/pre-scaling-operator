@@ -3,11 +3,13 @@ package resources
 import (
 	"context"
 	"strings"
+	"time"
 
 	c "github.com/containersol/prescale-operator/internal"
 	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
 	"github.com/containersol/prescale-operator/internal/validations"
+	"github.com/containersol/prescale-operator/pkg/utils/annotations"
 	"github.com/containersol/prescale-operator/pkg/utils/math"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -149,37 +151,62 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 	var err error
 	var oldReplicaCount int32
 	oldReplicaCount = *deployment.Spec.Replicas
-	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		if oldReplicaCount == stateReplica.Replicas {
-			log.Info("No Update on deployment. Desired replica count already matches current.")
-			return nil
-		}
-		log.Info("Updating deployment replicas for state", "replicas", stateReplica.Replicas)
-		updateErr := DeploymentScaler(ctx, _client, deployment, stateReplica.Replicas)
-		if updateErr == nil {
-			log.WithValues("Deployment", deployment.Name).
-				WithValues("StateReplica mode", stateReplica.Name).
-				WithValues("Old Replica count", oldReplicaCount).
-				WithValues("New Replica count", stateReplica.Replicas).
-				Info("Deployment succesfully updated")
-			return nil
-		}
-		log.Info("Updating deployment failed due to a conflict! Retrying..")
-		// We need to get a newer version of the object from the client
-		var req reconcile.Request
-		req.NamespacedName.Namespace = deployment.Namespace
-		req.NamespacedName.Name = deployment.Name
-		deployment, err = DeploymentGetter(ctx, _client, req)
-		if err != nil {
-			log.Error(err, "Error getting refreshed deployment in conflict resolution")
-		}
-		return updateErr
+	desiredReplicaCount := stateReplica.Replicas
 
-	})
-	if retryErr != nil {
-		log.Error(retryErr, "Unable to scale the deployment, err: %v")
+	if oldReplicaCount == stateReplica.Replicas {
+		log.Info("No Update on deployment. Desired replica count already matches current.")
+		return nil
 	}
 
+	var stepReplicaCount int32
+	var stepCondition bool = true
+	var retryErr error = nil
+	// Loop step by step until deployment has reached desiredreplica count. Fail when the deployment update failed too many times
+	for stepCondition && retryErr == nil {
+
+		// decide if we need to step up or down
+		oldReplicaCount = *deployment.Spec.Replicas
+		if oldReplicaCount < desiredReplicaCount {
+			stepReplicaCount = oldReplicaCount + 1
+		} else {
+			stepReplicaCount = oldReplicaCount - 1
+		}
+
+		// keep/put the annotation on the deployment or remove it in last run
+		if oldReplicaCount+1 == desiredReplicaCount || oldReplicaCount-1 == desiredReplicaCount {
+			deployment = annotations.RemoveAnnotationFromDeployment(deployment, "scaler/step-scale-active")
+		} else {
+			deployment = annotations.PutAnnotationOnDeployment(deployment, "scaler/step-scale-active", "true")
+		}
+
+		retryErr = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			var updateErr error = nil
+			updateErr = DeploymentScaler(ctx, _client, deployment, stepReplicaCount)
+
+			// We need to get a newer version of the object from the client
+			var req reconcile.Request
+			req.NamespacedName.Namespace = deployment.Namespace
+			req.NamespacedName.Name = deployment.Name
+			deployment, err = DeploymentGetter(ctx, _client, req)
+			if err != nil {
+				log.Error(err, "Error getting refreshed deployment in conflict resolution")
+			}
+			return updateErr
+		})
+		if retryErr != nil {
+			log.Error(retryErr, "Unable to scale the deployment, err: %v")
+		}
+
+		time.Sleep(time.Second * 10)
+		if deployment.Status.ReadyReplicas == desiredReplicaCount {
+			stepCondition = false
+			log.WithValues("State", stateReplica.Name).
+				WithValues("Desired Replica Count", stateReplica.Replicas).
+				WithValues("Deployment Name", deployment.Name).
+				WithValues("Namespace", deployment.Namespace).
+				Info("Finished scaling deployment to desired replica count")
+		}
+	}
 	return nil
 }
 
