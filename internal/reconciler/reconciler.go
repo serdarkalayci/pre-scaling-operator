@@ -9,6 +9,7 @@ import (
 	"github.com/containersol/prescale-operator/internal/resources"
 	"github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
+	"github.com/containersol/prescale-operator/pkg/utils/annotations"
 	"github.com/containersol/prescale-operator/pkg/utils/math"
 	ocv1 "github.com/openshift/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
@@ -90,11 +91,15 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 	if allowed {
 		for i, deployment := range deployments.Items {
-			log := ctrl.Log.
-				WithValues("deployment", deployment.Name).
-				WithValues("namespace", deployment.Namespace)
+			var err error = nil
+			if !annotations.IsStepScaleAnnotationPresent(deployment.Annotations) {
+				log = ctrl.Log.
+					WithValues("deployment", deployment.Name).
+					WithValues("namespace", deployment.Namespace)
 
-			err := resources.ScaleDeployment(ctx, _client, deployment, scaleReplicalist[i])
+				err = resources.ScaleDeployment(ctx, _client, deployment, scaleReplicalist[i])
+			}
+
 			if err != nil {
 				log.Error(err, "Error scaling the deployment")
 				continue

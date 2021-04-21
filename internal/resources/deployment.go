@@ -181,6 +181,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 
 		retryErr = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			var updateErr error = nil
+			time.Sleep(time.Second * 2)
 			updateErr = DeploymentScaler(ctx, _client, deployment, stepReplicaCount)
 
 			// We need to get a newer version of the object from the client
