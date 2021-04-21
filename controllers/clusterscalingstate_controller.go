@@ -99,10 +99,10 @@ func (r *ClusterScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.
 	err = r.Get(ctx, req.NamespacedName, css)
 
 	if len(nsQuotaExceededList) != 0 {
-		r.Recorder.Event(css, "Warning", "QuotaExceeded", fmt.Sprintf("Exceeded for %d namespaces. Namely: %s", len(nsQuotaExceededList), nsQuotaExceededList))
+		r.Recorder.Event(css, "Warning", "QuotaExceeded", fmt.Sprintf("Not enough available resources for the following %d namespaces: %s", len(nsQuotaExceededList), nsQuotaExceededList))
 	}
 
-	r.Recorder.Event(css, "Normal", "CreatedFinalStates", fmt.Sprintf("The final state for %s namespaces are %s", finalStateNSList, finalStateList))
+	r.Recorder.Event(css, "Normal", "AppliedStates", fmt.Sprintf("The applied state for each of the %s namespaces is %s", finalStateNSList, finalStateList))
 
 	log.Info("Reconciliation loop completed successfully")
 
