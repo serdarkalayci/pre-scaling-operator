@@ -93,6 +93,6 @@ func (r *DeploymentWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *DeploymentWatcher) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.Deployment{}).
-		WithEventFilter(validations.PreFilter()).
+		WithEventFilter(validations.PreFilter(r.Recorder)).
 		Complete(r)
 }
