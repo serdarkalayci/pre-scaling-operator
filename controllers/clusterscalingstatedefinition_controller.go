@@ -72,6 +72,7 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 	}
 
 	log.Info("Reconciling")
+
 	namespaces := corev1.NamespaceList{}
 	err = r.Client.List(ctx, &namespaces)
 	if err != nil {
