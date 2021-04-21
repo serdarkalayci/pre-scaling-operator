@@ -56,9 +56,9 @@ type ClusterScalingStateDefinitionReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.7.0/pkg/reconcile
 func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	var nsQuotaExceededList []string
-	var finalStateList []string
-	var finalStateNSList []string
+	var eventsList []string
+	var appliedStates []string
+	var appliedStateNamespaceList []string
 	log := r.Log.
 		WithValues("reconciler kind", "ClusterScalingStatesDefinition").
 		WithValues("reconciler object", req.Name)
@@ -81,28 +81,28 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 
 	for _, namespace := range namespaces.Items {
 
-		nsQuotaExceeded, state, err := reconciler.ReconcileNamespace(ctx, r.Client, namespace.Name, clusterStateDefinitions, states.State{})
+		events, state, err := reconciler.ReconcileNamespace(ctx, r.Client, namespace.Name, clusterStateDefinitions, states.State{})
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 
-		if nsQuotaExceeded.QuotaExceeded != "" {
-			nsQuotaExceededList = append(nsQuotaExceededList, nsQuotaExceeded.QuotaExceeded)
+		if events.QuotaExceeded != "" {
+			eventsList = append(eventsList, events.QuotaExceeded)
 		}
 
-		finalStateNSList = append(finalStateNSList, namespace.Name)
-		finalStateList = append(finalStateList, state)
+		appliedStateNamespaceList = append(appliedStateNamespaceList, namespace.Name)
+		appliedStates = append(appliedStates, state)
 
 	}
 
 	cssd := &v1alpha1.ClusterScalingStateDefinition{}
 	err = r.Get(ctx, req.NamespacedName, cssd)
 
-	if len(nsQuotaExceededList) != 0 {
-		r.Recorder.Event(cssd, "Warning", "QuotaExceeded", fmt.Sprintf("Not enough available resources for the following %d namespaces: %s", len(nsQuotaExceededList), nsQuotaExceededList))
+	if len(eventsList) != 0 {
+		r.Recorder.Event(cssd, "Warning", "QuotaExceeded", fmt.Sprintf("Not enough available resources for the following %d namespaces: %s", len(eventsList), eventsList))
 	}
 
-	r.Recorder.Event(cssd, "Normal", "AppliedStates", fmt.Sprintf("The applied state for each of the %s namespaces is %s", finalStateNSList, finalStateList))
+	r.Recorder.Event(cssd, "Normal", "AppliedStates", fmt.Sprintf("The applied state for each of the %s namespaces is %s", appliedStateNamespaceList, appliedStates))
 
 	return ctrl.Result{}, nil
 }
