@@ -26,30 +26,7 @@ func PreFilter(r record.EventRecorder) predicate.Predicate {
 			oldoptin = labels.GetLabelValue(e.ObjectOld.GetLabels(), "scaler/opt-in")
 			newoptin = labels.GetLabelValue(e.ObjectNew.GetLabels(), "scaler/opt-in")
 
-			if newoptin != oldoptin {
-
-				if reflect.TypeOf(e.ObjectNew) == reflect.TypeOf(&ocv1.DeploymentConfig{}) {
-
-					// objectOpenshift := *e.ObjectNew.(*ocv1.DeploymentConfig)
-
-					if newoptin {
-						r.Event(e.ObjectNew.(*ocv1.DeploymentConfig), "Normal", "PreScalingOperator", fmt.Sprintf("The %s object has just opted-in", e.ObjectNew.(*ocv1.DeploymentConfig).Name))
-					} else {
-						r.Event(e.ObjectNew.(*ocv1.DeploymentConfig), "Normal", "PreScalingOperator", fmt.Sprintf("The %s object has just opted-out", e.ObjectNew.(*ocv1.DeploymentConfig).Name))
-					}
-
-				} else {
-
-					// objectK8s := *e.ObjectNew.(*v1.Deployment)
-
-					if newoptin {
-						r.Event(e.ObjectNew.(*v1.Deployment), "Normal", "PreScalingOperator", fmt.Sprintf("The %s object has just opted-in", e.ObjectNew.(*v1.Deployment).Name))
-					} else {
-						r.Event(e.ObjectNew.(*v1.Deployment), "Normal", "PreScalingOperator", fmt.Sprintf("The %s object has just opted-out", e.ObjectNew.(*v1.Deployment).Name))
-					}
-				}
-
-			}
+			generateOptInLabelUpdateEvent(e, r, newoptin, oldoptin)
 
 			// Deployment opted out. Don't do anything
 			if !newoptin {
@@ -83,6 +60,10 @@ func PreFilter(r record.EventRecorder) predicate.Predicate {
 			log := ctrl.Log
 			log.WithValues("OptIn is: ", newoptin)
 			log.Info("(CreateEvent) New deployment detected: " + deploymentName)
+
+			if newoptin {
+				generateOptInLabelCreateEvent(e, r, newoptin)
+			}
 
 			return newoptin
 		},
@@ -121,4 +102,39 @@ func AssesReplicaChange(e event.UpdateEvent) bool {
 		return true
 	}
 	return false
+}
+
+func generateOptInLabelUpdateEvent(e event.UpdateEvent, r record.EventRecorder, newoptin, oldoptin bool) {
+
+	if newoptin != oldoptin {
+
+		if reflect.TypeOf(e.ObjectNew) == reflect.TypeOf(&ocv1.DeploymentConfig{}) {
+
+			if newoptin {
+				r.Event(e.ObjectNew.(*ocv1.DeploymentConfig), "Normal", "PreScalingOperator", fmt.Sprintf("The %s object has just opted-in", e.ObjectNew.(*ocv1.DeploymentConfig).Name))
+			} else {
+				r.Event(e.ObjectNew.(*ocv1.DeploymentConfig), "Normal", "PreScalingOperator", fmt.Sprintf("The %s object has just opted-out", e.ObjectNew.(*ocv1.DeploymentConfig).Name))
+			}
+
+		} else {
+
+			if newoptin {
+				r.Event(e.ObjectNew.(*v1.Deployment), "Normal", "PreScalingOperator", fmt.Sprintf("The %s object has just opted-in", e.ObjectNew.(*v1.Deployment).Name))
+			} else {
+				r.Event(e.ObjectNew.(*v1.Deployment), "Normal", "PreScalingOperator", fmt.Sprintf("The %s object has just opted-out", e.ObjectNew.(*v1.Deployment).Name))
+			}
+		}
+
+	}
+
+}
+
+func generateOptInLabelCreateEvent(e event.CreateEvent, r record.EventRecorder, newoptin bool) {
+
+	if reflect.TypeOf(e.Object) == reflect.TypeOf(&ocv1.DeploymentConfig{}) {
+		r.Event(e.Object.(*ocv1.DeploymentConfig), "Normal", "PreScalingOperator", fmt.Sprintf("The %s object has just opted-in", e.Object.(*ocv1.DeploymentConfig).Name))
+
+	} else {
+		r.Event(e.Object.(*v1.Deployment), "Normal", "PreScalingOperator", fmt.Sprintf("The %s object has just opted-in", e.Object.(*v1.Deployment).Name))
+	}
 }
