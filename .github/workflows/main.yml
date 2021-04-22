@@ -12,8 +12,8 @@ on:
 env:
   CR_USER: ${{ secrets.CR_USER }}
   CR_PAT: ${{ secrets.CR_PAT }}
-  DH_USER: ${{ secrets.DOCKERHUB_PUSH_USERNAME }}
-  DH_TOKEN: ${{ secrets.DOCKERHUB_PUSH_PASS }}
+  DH_USER: ${{ secrets.DOCKERHUB_USER }}
+  DH_TOKEN: ${{ secrets.DOCKERHUB_PASS }}
   OKD_GITHUB_TOKEN: ${{ secrets.OKD_GITHUB_TOKEN }}
 
 jobs:
