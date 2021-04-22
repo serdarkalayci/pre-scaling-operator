@@ -22,6 +22,7 @@ import (
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,12 +34,14 @@ import (
 // DeploymentWatcher reconciles a ScalingState object
 type DeploymentWatcher struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log      logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=list;watch;
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;patch;update;
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // WatchForDeployments creates watcher for the deployment objects
 func (r *DeploymentWatcher) WatchForDeployments(client client.Client, c controller.Controller) error {
@@ -90,6 +93,6 @@ func (r *DeploymentWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *DeploymentWatcher) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.Deployment{}).
-		WithEventFilter(validations.PreFilter()).
+		WithEventFilter(validations.PreFilter(r.Recorder)).
 		Complete(r)
 }

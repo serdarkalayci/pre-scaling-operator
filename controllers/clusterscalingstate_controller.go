@@ -18,11 +18,14 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/containersol/prescale-operator/api/v1alpha1"
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -33,14 +36,16 @@ import (
 // ClusterScalingStateReconciler reconciles a ClusterScalingState object
 type ClusterScalingStateReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log      logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=scaling.prescale.com,resources=clusterscalingstates,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=scaling.prescale.com,resources=clusterscalingstates/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=scaling.prescale.com,resources=clusterscalingstates/finalizers,verbs=update
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -52,7 +57,9 @@ type ClusterScalingStateReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.7.0/pkg/reconcile
 func (r *ClusterScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-
+	var eventsList []string
+	var appliedStates []string
+	var appliedStateNamespaceList []string
 	log := r.Log.
 		WithValues("reconciler kind", "ClusterScalingState").
 		WithValues("reconciler object", req.Name)
@@ -74,13 +81,28 @@ func (r *ClusterScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.
 
 	for _, namespace := range namespaces.Items {
 
-		err = reconciler.ReconcileNamespace(ctx, r.Client, namespace.Name, clusterStateDefinitions, states.State{})
-
+		events, state, err := reconciler.ReconcileNamespace(ctx, r.Client, namespace.Name, clusterStateDefinitions, states.State{})
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 
+		if events.QuotaExceeded != "" {
+			eventsList = append(eventsList, events.QuotaExceeded)
+		}
+
+		appliedStateNamespaceList = append(appliedStateNamespaceList, namespace.Name)
+		appliedStates = append(appliedStates, state)
+
 	}
+
+	css := &v1alpha1.ClusterScalingState{}
+	err = r.Get(ctx, req.NamespacedName, css)
+
+	if len(eventsList) != 0 {
+		r.Recorder.Event(css, "Warning", "QuotaExceeded", fmt.Sprintf("Not enough available resources for the following %d namespaces: %s", len(eventsList), eventsList))
+	}
+
+	r.Recorder.Event(css, "Normal", "AppliedStates", fmt.Sprintf("The applied state for each of the %s namespaces is %s", appliedStateNamespaceList, appliedStates))
 
 	log.Info("Reconciliation loop completed successfully")
 
