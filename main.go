@@ -83,33 +83,37 @@ func main() {
 	}
 
 	if err = (&controllers.ClusterScalingStateDefinitionReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ClusterScalingStateDefinition"),
-		Scheme: mgr.GetScheme(),
+		Client:   mgr.GetClient(),
+		Log:      ctrl.Log.WithName("controllers").WithName("ClusterScalingStateDefinition"),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("clusterscalingstatedefinition-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ClusterScalingStateDefinition")
 		os.Exit(1)
 	}
 	if err = (&controllers.ClusterScalingStateReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ClusterScalingState"),
-		Scheme: mgr.GetScheme(),
+		Client:   mgr.GetClient(),
+		Log:      ctrl.Log.WithName("controllers").WithName("ClusterScalingState"),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("clusterscalingstate-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ClusterScalingState")
 		os.Exit(1)
 	}
 	if err = (&controllers.ScalingStateReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ScalingState"),
-		Scheme: mgr.GetScheme(),
+		Client:   mgr.GetClient(),
+		Log:      ctrl.Log.WithName("controllers").WithName("ScalingState"),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("scalingstate-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ScalingState")
 		os.Exit(1)
 	}
 	if err = (&controllers.DeploymentWatcher{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("DeploymentWatcher"),
-		Scheme: mgr.GetScheme(),
+		Client:   mgr.GetClient(),
+		Log:      ctrl.Log.WithName("controllers").WithName("DeploymentWatcher"),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("deployment-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "DeploymentWatcher")
 		os.Exit(1)
@@ -122,9 +126,10 @@ func main() {
 	}
 	if c.OpenshiftCluster {
 		if err = (&controllers.DeploymentConfigWatcher{
-			Client: mgr.GetClient(),
-			Log:    ctrl.Log.WithName("controllers").WithName("DeploymentConfigWatcher"),
-			Scheme: mgr.GetScheme(),
+			Client:   mgr.GetClient(),
+			Log:      ctrl.Log.WithName("controllers").WithName("DeploymentConfigWatcher"),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("deploymentconfig-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "DeploymentConfigWatcher")
 			os.Exit(1)

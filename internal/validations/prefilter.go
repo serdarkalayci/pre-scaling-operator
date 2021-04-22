@@ -1,6 +1,7 @@
 package validations
 
 import (
+	"fmt"
 	"reflect"
 
 	c "github.com/containersol/prescale-operator/internal"
@@ -8,13 +9,14 @@ import (
 	"github.com/containersol/prescale-operator/pkg/utils/labels"
 	ocv1 "github.com/openshift/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 // PreFilter for incoming changes of deployments or deploymentconfigs. We only care about changes on the opt-in label, replica count and annotations.
-func PreFilter() predicate.Predicate {
+func PreFilter(r record.EventRecorder) predicate.Predicate {
 	return predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			// Ignore updates to CR status in which case metadata.Generation does not change
@@ -24,6 +26,8 @@ func PreFilter() predicate.Predicate {
 
 			oldoptin = labels.GetLabelValue(e.ObjectOld.GetLabels(), "scaler/opt-in")
 			newoptin = labels.GetLabelValue(e.ObjectNew.GetLabels(), "scaler/opt-in")
+
+			generateOptInLabelUpdateEvent(e, r, newoptin, oldoptin)
 
 			// Deployment opted out. Don't do anything
 			if !newoptin {
@@ -47,15 +51,16 @@ func PreFilter() predicate.Predicate {
 			if !annotationchange && !replicaChange && newoptin && oldoptin {
 				// Something else on the deployment has changed. Don't reconcile.
 				return false
-			} else {
-				log := ctrl.Log.
-					WithValues("Annotationchange", annotationchange).
-					WithValues("Replicachange", replicaChange).
-					WithValues("OldOptIn", oldoptin).
-					WithValues("NewOptIn", newoptin)
-				log.Info("Reconciling for deployment " + deploymentName)
-				return true
 			}
+
+			log := ctrl.Log.
+				WithValues("Annotationchange", annotationchange).
+				WithValues("Replicachange", replicaChange).
+				WithValues("OldOptIn", oldoptin).
+				WithValues("NewOptIn", newoptin)
+			log.Info("Reconciling for deployment " + deploymentName)
+
+			return true
 
 		},
 		CreateFunc: func(e event.CreateEvent) bool {
@@ -66,6 +71,10 @@ func PreFilter() predicate.Predicate {
 			log := ctrl.Log
 			log.WithValues("OptIn is: ", newoptin)
 			log.Info("(CreateEvent) New deployment detected: " + deploymentName)
+
+			if newoptin {
+				generateOptInLabelCreateEvent(e, r, newoptin)
+			}
 
 			return newoptin
 		},
@@ -103,4 +112,39 @@ func AssesReplicaChange(e event.UpdateEvent) bool {
 		return true
 	}
 	return false
+}
+
+func generateOptInLabelUpdateEvent(e event.UpdateEvent, r record.EventRecorder, newoptin, oldoptin bool) {
+
+	if newoptin != oldoptin {
+
+		if reflect.TypeOf(e.ObjectNew) == reflect.TypeOf(&ocv1.DeploymentConfig{}) {
+
+			if newoptin {
+				r.Event(e.ObjectNew.(*ocv1.DeploymentConfig), "Normal", "PreScalingOperator", fmt.Sprintf("The %s object has just opted-in", e.ObjectNew.(*ocv1.DeploymentConfig).Name))
+			} else {
+				r.Event(e.ObjectNew.(*ocv1.DeploymentConfig), "Normal", "PreScalingOperator", fmt.Sprintf("The %s object has just opted-out", e.ObjectNew.(*ocv1.DeploymentConfig).Name))
+			}
+
+		} else {
+
+			if newoptin {
+				r.Event(e.ObjectNew.(*v1.Deployment), "Normal", "PreScalingOperator", fmt.Sprintf("The %s object has just opted-in", e.ObjectNew.(*v1.Deployment).Name))
+			} else {
+				r.Event(e.ObjectNew.(*v1.Deployment), "Normal", "PreScalingOperator", fmt.Sprintf("The %s object has just opted-out", e.ObjectNew.(*v1.Deployment).Name))
+			}
+		}
+
+	}
+
+}
+
+func generateOptInLabelCreateEvent(e event.CreateEvent, r record.EventRecorder, newoptin bool) {
+
+	if reflect.TypeOf(e.Object) == reflect.TypeOf(&ocv1.DeploymentConfig{}) {
+		r.Event(e.Object.(*ocv1.DeploymentConfig), "Normal", "PreScalingOperator", fmt.Sprintf("The %s object has just opted-in", e.Object.(*ocv1.DeploymentConfig).Name))
+
+	} else {
+		r.Event(e.Object.(*v1.Deployment), "Normal", "PreScalingOperator", fmt.Sprintf("The %s object has just opted-in", e.Object.(*v1.Deployment).Name))
+	}
 }
