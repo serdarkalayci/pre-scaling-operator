@@ -161,6 +161,9 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 	var stepReplicaCount int32
 	var stepCondition bool = true
 	var retryErr error = nil
+	var req reconcile.Request
+	req.NamespacedName.Namespace = deployment.Namespace
+	req.NamespacedName.Name = deployment.Name
 	// Loop step by step until deployment has reached desiredreplica count. Fail when the deployment update failed too many times
 	for stepCondition && retryErr == nil {
 
@@ -172,23 +175,23 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 			stepReplicaCount = oldReplicaCount - 1
 		}
 
-		// keep/put the annotation on the deployment or remove it in last run
-		if oldReplicaCount+1 == desiredReplicaCount || oldReplicaCount-1 == desiredReplicaCount {
-			deployment = annotations.RemoveAnnotationFromDeployment(deployment, "scaler/step-scale-active")
-		} else {
-			deployment = annotations.PutAnnotationOnDeployment(deployment, "scaler/step-scale-active", "true")
-		}
 
 		retryErr = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			var updateErr error = nil
+			// keep/put the annotation on the deployment or remove it in last run
+			if oldReplicaCount+1 == desiredReplicaCount || oldReplicaCount-1 == desiredReplicaCount {
+				deployment = annotations.RemoveAnnotationFromDeployment(deployment, "scaler/step-scale-active")
+			} else {
+				deployment = annotations.PutAnnotationOnDeployment(deployment, "scaler/step-scale-active", "true")
+			}
+
+			// Don't spam the api in case of conflict error
 			time.Sleep(time.Second * 2)
-			updateErr = DeploymentScaler(ctx, _client, deployment, stepReplicaCount)
+
+			updateErr := DeploymentScaler(ctx, _client, deployment, stepReplicaCount)
 
 			// We need to get a newer version of the object from the client
-			var req reconcile.Request
-			req.NamespacedName.Namespace = deployment.Namespace
-			req.NamespacedName.Name = deployment.Name
 			deployment, err = DeploymentGetter(ctx, _client, req)
+
 			if err != nil {
 				log.Error(err, "Error getting refreshed deployment in conflict resolution")
 			}
@@ -198,14 +201,23 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 			log.Error(retryErr, "Unable to scale the deployment, err: %v")
 		}
 
-		time.Sleep(time.Second * 10)
+		// Wait until deployment is ready for the step
+		for deployment.Status.ReadyReplicas != stepReplicaCount {
+			time.Sleep(time.Second * 10)
+			deployment, err = DeploymentGetter(ctx, _client, req)
+			if err != nil {
+				log.Error(err, "Error getting refreshed deployment in wait for Readiness loop")
+			}
+		}
+
+		// check if desired is reached
 		if deployment.Status.ReadyReplicas == desiredReplicaCount {
-			stepCondition = false
 			log.WithValues("State", stateReplica.Name).
 				WithValues("Desired Replica Count", stateReplica.Replicas).
 				WithValues("Deployment Name", deployment.Name).
 				WithValues("Namespace", deployment.Namespace).
 				Info("Finished scaling deployment to desired replica count")
+			stepCondition = false
 		}
 	}
 	return nil

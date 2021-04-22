@@ -37,8 +37,5 @@ func RemoveAnnotationFromDeployment(deployment v1.Deployment, key string) v1.Dep
 }
 
 func IsStepScaleAnnotationPresent(annotations map[string]string) bool {
-	if len(annotations) == 0 {
-		return false
-	}
-	return true
+	return len(FilterByKeyPrefix("scaler/step-scale-active", annotations)) != 0
 }
