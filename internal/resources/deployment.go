@@ -9,7 +9,6 @@ import (
 	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
 	"github.com/containersol/prescale-operator/internal/validations"
-	"github.com/containersol/prescale-operator/pkg/utils/annotations"
 	"github.com/containersol/prescale-operator/pkg/utils/math"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -144,9 +143,15 @@ func DeploymentStateReplicasList(state states.State, deployments v1.DeploymentLi
 }
 
 func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.Deployment, stateReplica sr.StateReplica) error {
+
 	log := ctrl.Log.
 		WithValues("deployment", deployment.Name).
 		WithValues("namespace", deployment.Namespace)
+
+	if c.IsDeploymentOnBlackList(deployment) {
+		log.Info("Not Scaling. The deployment is on the blacklist.")
+		return nil
+	}
 
 	var err error
 	var oldReplicaCount int32
@@ -164,6 +169,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 	var req reconcile.Request
 	req.NamespacedName.Namespace = deployment.Namespace
 	req.NamespacedName.Name = deployment.Name
+	c.PutDeploymentOnGlobalBlackList(deployment)
 	// Loop step by step until deployment has reached desiredreplica count. Fail when the deployment update failed too many times
 	for stepCondition && retryErr == nil {
 
@@ -175,15 +181,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 			stepReplicaCount = oldReplicaCount - 1
 		}
 
-
 		retryErr = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			// keep/put the annotation on the deployment or remove it in last run
-			if oldReplicaCount+1 == desiredReplicaCount || oldReplicaCount-1 == desiredReplicaCount {
-				deployment = annotations.RemoveAnnotationFromDeployment(deployment, "scaler/step-scale-active")
-			} else {
-				deployment = annotations.PutAnnotationOnDeployment(deployment, "scaler/step-scale-active", "true")
-			}
-
 			// Don't spam the api in case of conflict error
 			time.Sleep(time.Second * 2)
 
@@ -201,12 +199,20 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 			log.Error(retryErr, "Unable to scale the deployment, err: %v")
 		}
 
-		// Wait until deployment is ready for the step
-		for deployment.Status.ReadyReplicas != stepReplicaCount {
-			time.Sleep(time.Second * 10)
-			deployment, err = DeploymentGetter(ctx, _client, req)
-			if err != nil {
-				log.Error(err, "Error getting refreshed deployment in wait for Readiness loop")
+		// Wait until deployment is ready for the next step
+		for stay, timeout := true, time.After(time.Second*60); stay; {
+			select {
+			case <-timeout:
+				stay = false
+			default:
+				time.Sleep(time.Second * 5)
+				deployment, err = DeploymentGetter(ctx, _client, req)
+				if err != nil {
+					log.Error(err, "Error getting refreshed deployment in wait for Readiness loop")
+				}
+				if deployment.Status.ReadyReplicas == stepReplicaCount {
+					stay = false
+				}
 			}
 		}
 
@@ -220,6 +226,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 			stepCondition = false
 		}
 	}
+	c.RemoveDeploymentFromGlobalBlackList(deployment)
 	return nil
 }
 

@@ -124,6 +124,14 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 
 					ss = CreateScalingState("peak", namespaceList[0].Name)
 					Expect(k8sClient.Create(context.Background(), &ss)).Should(Succeed())
+				} else if casenumber == 4 {
+					css = CreateClusterScalingState("peak")
+					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
+
+					time.Sleep(time.Second * 10)
+
+					ss = CreateScalingState("bau", namespaceList[1].Name)
+					Expect(k8sClient.Create(context.Background(), &ss)).Should(Succeed())
 				} else if casenumber == 5 {
 					css = CreateClusterScalingState("bau")
 					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
@@ -157,14 +165,6 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 
 					cssdMofified := getModifiedClusterScalingStateDefinition(cssdList.Items[0], true, false)
 					Expect(k8sClient.Update(context.Background(), &cssdMofified)).Should(Succeed())
-				} else {
-					css = CreateClusterScalingState("peak")
-					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
-
-					time.Sleep(time.Second * 10)
-
-					ss = CreateScalingState("bau", namespaceList[1].Name)
-					Expect(k8sClient.Create(context.Background(), &ss)).Should(Succeed())
 				}
 
 				time.Sleep(time.Second * 10)

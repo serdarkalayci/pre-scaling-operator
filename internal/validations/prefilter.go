@@ -3,6 +3,7 @@ package validations
 import (
 	"reflect"
 
+	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/pkg/utils/annotations"
 	"github.com/containersol/prescale-operator/pkg/utils/labels"
 	ocv1 "github.com/openshift/api/apps/v1"
@@ -18,6 +19,7 @@ func PreFilter() predicate.Predicate {
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			// Ignore updates to CR status in which case metadata.Generation does not change
 			deploymentName := e.ObjectNew.GetName()
+			nameSpace := e.ObjectNew.GetNamespace()
 			var oldoptin, newoptin, replicaChange, annotationchange bool
 
 			oldoptin = labels.GetLabelValue(e.ObjectOld.GetLabels(), "scaler/opt-in")
@@ -32,8 +34,12 @@ func PreFilter() predicate.Predicate {
 			annotationchange = AssessAnnotationChange(e)
 
 			// don't reconcile if the stepscale annotation is present.
-			stepScaleActive := AssessStepScaleAnnotation(e)
-			if stepScaleActive {
+			//stepScaleActive := AssessStepScaleAnnotation(e)
+			item := c.DeploymentInfo{
+				Name:      deploymentName,
+				Namespace: nameSpace,
+			}
+			if c.IsOnBlackList(item) {
 				return false
 			}
 
@@ -97,12 +103,4 @@ func AssesReplicaChange(e event.UpdateEvent) bool {
 		return true
 	}
 	return false
-}
-
-func AssessStepScaleAnnotation(e event.UpdateEvent) bool {
-	annotationsold := annotations.FilterByKeyPrefix("scaler/step-scale-active", e.ObjectOld.GetAnnotations())
-	if len(annotationsold) == 0 {
-		return false
-	}
-	return true
 }
