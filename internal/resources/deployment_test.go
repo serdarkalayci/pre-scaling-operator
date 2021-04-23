@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	c "github.com/containersol/prescale-operator/internal"
+	c "github.com/containersol/prescale-operator/pkg/utils/global"
 	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
 	v1 "k8s.io/api/apps/v1"

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"reflect"
 
-	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/pkg/utils/annotations"
+	g "github.com/containersol/prescale-operator/pkg/utils/global"
 	"github.com/containersol/prescale-operator/pkg/utils/labels"
 	ocv1 "github.com/openshift/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
@@ -39,11 +39,11 @@ func PreFilter(r record.EventRecorder) predicate.Predicate {
 
 			// don't reconcile if the stepscale annotation is present.
 			//stepScaleActive := AssessStepScaleAnnotation(e)
-			item := c.DeploymentInfo{
+			item := g.DeploymentInfo{
 				Name:      deploymentName,
 				Namespace: nameSpace,
 			}
-			if c.IsOnBlackList(item) {
+			if g.IsOnBlackList(item) {
 				return false
 			}
 

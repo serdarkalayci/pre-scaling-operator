@@ -9,6 +9,7 @@ import (
 	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
 	"github.com/containersol/prescale-operator/internal/validations"
+	g "github.com/containersol/prescale-operator/pkg/utils/global"
 	"github.com/containersol/prescale-operator/pkg/utils/math"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -148,7 +149,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 		WithValues("deployment", deployment.Name).
 		WithValues("namespace", deployment.Namespace)
 
-	if c.IsDeploymentOnBlackList(deployment) {
+	if g.IsDeploymentOnBlackList(deployment) {
 		log.Info("Waiting for the deployment ot be off the blacklist.")
 		for stay, timeout := true, time.After(time.Second*60); stay; {
 			select {
@@ -157,7 +158,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 				return nil
 			default:
 				time.Sleep(time.Second * 10)
-				if !c.IsDeploymentOnBlackList(deployment) {
+				if !g.IsDeploymentOnBlackList(deployment) {
 					stay = false
 				}
 			}
@@ -180,7 +181,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 	var req reconcile.Request
 	req.NamespacedName.Namespace = deployment.Namespace
 	req.NamespacedName.Name = deployment.Name
-	c.PutDeploymentOnGlobalBlackList(deployment)
+	g.PutDeploymentOnGlobalBlackList(deployment)
 	// Loop step by step until deployment has reached desiredreplica count. Fail when the deployment update failed too many times
 	for stepCondition && retryErr == nil {
 
@@ -208,7 +209,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 		})
 		if retryErr != nil {
 			log.Error(retryErr, "Unable to scale the deployment, err: %v")
-			c.RemoveDeploymentFromGlobalBlackList(deployment)
+			g.RemoveDeploymentFromGlobalBlackList(deployment)
 			return retryErr
 		}
 
@@ -222,7 +223,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 				deployment, err = DeploymentGetter(ctx, _client, req)
 				if err != nil {
 					log.Error(err, "Error getting refreshed deployment in wait for Readiness loop")
-					c.RemoveDeploymentFromGlobalBlackList(deployment)
+					g.RemoveDeploymentFromGlobalBlackList(deployment)
 					return err
 				}
 				if deployment.Status.ReadyReplicas == stepReplicaCount {
@@ -241,7 +242,8 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 			stepCondition = false
 		}
 	}
-	c.RemoveDeploymentFromGlobalBlackList(deployment)
+
+	g.RemoveDeploymentFromGlobalBlackList(deployment)
 	return nil
 }
 
