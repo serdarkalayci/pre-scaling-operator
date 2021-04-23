@@ -7,10 +7,43 @@ var (
 	ReconcileBlackList []DeploymentInfo
 )
 
-type DeploymentInfo struct {
-	Namespace string
-	Name      string
-}
+// type DeploymentInfo struct {
+// 	Namespace string
+// 	Name      string
+// }
+
+// type ConcurrentBlackList struct {
+// 	sync.RWMutex
+// 	items []ConcurrentDeploymentInfoItem
+// }
+
+// type ConcurrentDeploymentInfoItem struct {
+// 	Index      int
+// 	DeployInfo DeploymentInfo
+// }
+
+// func (cbl *ConcurrentBlackList) Append(item ConcurrentDeploymentInfoItem) {
+// 	cbl.Lock()
+// 	defer cbl.Unlock()
+
+// 	cbl.items = append(cbl.items, item)
+// }
+
+// func (cbl *ConcurrentBlackList) Iter() <-chan ConcurrentDeploymentInfoItem {
+// 	c := make(chan ConcurrentDeploymentInfoItem)
+
+// 	f := func() {
+// 		cbl.Lock()
+// 		defer cbl.Unlock()
+// 		for index, value := range cbl.items {
+// 			c <- ConcurrentDeploymentInfoItem{index, value.DeployInfo}
+// 		}
+// 		close(c)
+// 	}
+// 	go f()
+
+// 	return c
+// }
 
 func RemoveDeploymentFromGlobalBlackList(deployment v1.Deployment) {
 	removeItem := DeploymentInfo{
@@ -29,10 +62,6 @@ func RemoveFromBlackList(removeItem DeploymentInfo) {
 		}
 		i++
 	}
-}
-
-func RemoveIndex(s []DeploymentInfo, index int) []DeploymentInfo {
-	return append(s[:index], s[index+1:]...)
 }
 
 // Puts unique deployment on the Blacklist
