@@ -607,56 +607,6 @@ func TestLimitsNeededDeploymentList(t *testing.T) {
 	}
 }
 
-func TestScaleDeployment(t *testing.T) {
-	type args struct {
-		ctx          context.Context
-		_client      client.Client
-		deployment   v1.Deployment
-		stateReplica sr.StateReplica
-	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "TestScalingDeployment",
-			args: args{
-				ctx:     context.TODO(),
-				_client: fake.NewClientBuilder().Build(),
-				deployment: v1.Deployment{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "Deployment",
-						APIVersion: "apps/v1",
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "foo",
-						Namespace: "bar",
-					},
-					Spec: v1.DeploymentSpec{
-						Replicas: new(int32),
-					},
-					Status: v1.DeploymentStatus{
-						Replicas: 5,
-					},
-				},
-				stateReplica: sr.StateReplica{
-					Name:     "test",
-					Replicas: 7,
-				},
-			},
-			wantErr: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := ScaleDeployment(tt.args.ctx, tt.args._client, tt.args.deployment, tt.args.stateReplica); (err != nil) != tt.wantErr {
-				t.Errorf("ScaleDeployment() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
 func TestPutOnBlackList(t *testing.T) {
 	type args struct {
 		deployment []v1.Deployment
