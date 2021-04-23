@@ -620,7 +620,7 @@ func TestPutOnBlackList(t *testing.T) {
 			name: "TestPutOneOnBlackList",
 			args: args{
 				[]v1.Deployment{
-					v1.Deployment{
+					{
 						TypeMeta: metav1.TypeMeta{
 							Kind:       "Deployment",
 							APIVersion: "apps/v1",
@@ -644,7 +644,7 @@ func TestPutOnBlackList(t *testing.T) {
 			name: "TestPutTwoOnBlackList",
 			args: args{
 				[]v1.Deployment{
-					v1.Deployment{
+					{
 						TypeMeta: metav1.TypeMeta{
 							Kind:       "Deployment",
 							APIVersion: "apps/v1",
@@ -660,7 +660,7 @@ func TestPutOnBlackList(t *testing.T) {
 							Replicas: 5,
 						},
 					},
-					v1.Deployment{
+					{
 						TypeMeta: metav1.TypeMeta{
 							Kind:       "Deployment",
 							APIVersion: "apps/v1",
@@ -684,7 +684,7 @@ func TestPutOnBlackList(t *testing.T) {
 			name: "TestPutDuplicateOnBlackList",
 			args: args{
 				[]v1.Deployment{
-					v1.Deployment{
+					{
 						TypeMeta: metav1.TypeMeta{
 							Kind:       "Deployment",
 							APIVersion: "apps/v1",
@@ -700,7 +700,7 @@ func TestPutOnBlackList(t *testing.T) {
 							Replicas: 5,
 						},
 					},
-					v1.Deployment{
+					{
 						TypeMeta: metav1.TypeMeta{
 							Kind:       "Deployment",
 							APIVersion: "apps/v1",
@@ -750,7 +750,7 @@ func TestRemoveFromBlackList(t *testing.T) {
 			name: "TestPutTwoOnBlackListAndDeleteOne",
 			args: args{
 				[]v1.Deployment{
-					v1.Deployment{
+					{
 						TypeMeta: metav1.TypeMeta{
 							Kind:       "Deployment",
 							APIVersion: "apps/v1",
@@ -766,7 +766,7 @@ func TestRemoveFromBlackList(t *testing.T) {
 							Replicas: 5,
 						},
 					},
-					v1.Deployment{
+					{
 						TypeMeta: metav1.TypeMeta{
 							Kind:       "Deployment",
 							APIVersion: "apps/v1",
@@ -820,7 +820,7 @@ func TestIsOnBlackList(t *testing.T) {
 			name: "TestPutTwoOnBlackListAndCheckOnList",
 			args: args{
 				[]v1.Deployment{
-					v1.Deployment{
+					{
 						TypeMeta: metav1.TypeMeta{
 							Kind:       "Deployment",
 							APIVersion: "apps/v1",
@@ -836,7 +836,7 @@ func TestIsOnBlackList(t *testing.T) {
 							Replicas: 5,
 						},
 					},
-					v1.Deployment{
+					{
 						TypeMeta: metav1.TypeMeta{
 							Kind:       "Deployment",
 							APIVersion: "apps/v1",

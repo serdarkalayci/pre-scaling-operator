@@ -7,7 +7,6 @@ import (
 
 	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
-	dc "github.com/openshift/api/apps/v1"
 	v1 "github.com/openshift/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -28,7 +27,7 @@ func TestDeploymentConfigLister(t *testing.T) {
 		OptInLabel map[string]string
 	}
 
-	_ = dc.AddToScheme(scheme.Scheme)
+	_ = v1.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
 		name    string
@@ -80,7 +79,7 @@ func TestDeploymentConfigGetter(t *testing.T) {
 		req     ctrl.Request
 	}
 
-	_ = dc.AddToScheme(scheme.Scheme)
+	_ = v1.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
 		name    string
@@ -172,7 +171,7 @@ func TestDeploymentConfigScaler(t *testing.T) {
 		replicas         int32
 	}
 
-	_ = dc.AddToScheme(scheme.Scheme)
+	_ = v1.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
 		name    string

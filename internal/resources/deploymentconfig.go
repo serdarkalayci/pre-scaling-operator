@@ -148,8 +148,7 @@ func ScaleDeploymentConfig(ctx context.Context, _client client.Client, deploymen
 		WithValues("namespace", deploymentconfig.Namespace)
 
 	var err error
-	var oldReplicaCount int32
-	oldReplicaCount = deploymentconfig.Spec.Replicas
+	oldReplicaCount := deploymentconfig.Spec.Replicas
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		if oldReplicaCount == stateReplica.Replicas {
 			log.Info("No Update on deploymentconfig. Desired replica count already matches current.")
