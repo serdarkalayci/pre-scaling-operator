@@ -43,7 +43,7 @@ func PreFilter(r record.EventRecorder) predicate.Predicate {
 				Name:      deploymentName,
 				Namespace: nameSpace,
 			}
-			if g.IsOnBlackList(item) {
+			if g.GetBlackList().IsInConcurrentBlackList(item) {
 				return false
 			}
 

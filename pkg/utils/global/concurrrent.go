@@ -11,7 +11,7 @@ type DeploymentInfo struct {
 	Name      string
 }
 
-var blackListSlice *ConcurrentSlice
+var blackList *ConcurrentSlice
 
 // ConcurrentSlice type that can be safely shared between goroutines
 type ConcurrentSlice struct {
@@ -26,12 +26,12 @@ type ConcurrentSliceItem struct {
 	Value DeploymentInfo
 }
 
-func GetBlackListSlice() *ConcurrentSlice {
-	if blackListSlice == nil {
-		blackListSlice = NewConcurrentSlice()
-		return blackListSlice
+func GetBlackList() *ConcurrentSlice {
+	if blackList == nil {
+		blackList = NewConcurrentSlice()
+		return blackList
 	}
-	return blackListSlice
+	return blackList
 }
 
 // NewConcurrentSlice creates a new concurrent slice
@@ -40,6 +40,7 @@ func NewConcurrentSlice() *ConcurrentSlice {
 		items: make([]DeploymentInfo, 0),
 	}
 
+	blackList = cs
 	return cs
 }
 

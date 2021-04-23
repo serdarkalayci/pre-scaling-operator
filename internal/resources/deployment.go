@@ -148,8 +148,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 	log := ctrl.Log.
 		WithValues("deployment", deployment.Name).
 		WithValues("namespace", deployment.Namespace)
-
-	if g.IsDeploymentOnBlackList(deployment) {
+	if g.GetBlackList().IsInConcurrentBlackList(g.ConvertDeploymentToItem(deployment)) {
 		log.Info("Waiting for the deployment ot be off the blacklist.")
 		for stay, timeout := true, time.After(time.Second*60); stay; {
 			select {
@@ -158,7 +157,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 				return nil
 			default:
 				time.Sleep(time.Second * 10)
-				if !g.IsDeploymentOnBlackList(deployment) {
+				if !g.GetBlackList().IsInConcurrentBlackList(g.ConvertDeploymentToItem(deployment)) {
 					stay = false
 				}
 			}
@@ -181,7 +180,8 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 	var req reconcile.Request
 	req.NamespacedName.Namespace = deployment.Namespace
 	req.NamespacedName.Name = deployment.Name
-	g.PutDeploymentOnGlobalBlackList(deployment)
+	g.GetBlackList().Append(g.ConvertDeploymentToItem(deployment))
+	//g.PutDeploymentOnGlobalBlackList(deployment)
 	// Loop step by step until deployment has reached desiredreplica count. Fail when the deployment update failed too many times
 	for stepCondition && retryErr == nil {
 
@@ -209,7 +209,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 		})
 		if retryErr != nil {
 			log.Error(retryErr, "Unable to scale the deployment, err: %v")
-			g.RemoveDeploymentFromGlobalBlackList(deployment)
+			g.GetBlackList().DeleteFromBlackList(g.ConvertDeploymentToItem(deployment))
 			return retryErr
 		}
 
@@ -223,7 +223,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 				deployment, err = DeploymentGetter(ctx, _client, req)
 				if err != nil {
 					log.Error(err, "Error getting refreshed deployment in wait for Readiness loop")
-					g.RemoveDeploymentFromGlobalBlackList(deployment)
+					g.GetBlackList().DeleteFromBlackList(g.ConvertDeploymentToItem(deployment))
 					return err
 				}
 				if deployment.Status.ReadyReplicas == stepReplicaCount {
@@ -243,7 +243,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 		}
 	}
 
-	g.RemoveDeploymentFromGlobalBlackList(deployment)
+	g.GetBlackList().DeleteFromBlackList(g.ConvertDeploymentToItem(deployment))
 	return nil
 }
 

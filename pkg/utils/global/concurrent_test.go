@@ -43,7 +43,7 @@ func TestPutOnBlackListAndIsFound(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cs := GetBlackListSlice()
+			cs := GetBlackList()
 			for _, item := range tt.args.deployment {
 				cs.Append(ConvertDeploymentToItem(item))
 			}
@@ -172,7 +172,7 @@ func TestBlackList(t *testing.T) {
 			length: 1,
 		},
 	}
-	cs := GetBlackListSlice()
+	cs := GetBlackList()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
@@ -191,7 +191,7 @@ func TestBlackList(t *testing.T) {
 }
 
 func TestAddDuplicateAndPurge(t *testing.T) {
-	cs := GetBlackListSlice()
+	cs := GetBlackList()
 	deploymentItem := DeploymentInfo{
 		Name:      "foo",
 		Namespace: "bar",
