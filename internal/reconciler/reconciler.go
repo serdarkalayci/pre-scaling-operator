@@ -37,7 +37,6 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 	finalState, err := GetAppliedState(ctx, _client, namespace, stateDefinitions, clusterState)
 	if err != nil {
-		log.Error(err, "Cannot determine applied state for namespace")
 		return nsEvents, finalState.Name, err
 	}
 
@@ -209,7 +208,6 @@ func GetAppliedState(ctx context.Context, _client client.Client, namespace strin
 	}
 
 	if namespaceState == (states.State{}) && clusterState == (states.State{}) {
-		err = errors.New("cannot continue as no states are set for namespace")
 		return states.State{}, err
 	}
 

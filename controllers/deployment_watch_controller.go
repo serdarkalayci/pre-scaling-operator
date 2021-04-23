@@ -74,7 +74,6 @@ func (r *DeploymentWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// We need to calculate the desired state before we try to reconcile the deployment
 	finalState, err := reconciler.GetAppliedState(ctx, r.Client, req.Namespace, stateDefinitions, states.State{})
 	if err != nil {
-		log.Error(err, "Cannot determine applied state for namespace")
 		return ctrl.Result{}, err
 	}
 

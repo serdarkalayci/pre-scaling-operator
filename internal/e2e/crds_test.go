@@ -20,7 +20,7 @@ import (
 var _ = Describe("e2e Test for the crd controllers", func() {
 
 	const (
-		timeout  = time.Second * 20
+		timeout  = time.Second * 40
 		interval = time.Millisecond * 500
 	)
 

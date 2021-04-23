@@ -20,7 +20,7 @@ import (
 
 var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 
-	const timeout = time.Second * 60
+	const timeout = time.Second * 80
 	const interval = time.Millisecond * 500
 
 	var casenumber = 1

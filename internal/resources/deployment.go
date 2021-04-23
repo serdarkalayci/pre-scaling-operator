@@ -149,8 +149,19 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 		WithValues("namespace", deployment.Namespace)
 
 	if c.IsDeploymentOnBlackList(deployment) {
-		log.Info("Not Scaling. The deployment is on the blacklist.")
-		return nil
+		log.Info("Waiting for the deployment ot be off the blacklist.")
+		for stay, timeout := true, time.After(time.Second*60); stay; {
+			select {
+			case <-timeout:
+				log.Info("Timeout reached! The deployment stayed on the blacklist for too long. Couldn't reconcile this deployment!")
+				return nil
+			default:
+				time.Sleep(time.Second * 10)
+				if !c.IsDeploymentOnBlackList(deployment) {
+					stay = false
+				}
+			}
+		}
 	}
 
 	var err error
@@ -197,6 +208,8 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 		})
 		if retryErr != nil {
 			log.Error(retryErr, "Unable to scale the deployment, err: %v")
+			c.RemoveDeploymentFromGlobalBlackList(deployment)
+			return retryErr
 		}
 
 		// Wait until deployment is ready for the next step
@@ -209,6 +222,8 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 				deployment, err = DeploymentGetter(ctx, _client, req)
 				if err != nil {
 					log.Error(err, "Error getting refreshed deployment in wait for Readiness loop")
+					c.RemoveDeploymentFromGlobalBlackList(deployment)
+					return err
 				}
 				if deployment.Status.ReadyReplicas == stepReplicaCount {
 					stay = false

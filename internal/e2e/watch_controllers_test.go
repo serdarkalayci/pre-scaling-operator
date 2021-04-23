@@ -19,7 +19,7 @@ import (
 
 var _ = Describe("e2e Test for the main operator functionalities", func() {
 
-	const timeout = time.Second * 25
+	const timeout = time.Second * 70
 	const interval = time.Millisecond * 200
 
 	var casenumber = 1
