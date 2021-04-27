@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/binary"
 	"strconv"
 	"time"
 
@@ -80,7 +81,8 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 	})
 
 	AfterEach(func() {
-
+		// Wait until all potential wait-loops in the step scaler are finished.
+		time.Sleep(time.Second * 11)
 		for _, ns := range namespaceList {
 			Expect(k8sClient.Delete(context.Background(), &ns)).Should(Succeed())
 		}
@@ -182,13 +184,15 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 						}
 					}
 
-					time.Sleep(time.Second * 2)
-
+					time.Sleep(time.Second * 30)
 					for k := 0; k < len(fetchedDeploymentConfigList); k++ {
-						Eventually(func() int32 {
+						Eventually(func() bool {
 							k8sClient.Get(context.Background(), updateKey(fetchedDeploymentConfigList[k].Name, fetchedDeploymentConfigList[k].Namespace, key), &fetchedDeploymentConfigList[k])
-							return fetchedDeploymentConfigList[k].Spec.Replicas
-						}, timeout, interval).Should(Equal(int32(expectedReplicas[k])))
+							return fetchedDeploymentConfigList[k].Spec.Replicas == int32(expectedReplicas[k]) && fetchedDeploymentConfigList[k].Status.ReadyReplicas == int32(expectedReplicas[k])
+						}, timeout, interval).Should(Equal(true))
+						binary.Write(GinkgoWriter, binary.LittleEndian, int32(expectedReplicas[k]))
+						binary.Write(GinkgoWriter, binary.LittleEndian, fetchedDeploymentConfigList[k].Spec.Replicas)
+						binary.Write(GinkgoWriter, binary.LittleEndian, &fetchedDeploymentConfigList[k].Status.ReadyReplicas)
 					}
 
 				} else {
@@ -205,25 +209,23 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 
 					}
 
-					time.Sleep(time.Second * 2)
-
+					time.Sleep(time.Second * 10)
 					for k := 0; k < len(fetchedDeploymentList); k++ {
-						Eventually(func() int32 {
-							k8sClient.Get(context.Background(), updateKey(fetchedDeploymentList[k].Namespace, fetchedDeploymentList[k].Name, key), &fetchedDeploymentList[k])
-							return *fetchedDeploymentList[k].Spec.Replicas
-						}, timeout, interval).Should(Equal(int32(expectedReplicas[k])))
+						Eventually(func() bool {
+							k8sClient.Get(context.Background(), updateKey(fetchedDeploymentList[k].Name, fetchedDeploymentList[k].Namespace, key), &fetchedDeploymentList[k])
+							return *fetchedDeploymentList[k].Spec.Replicas == int32(expectedReplicas[k]) && fetchedDeploymentList[k].Status.ReadyReplicas == int32(expectedReplicas[k])
+						}, timeout, interval).Should(Equal(true))
 					}
-
 				}
 
 			},
-			// Structure:  ("Description of the case" , expectedReplicas)
-			// table.Entry("CASE 1  | Apply a CSS and affect only opted-in applications", []int{2, 1, 2, 1}),
-			// table.Entry("CASE 2  | Apply a SS on one namespace", []int{4, 1, 1, 1}),
-			// table.Entry("CASE 3  | Apply SS with higher prio than an existing CSS", []int{4, 1, 2, 1}),
-			// table.Entry("CASE 4  | Apply CSS with higher prio than an existing SS", []int{4, 1, 4, 1}),
-			// table.Entry("CASE 5  | Swap Prio in CSSD", []int{2, 1, 2, 1}),
-			// table.Entry("CASE 6  | Remove states in CSSD", []int{4, 1, 4, 1}),
+				// Structure:  ("Description of the case" , expectedReplicas)
+				table.Entry("CASE 1  | Apply a CSS and affect only opted-in applications", []int{2, 1, 2, 1}),
+				table.Entry("CASE 2  | Apply a SS on one namespace", []int{4, 1, 1, 1}),
+				table.Entry("CASE 3  | Apply SS with higher prio than an existing CSS", []int{4, 1, 2, 1}),
+				table.Entry("CASE 4  | Apply CSS with higher prio than an existing SS", []int{4, 1, 4, 1}),
+				table.Entry("CASE 5  | Swap Prio in CSSD", []int{2, 1, 2, 1}),
+				table.Entry("CASE 6  | Remove states in CSSD", []int{4, 1, 4, 1}),
 			)
 		})
 	})
