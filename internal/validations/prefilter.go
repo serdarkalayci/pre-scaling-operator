@@ -43,7 +43,9 @@ func PreFilter(r record.EventRecorder) predicate.Predicate {
 				Name:      deploymentName,
 				Namespace: nameSpace,
 			}
-			if g.GetBlackList().IsInConcurrentBlackList(item) {
+
+			// Don't reconcile on any change except when Annotation may have changed while the deployment was on the deny list.
+			if g.GetDenyList().IsInConcurrentDenyList(item) && !annotationchange {
 				return false
 			}
 

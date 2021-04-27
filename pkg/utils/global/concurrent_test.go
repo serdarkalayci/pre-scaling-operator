@@ -7,7 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestPutOnBlackListAndIsFound(t *testing.T) {
+func TestPutOnDenyListAndIsFound(t *testing.T) {
 	type args struct {
 		deployment []v1.Deployment
 	}
@@ -17,7 +17,7 @@ func TestPutOnBlackListAndIsFound(t *testing.T) {
 		result bool
 	}{
 		{
-			name: "TestPutOneOnBlackListAndIsFound",
+			name: "TestPutOneOnDenyListAndIsFound",
 			args: args{
 				[]v1.Deployment{
 					{
@@ -43,14 +43,13 @@ func TestPutOnBlackListAndIsFound(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cs := GetBlackList()
 			for _, item := range tt.args.deployment {
-				cs.Append(ConvertDeploymentToItem(item))
+				GetDenyList().Append(ConvertDeploymentToItem(item))
 			}
 
 			for _, item := range tt.args.deployment {
-				if cs.IsInConcurrentBlackList(ConvertDeploymentToItem(item)) != true {
-					t.Errorf("The item is not in the Blacklist! Got  %v, Want %v", cs.IsInConcurrentBlackList(ConvertDeploymentToItem(item)), tt.result)
+				if GetDenyList().IsInConcurrentDenyList(ConvertDeploymentToItem(item)) != true {
+					t.Errorf("The item is not in the DenyList! Got  %v, Want %v", GetDenyList().IsInConcurrentDenyList(ConvertDeploymentToItem(item)), tt.result)
 				}
 			}
 		})
@@ -58,7 +57,7 @@ func TestPutOnBlackListAndIsFound(t *testing.T) {
 
 }
 
-func TestBlackList(t *testing.T) {
+func TestDenyList(t *testing.T) {
 	type args struct {
 		deployment []v1.Deployment
 	}
@@ -68,7 +67,7 @@ func TestBlackList(t *testing.T) {
 		length int
 	}{
 		{
-			name: "TestPutOneOnBlackList",
+			name: "TestPutOneOnDenyList",
 			args: args{
 				[]v1.Deployment{
 					{
@@ -92,7 +91,7 @@ func TestBlackList(t *testing.T) {
 			length: 1,
 		},
 		{
-			name: "TestPutTwoOnBlackList",
+			name: "TestPutTwoOnDenyList",
 			args: args{
 				[]v1.Deployment{
 					{
@@ -132,7 +131,7 @@ func TestBlackList(t *testing.T) {
 			length: 2,
 		},
 		{
-			name: "TestPutDuplicateOnBlackList",
+			name: "TestPutDuplicateOnDenyList",
 			args: args{
 				[]v1.Deployment{
 					{
@@ -172,26 +171,24 @@ func TestBlackList(t *testing.T) {
 			length: 1,
 		},
 	}
-	cs := GetBlackList()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
 			for _, item := range tt.args.deployment {
-				cs.Append(ConvertDeploymentToItem(item))
+				GetDenyList().Append(ConvertDeploymentToItem(item))
 			}
-			listle := cs.Length()
+			listle := GetDenyList().Length()
 			if listle != tt.length {
 				t.Errorf("The length is not correct! Got  %v, Want %v", listle, tt.length)
 			}
 
-			cs.PurgeBlackList()
+			GetDenyList().PurgeDenyList()
 		})
 	}
 
 }
 
 func TestAddDuplicateAndPurge(t *testing.T) {
-	cs := GetBlackList()
 	deploymentItem := DeploymentInfo{
 		Name:      "foo",
 		Namespace: "bar",
@@ -207,17 +204,41 @@ func TestAddDuplicateAndPurge(t *testing.T) {
 		Namespace: "wob",
 	}
 
-	cs.Append(deploymentItem)
-	cs.Append(deploymentItemDuplicate)
-	cs.Append(secondDeploymentItem)
+	GetDenyList().Append(deploymentItem)
+	GetDenyList().Append(deploymentItemDuplicate)
+	GetDenyList().Append(secondDeploymentItem)
 
-	if cs.Length() != 2 {
-		t.Errorf("Failed to put item on slice! Got  %v, Want %v", cs.Length(), 2)
+	if GetDenyList().Length() != 2 {
+		t.Errorf("Failed to put item on slice! Got  %v, Want %v", GetDenyList().Length(), 2)
 	}
 
-	cs.PurgeBlackList()
+	GetDenyList().PurgeDenyList()
 
-	if cs.Length() != 0 {
-		t.Errorf("The slice didn't get purged correctly! Got  %v, Want %v", cs.Length(), 0)
+	if GetDenyList().Length() != 0 {
+		t.Errorf("The slice didn't get purged correctly! Got  %v, Want %v", GetDenyList().Length(), 0)
+	}
+}
+
+func TestAddTwoAndDeleteOne(t *testing.T) {
+	deploymentItem := DeploymentInfo{
+		Name:      "foo",
+		Namespace: "bar",
+	}
+	secondDeploymentItem := DeploymentInfo{
+		Name:      "woop",
+		Namespace: "wob",
+	}
+
+	GetDenyList().Append(deploymentItem)
+	GetDenyList().Append(secondDeploymentItem)
+
+	if GetDenyList().Length() != 2 {
+		t.Errorf("Failed to put item on slice! Got  %v, Want %v", GetDenyList().Length(), 2)
+	}
+
+	GetDenyList().RemoveFromDenyList(secondDeploymentItem)
+
+	if GetDenyList().Length() != 1 {
+		t.Errorf("The item didn't get removed properly!! Got  %v, Want %v", GetDenyList().Length(), 1)
 	}
 }

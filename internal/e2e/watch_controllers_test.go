@@ -51,6 +51,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 	})
 
 	AfterEach(func() {
+		time.Sleep(time.Second * 10)
 		// Tear down the deployment or deploymentconfig
 		if OpenshiftCluster {
 			Expect(k8sClient.Delete(context.Background(), &deploymentconfig)).Should(Succeed())
@@ -145,10 +146,10 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 					var replicas32 int32 = int32(expectedReplicas)
 
-					Eventually(func() int32 {
+					Eventually(func() bool {
 						k8sClient.Get(context.Background(), key, &fetchedDeployment)
-						return *fetchedDeployment.Spec.Replicas
-					}, timeout, interval).Should(Equal(replicas32))
+						return *fetchedDeployment.Spec.Replicas == replicas32 && fetchedDeployment.Status.ReadyReplicas == replicas32
+					}, timeout, interval).Should(Equal(true))
 				}
 
 			},

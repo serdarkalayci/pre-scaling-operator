@@ -148,16 +148,16 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 	log := ctrl.Log.
 		WithValues("deployment", deployment.Name).
 		WithValues("namespace", deployment.Namespace)
-	if g.GetBlackList().IsInConcurrentBlackList(g.ConvertDeploymentToItem(deployment)) {
-		log.Info("Waiting for the deployment ot be off the blacklist.")
-		for stay, timeout := true, time.After(time.Second*60); stay; {
+	if g.GetDenyList().IsInConcurrentDenyList(g.ConvertDeploymentToItem(deployment)) {
+		log.Info("Waiting for the deployment ot be off the denylist.")
+		for stay, timeout := true, time.After(time.Second*120); stay; {
 			select {
 			case <-timeout:
-				log.Info("Timeout reached! The deployment stayed on the blacklist for too long. Couldn't reconcile this deployment!")
+				log.Info("Timeout reached! The deployment stayed on the denylist for too long. Couldn't reconcile this deployment!")
 				return nil
 			default:
 				time.Sleep(time.Second * 10)
-				if !g.GetBlackList().IsInConcurrentBlackList(g.ConvertDeploymentToItem(deployment)) {
+				if !g.GetDenyList().IsInConcurrentDenyList(g.ConvertDeploymentToItem(deployment)) {
 					stay = false
 				}
 			}
@@ -180,8 +180,17 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 	var req reconcile.Request
 	req.NamespacedName.Namespace = deployment.Namespace
 	req.NamespacedName.Name = deployment.Name
-	g.GetBlackList().Append(g.ConvertDeploymentToItem(deployment))
-	//g.PutDeploymentOnGlobalBlackList(deployment)
+	println(g.GetDenyList().Length())
+	println("Putting deployment on denylist " + deployment.Name + " ns " + deployment.Namespace)
+	g.GetDenyList().Append(g.ConvertDeploymentToItem(deployment))
+	for item := range g.GetDenyList().Iter() {
+		println(item.Value.Name)
+		println(item.Value.Namespace)
+		println("")
+	}
+	println(g.GetDenyList().Length())
+	println("")
+	println("")
 	// Loop step by step until deployment has reached desiredreplica count. Fail when the deployment update failed too many times
 	for stepCondition && retryErr == nil {
 
@@ -209,7 +218,9 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 		})
 		if retryErr != nil {
 			log.Error(retryErr, "Unable to scale the deployment, err: %v")
-			g.GetBlackList().DeleteFromBlackList(g.ConvertDeploymentToItem(deployment))
+			g.GetDenyList().RemoveFromDenyList(g.ConvertDeploymentToItem(deployment))
+			println("After too many retry failure: ")
+			println(g.GetDenyList().Length())
 			return retryErr
 		}
 
@@ -223,7 +234,9 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 				deployment, err = DeploymentGetter(ctx, _client, req)
 				if err != nil {
 					log.Error(err, "Error getting refreshed deployment in wait for Readiness loop")
-					g.GetBlackList().DeleteFromBlackList(g.ConvertDeploymentToItem(deployment))
+					g.GetDenyList().RemoveFromDenyList(g.ConvertDeploymentToItem(deployment))
+					println("After refresh wait failure: ")
+					println(g.GetDenyList().Length())
 					return err
 				}
 				if deployment.Status.ReadyReplicas == stepReplicaCount {
@@ -243,7 +256,17 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 		}
 	}
 
-	g.GetBlackList().DeleteFromBlackList(g.ConvertDeploymentToItem(deployment))
+	println("Removing deployment from denylist " + deployment.Name + " ns " + deployment.Namespace)
+	println(g.GetDenyList().Length())
+	g.GetDenyList().RemoveFromDenyList(g.ConvertDeploymentToItem(deployment))
+	for item := range g.GetDenyList().Iter() {
+		println(item.Value.Name)
+		println(item.Value.Namespace)
+		println("")
+	}
+	println(g.GetDenyList().Length())
+	println("")
+	println("")
 	return nil
 }
 

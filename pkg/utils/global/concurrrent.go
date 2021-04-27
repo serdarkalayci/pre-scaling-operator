@@ -11,7 +11,8 @@ type DeploymentInfo struct {
 	Name      string
 }
 
-var blackList *ConcurrentSlice
+// Global DenyList to check if the deployment is currently reconciles/step scaled
+var denylist *ConcurrentSlice
 
 // ConcurrentSlice type that can be safely shared between goroutines
 type ConcurrentSlice struct {
@@ -26,12 +27,12 @@ type ConcurrentSliceItem struct {
 	Value DeploymentInfo
 }
 
-func GetBlackList() *ConcurrentSlice {
-	if blackList == nil {
-		blackList = NewConcurrentSlice()
-		return blackList
+func GetDenyList() *ConcurrentSlice {
+	if denylist == nil {
+		denylist = NewConcurrentSlice()
+		return denylist
 	}
-	return blackList
+	return denylist
 }
 
 // NewConcurrentSlice creates a new concurrent slice
@@ -40,13 +41,13 @@ func NewConcurrentSlice() *ConcurrentSlice {
 		items: make([]DeploymentInfo, 0),
 	}
 
-	blackList = cs
+	denylist = cs
 	return cs
 }
 
 // Append adds an item to the concurrent slice
 func (cs *ConcurrentSlice) Append(item DeploymentInfo) {
-	if !cs.IsInConcurrentBlackList(item) {
+	if !cs.IsInConcurrentDenyList(item) {
 		cs.Lock()
 		defer cs.Unlock()
 
@@ -73,15 +74,17 @@ func (cs *ConcurrentSlice) Iter() <-chan ConcurrentSliceItem {
 	return c
 }
 
-func (cs *ConcurrentSlice) DeleteFromBlackList(item DeploymentInfo) {
+func (cs *ConcurrentSlice) RemoveFromDenyList(item DeploymentInfo) {
+	i := 0
 	for inList := range cs.Iter() {
 		if item == inList.Value {
-			cs.items = RemoveIndex(cs.items, inList.Index)
+			cs.items = RemoveIndex(cs.items, i)
 		}
+		i++
 	}
 }
 
-func (cs *ConcurrentSlice) PurgeBlackList() {
+func (cs *ConcurrentSlice) PurgeDenyList() {
 	for range cs.Iter() {
 		cs.items = RemoveIndex(cs.items, 0)
 	}
@@ -99,7 +102,7 @@ func RemoveIndex(s []DeploymentInfo, index int) []DeploymentInfo {
 	return append(s[:index], s[index+1:]...)
 }
 
-func (cs *ConcurrentSlice) IsInConcurrentBlackList(item DeploymentInfo) bool {
+func (cs *ConcurrentSlice) IsInConcurrentDenyList(item DeploymentInfo) bool {
 	for inList := range cs.Iter() {
 		if item == inList.Value {
 			return true
