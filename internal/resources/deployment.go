@@ -148,6 +148,10 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 	log := ctrl.Log.
 		WithValues("deployment", deployment.Name).
 		WithValues("namespace", deployment.Namespace)
+	var req reconcile.Request
+	req.NamespacedName.Namespace = deployment.Namespace
+	req.NamespacedName.Name = deployment.Name
+	var err error
 	if g.GetDenyList().IsInConcurrentDenyList(g.ConvertDeploymentToItem(deployment)) {
 		log.Info("Waiting for the deployment ot be off the denylist.")
 		for stay, timeout := true, time.After(time.Second*120); stay; {
@@ -158,13 +162,19 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 			default:
 				time.Sleep(time.Second * 10)
 				if !g.GetDenyList().IsInConcurrentDenyList(g.ConvertDeploymentToItem(deployment)) {
+					// Refresh deployment to get a new object to reconcile
+
+					deployment, err = DeploymentGetter(ctx, _client, req)
+					if err != nil {
+						log.Error(err, "Deployment waited to be out of denylist but couldn't get a refreshed object to Reconcile.")
+						return nil
+					}
 					stay = false
 				}
 			}
 		}
 	}
 
-	var err error
 	var oldReplicaCount int32
 	oldReplicaCount = *deployment.Spec.Replicas
 	desiredReplicaCount := stateReplica.Replicas
@@ -177,9 +187,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 	var stepReplicaCount int32
 	var stepCondition bool = true
 	var retryErr error = nil
-	var req reconcile.Request
-	req.NamespacedName.Namespace = deployment.Namespace
-	req.NamespacedName.Name = deployment.Name
+
 	println(g.GetDenyList().Length())
 	println("Putting deployment on denylist " + deployment.Name + " ns " + deployment.Namespace)
 	g.GetDenyList().Append(g.ConvertDeploymentToItem(deployment))
