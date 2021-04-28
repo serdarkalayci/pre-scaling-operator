@@ -114,7 +114,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 					Eventually(func() int32 {
 						k8sClient.Get(context.Background(), key, &fetchedDeploymentConfig)
-						return fetchedDeploymentConfig.Spec.Replicas
+						return fetchedDeploymentConfig.Status.AvailableReplicas
 					}, timeout, interval).Should(Equal(replicas32))
 
 				} else {

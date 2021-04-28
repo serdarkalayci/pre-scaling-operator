@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 
 	"github.com/containersol/prescale-operator/internal/reconciler"
 	"github.com/containersol/prescale-operator/internal/states"
@@ -114,5 +115,6 @@ func (r *ClusterScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.
 func (r *ClusterScalingStateReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&scalingv1alpha1.ClusterScalingState{}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: 5}).
 		Complete(r)
 }
