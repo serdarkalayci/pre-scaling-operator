@@ -3,11 +3,13 @@ package resources
 import (
 	"context"
 	"strings"
+	"time"
 
 	c "github.com/containersol/prescale-operator/internal"
 	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
 	"github.com/containersol/prescale-operator/internal/validations"
+	g "github.com/containersol/prescale-operator/pkg/utils/global"
 	"github.com/containersol/prescale-operator/pkg/utils/math"
 	v1 "github.com/openshift/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -67,14 +69,14 @@ func DeploymentConfigOptinLabel(deploymentConfig v1.DeploymentConfig) (bool, err
 	return validations.OptinLabelExists(deploymentConfig.GetLabels())
 }
 
-func DeploymentConfigStateReplicas(state states.State, deployment v1.DeploymentConfig) (sr.StateReplica, error) {
+func DeploymentConfigStateReplicas(state states.State, deploymentconfig v1.DeploymentConfig) (sr.StateReplica, error) {
 	log := ctrl.Log.
-		WithValues("deploymentconfig", deployment.Name).
-		WithValues("namespace", deployment.Namespace)
-	stateReplicas, err := sr.NewStateReplicasFromAnnotations(deployment.GetAnnotations())
+		WithValues("deploymentconfig", deploymentconfig.Name).
+		WithValues("namespace", deploymentconfig.Namespace)
+	stateReplicas, err := sr.NewStateReplicasFromAnnotations(deploymentconfig.GetAnnotations())
 	if err != nil {
-		log.WithValues("deploymentconfig", deployment.Name).
-			WithValues("namespace", deployment.Namespace).
+		log.WithValues("deploymentconfig", deploymentconfig.Name).
+			WithValues("namespace", deploymentconfig.Namespace).
 			Error(err, "Cannot calculate state replicas. Please check deploymentconfig annotations. Continuing.")
 		return sr.StateReplica{}, err
 	}
@@ -118,9 +120,9 @@ func DeploymentConfigStateReplicasList(state states.State, deploymentconfigs v1.
 			return []sr.StateReplica{}, err
 		}
 
-		// Now we have all the state settings, we can set the replicas for the deployment accordingly
+		// Now we have all the state settings, we can set the replicas for the deploymentconfig accordingly
 		if !optIn {
-			// the deployment opted out. We need to set back to default.
+			// the deploymentconfig opted out. We need to set back to default.
 			log.Info("The deploymentconfig opted out. Will scale back to default")
 			state.Name = c.DefaultReplicaAnnotation
 		}
@@ -147,39 +149,111 @@ func ScaleDeploymentConfig(ctx context.Context, _client client.Client, deploymen
 		WithValues("deploymentconfig", deploymentconfig.Name).
 		WithValues("namespace", deploymentconfig.Namespace)
 
+	var req reconcile.Request
+	deploymentItem := g.ConvertDeploymentConfigToItem(deploymentconfig)
+	req.NamespacedName.Namespace = deploymentconfig.Namespace
+	req.NamespacedName.Name = deploymentconfig.Name
 	var err error
-	oldReplicaCount := deploymentconfig.Spec.Replicas
-	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		if oldReplicaCount == stateReplica.Replicas {
-			log.Info("No Update on deploymentconfig. Desired replica count already matches current.")
-			return nil
-		}
-		log.Info("Updating deploymentconfig replicas for state", "replicas", stateReplica.Replicas)
-		updateErr := DeploymentConfigScaler(ctx, _client, deploymentconfig, stateReplica.Replicas)
-		if updateErr == nil {
-			log.WithValues("Deploymentconfig", deploymentconfig.Name).
-				WithValues("StateReplica mode", stateReplica.Name).
-				WithValues("Old Replica count", oldReplicaCount).
-				WithValues("New Replica count", stateReplica.Replicas).
-				Info("Deployment succesfully updated")
-			return nil
-		}
-		log.Info("Updating deploymentconfig failed due to a conflict! Retrying..")
-		// We need to get a newer version of the object from the client
-		var req reconcile.Request
-		req.NamespacedName.Namespace = deploymentconfig.Namespace
-		req.NamespacedName.Name = deploymentconfig.Name
-		deploymentconfig, err = DeploymentConfigGetter(ctx, _client, req)
-		if err != nil {
-			log.Error(err, "Error getting refreshed deploymentconfig in conflict resolution")
-		}
-		return updateErr
 
-	})
-	if retryErr != nil {
-		log.Error(retryErr, "Unable to scale the deploymentconfig, err: %v")
+	if g.GetDenyList().IsInConcurrentDenyList(deploymentItem) {
+		log.Info("Waiting for the deploymentconfig to be off the denylist.")
+		for stay, timeout := true, time.After(time.Second*120); stay; {
+			select {
+			case <-timeout:
+				log.Info("Timeout reached! The deploymentconfig stayed on the denylist for too long. Couldn't reconcile this deploymentconfig!")
+				return nil
+			default:
+				time.Sleep(time.Second * 10)
+				if !g.GetDenyList().IsInConcurrentDenyList(deploymentItem) {
+					// Refresh deploymentconfig to get a new object to reconcile
+
+					deploymentconfig, err = DeploymentConfigGetter(ctx, _client, req)
+					if err != nil {
+						log.Error(err, "Deployment waited to be out of denylist but couldn't get a refreshed object to Reconcile.")
+						return nil
+					}
+					stay = false
+				}
+			}
+		}
 	}
 
+	var oldReplicaCount int32
+	oldReplicaCount = deploymentconfig.Spec.Replicas
+	desiredReplicaCount := stateReplica.Replicas
+
+	if oldReplicaCount == stateReplica.Replicas {
+		log.Info("No Update on deploymentconfig. Desired replica count already matches current.")
+		return nil
+	}
+
+	var stepReplicaCount int32
+	var stepCondition bool = true
+	var retryErr error = nil
+
+	g.GetDenyList().Append(deploymentItem)
+
+	// Loop step by step until deploymentconfig has reached desiredreplica count. Fail when the deploymentconfig update failed too many times
+	for stepCondition && retryErr == nil {
+
+		// decide if we need to step up or down
+		oldReplicaCount = deploymentconfig.Spec.Replicas
+		if oldReplicaCount < desiredReplicaCount {
+			stepReplicaCount = oldReplicaCount + 1
+		} else {
+			stepReplicaCount = oldReplicaCount - 1
+		}
+
+		retryErr = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			// Don't spam the api in case of conflict error
+			time.Sleep(time.Second * 1)
+
+			updateErr := DeploymentConfigScaler(ctx, _client, deploymentconfig, stepReplicaCount)
+
+			// We need to get a newer version of the object from the client
+			deploymentconfig, err = DeploymentConfigGetter(ctx, _client, req)
+
+			if err != nil {
+				log.Error(err, "Error getting refreshed deploymentconfig in conflict resolution")
+			}
+			return updateErr
+		})
+		if retryErr != nil {
+			log.Error(retryErr, "Unable to scale the deploymentconfig, err: %v")
+			g.GetDenyList().RemoveFromDenyList(deploymentItem)
+			return retryErr
+		}
+
+		// Wait until deploymentconfig is ready for the next step
+		for stay, timeout := true, time.After(time.Second*60); stay; {
+			select {
+			case <-timeout:
+				stay = false
+			default:
+				time.Sleep(time.Second * 5)
+				deploymentconfig, err = DeploymentConfigGetter(ctx, _client, req)
+				if err != nil {
+					log.Error(err, "Error getting refreshed deploymentconfig in wait for Readiness loop")
+					g.GetDenyList().RemoveFromDenyList(deploymentItem)
+					return err
+				}
+				if deploymentconfig.Status.ReadyReplicas == stepReplicaCount {
+					stay = false
+				}
+			}
+		}
+
+		// check if desired is reached
+		if deploymentconfig.Status.ReadyReplicas == desiredReplicaCount {
+			log.WithValues("State", stateReplica.Name).
+				WithValues("Desired Replica Count", stateReplica.Replicas).
+				WithValues("Deployment Name", deploymentconfig.Name).
+				WithValues("Namespace", deploymentconfig.Namespace).
+				Info("Finished scaling deploymentconfig to desired replica count")
+			stepCondition = false
+		}
+	}
+	g.GetDenyList().RemoveFromDenyList(deploymentItem)
 	return nil
 }
 

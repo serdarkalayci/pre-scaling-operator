@@ -3,6 +3,7 @@ package global
 import (
 	"sync"
 
+	ocv1 "github.com/openshift/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
 )
 
@@ -117,5 +118,12 @@ func ConvertDeploymentToItem(deployment v1.Deployment) DeploymentInfo {
 	return DeploymentInfo{
 		Name:      deployment.Name,
 		Namespace: deployment.Namespace,
+	}
+}
+
+func ConvertDeploymentConfigToItem(deploymentconfig ocv1.DeploymentConfig) DeploymentInfo {
+	return DeploymentInfo{
+		Name:      deploymentconfig.Name,
+		Namespace: deploymentconfig.Namespace,
 	}
 }
