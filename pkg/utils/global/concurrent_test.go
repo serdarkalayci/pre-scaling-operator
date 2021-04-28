@@ -219,25 +219,80 @@ func TestAddDuplicateAndPurge(t *testing.T) {
 	}
 }
 
-func TestAddTwoAndDeleteOne(t *testing.T) {
+func TestAddFiveAndDeleteMutiple(t *testing.T) {
 	deploymentItem := DeploymentInfo{
-		Name:      "foo",
+		Name:      "first",
 		Namespace: "bar",
 	}
 	secondDeploymentItem := DeploymentInfo{
-		Name:      "woop",
+		Name:      "second",
 		Namespace: "wob",
+	}
+
+	thirdDeploymentItem := DeploymentInfo{
+		Name:      "third",
+		Namespace: "woooob",
+	}
+
+	fourthdeploymentItem := DeploymentInfo{
+		Name:      "fourth",
+		Namespace: "baaar",
+	}
+	fithDeploymentItem := DeploymentInfo{
+		Name:      "fifth",
+		Namespace: "wfob",
+	}
+
+	someOther := DeploymentInfo{
+		Name:      "some",
+		Namespace: "other",
 	}
 
 	GetDenyList().Append(deploymentItem)
 	GetDenyList().Append(secondDeploymentItem)
+	GetDenyList().Append(thirdDeploymentItem)
+	GetDenyList().Append(fourthdeploymentItem)
+	GetDenyList().Append(fithDeploymentItem)
 
-	if GetDenyList().Length() != 2 {
-		t.Errorf("Failed to put item on slice! Got  %v, Want %v", GetDenyList().Length(), 2)
+	if GetDenyList().Length() != 5 {
+		t.Errorf("Failed to put item on slice! Got  %v, Want %v", GetDenyList().Length(), 5)
+	}
+
+	if GetDenyList().IsInConcurrentDenyList(someOther) {
+		t.Errorf("The item is still on the list!! Got  %v, Want %v", GetDenyList().IsInConcurrentDenyList(someOther), false)
 	}
 
 	GetDenyList().RemoveFromDenyList(secondDeploymentItem)
+	if GetDenyList().IsInConcurrentDenyList(secondDeploymentItem) {
+		t.Errorf("The item is still on the list!! Got  %v, Want %v", GetDenyList().IsInConcurrentDenyList(secondDeploymentItem), false)
+	}
+	if !GetDenyList().IsInConcurrentDenyList(thirdDeploymentItem) {
+		t.Errorf("The item is still on the list!! Got  %v, Want %v", GetDenyList().IsInConcurrentDenyList(thirdDeploymentItem), false)
+	}
+	if GetDenyList().Length() != 4 {
+		t.Errorf("The item didn't get removed properly!! Got  %v, Want %v", GetDenyList().Length(), 4)
+	}
 
+	// delete onne, and one that isn't on it anymore
+	GetDenyList().RemoveFromDenyList(thirdDeploymentItem)
+	GetDenyList().RemoveFromDenyList(secondDeploymentItem)
+	if GetDenyList().IsInConcurrentDenyList(thirdDeploymentItem) {
+		t.Errorf("The item is still on the list!! Got  %v, Want %v", GetDenyList().IsInConcurrentDenyList(thirdDeploymentItem), false)
+	}
+	if GetDenyList().Length() != 3 {
+		t.Errorf("The item didn't get removed properly!! Got  %v, Want %v", GetDenyList().Length(), 3)
+	}
+
+	//delete two at once
+	GetDenyList().RemoveFromDenyList(fourthdeploymentItem)
+	GetDenyList().RemoveFromDenyList(fithDeploymentItem)
+	if GetDenyList().IsInConcurrentDenyList(fourthdeploymentItem) {
+		t.Errorf("The item is still on the list!! Got  %v, Want %v", GetDenyList().IsInConcurrentDenyList(fourthdeploymentItem), false)
+	}
+	if GetDenyList().IsInConcurrentDenyList(fithDeploymentItem) {
+		t.Errorf("The item is still on the list!! Got  %v, Want %v", GetDenyList().IsInConcurrentDenyList(fithDeploymentItem), false)
+	}
+	println("After third delete")
 	if GetDenyList().Length() != 1 {
 		t.Errorf("The item didn't get removed properly!! Got  %v, Want %v", GetDenyList().Length(), 1)
 	}

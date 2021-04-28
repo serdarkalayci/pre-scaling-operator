@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"encoding/binary"
 	"strconv"
 	"time"
 
@@ -82,10 +81,11 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 
 	AfterEach(func() {
 		// Wait until all potential wait-loops in the step scaler are finished.
-		time.Sleep(time.Second * 11)
+		time.Sleep(time.Second * 5)
 		for _, ns := range namespaceList {
 			Expect(k8sClient.Delete(context.Background(), &ns)).Should(Succeed())
 		}
+		time.Sleep(time.Second * 5)
 
 		if casenumber == 1 || casenumber == 6 {
 			Expect(k8sClient.Delete(context.Background(), &css)).Should(Succeed())
@@ -190,9 +190,6 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 							k8sClient.Get(context.Background(), updateKey(fetchedDeploymentConfigList[k].Name, fetchedDeploymentConfigList[k].Namespace, key), &fetchedDeploymentConfigList[k])
 							return fetchedDeploymentConfigList[k].Spec.Replicas == int32(expectedReplicas[k]) && fetchedDeploymentConfigList[k].Status.ReadyReplicas == int32(expectedReplicas[k])
 						}, timeout, interval).Should(Equal(true))
-						binary.Write(GinkgoWriter, binary.LittleEndian, int32(expectedReplicas[k]))
-						binary.Write(GinkgoWriter, binary.LittleEndian, fetchedDeploymentConfigList[k].Spec.Replicas)
-						binary.Write(GinkgoWriter, binary.LittleEndian, &fetchedDeploymentConfigList[k].Status.ReadyReplicas)
 					}
 
 				} else {
@@ -211,10 +208,10 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 
 					time.Sleep(time.Second * 10)
 					for k := 0; k < len(fetchedDeploymentList); k++ {
-						Eventually(func() bool {
-							k8sClient.Get(context.Background(), updateKey(fetchedDeploymentList[k].Name, fetchedDeploymentList[k].Namespace, key), &fetchedDeploymentList[k])
-							return *fetchedDeploymentList[k].Spec.Replicas == int32(expectedReplicas[k]) && fetchedDeploymentList[k].Status.ReadyReplicas == int32(expectedReplicas[k])
-						}, timeout, interval).Should(Equal(true))
+						Eventually(func() int32 {
+							k8sClient.Get(context.Background(), updateKey(fetchedDeploymentList[k].Namespace, fetchedDeploymentList[k].Name, key), &fetchedDeploymentList[k])
+							return fetchedDeploymentList[k].Status.ReadyReplicas
+						}, timeout, interval).Should(Equal(int32(expectedReplicas[k])))
 					}
 				}
 

@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -149,11 +150,14 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 		WithValues("deployment", deployment.Name).
 		WithValues("namespace", deployment.Namespace)
 	var req reconcile.Request
+	deploymentItem := g.ConvertDeploymentToItem(deployment)
 	req.NamespacedName.Namespace = deployment.Namespace
 	req.NamespacedName.Name = deployment.Name
 	var err error
-	if g.GetDenyList().IsInConcurrentDenyList(g.ConvertDeploymentToItem(deployment)) {
-		log.Info("Waiting for the deployment ot be off the denylist.")
+
+
+	if g.GetDenyList().IsInConcurrentDenyList(deploymentItem) {
+		log.Info("Waiting for the deployment to be off the denylist.")
 		for stay, timeout := true, time.After(time.Second*120); stay; {
 			select {
 			case <-timeout:
@@ -161,7 +165,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 				return nil
 			default:
 				time.Sleep(time.Second * 10)
-				if !g.GetDenyList().IsInConcurrentDenyList(g.ConvertDeploymentToItem(deployment)) {
+				if !g.GetDenyList().IsInConcurrentDenyList(deploymentItem) {
 					// Refresh deployment to get a new object to reconcile
 
 					deployment, err = DeploymentGetter(ctx, _client, req)
@@ -188,17 +192,8 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 	var stepCondition bool = true
 	var retryErr error = nil
 
-	println(g.GetDenyList().Length())
-	println("Putting deployment on denylist " + deployment.Name + " ns " + deployment.Namespace)
-	g.GetDenyList().Append(g.ConvertDeploymentToItem(deployment))
-	for item := range g.GetDenyList().Iter() {
-		println(item.Value.Name)
-		println(item.Value.Namespace)
-		println("")
-	}
-	println(g.GetDenyList().Length())
-	println("")
-	println("")
+	g.GetDenyList().Append(deploymentItem)
+
 	// Loop step by step until deployment has reached desiredreplica count. Fail when the deployment update failed too many times
 	for stepCondition && retryErr == nil {
 
@@ -212,7 +207,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 
 		retryErr = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			// Don't spam the api in case of conflict error
-			time.Sleep(time.Second * 2)
+			time.Sleep(time.Second * 1)
 
 			updateErr := DeploymentScaler(ctx, _client, deployment, stepReplicaCount)
 
@@ -226,9 +221,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 		})
 		if retryErr != nil {
 			log.Error(retryErr, "Unable to scale the deployment, err: %v")
-			g.GetDenyList().RemoveFromDenyList(g.ConvertDeploymentToItem(deployment))
-			println("After too many retry failure: ")
-			println(g.GetDenyList().Length())
+			g.GetDenyList().RemoveFromDenyList(deploymentItem)
 			return retryErr
 		}
 
@@ -242,9 +235,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 				deployment, err = DeploymentGetter(ctx, _client, req)
 				if err != nil {
 					log.Error(err, "Error getting refreshed deployment in wait for Readiness loop")
-					g.GetDenyList().RemoveFromDenyList(g.ConvertDeploymentToItem(deployment))
-					println("After refresh wait failure: ")
-					println(g.GetDenyList().Length())
+					g.GetDenyList().RemoveFromDenyList(deploymentItem)
 					return err
 				}
 				if deployment.Status.ReadyReplicas == stepReplicaCount {
@@ -263,18 +254,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 			stepCondition = false
 		}
 	}
-
-	println("Removing deployment from denylist " + deployment.Name + " ns " + deployment.Namespace)
-	println(g.GetDenyList().Length())
-	g.GetDenyList().RemoveFromDenyList(g.ConvertDeploymentToItem(deployment))
-	for item := range g.GetDenyList().Iter() {
-		println(item.Value.Name)
-		println(item.Value.Namespace)
-		println("")
-	}
-	println(g.GetDenyList().Length())
-	println("")
-	println("")
+	g.GetDenyList().RemoveFromDenyList(deploymentItem)
 	return nil
 }
 

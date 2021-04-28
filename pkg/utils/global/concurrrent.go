@@ -78,7 +78,7 @@ func (cs *ConcurrentSlice) RemoveFromDenyList(item DeploymentInfo) {
 	i := 0
 	for inList := range cs.Iter() {
 		if item == inList.Value {
-			cs.items = RemoveIndex(cs.items, i)
+			denylist.items = RemoveIndex(cs.items, i)
 		}
 		i++
 	}
@@ -95,6 +95,7 @@ func (cs *ConcurrentSlice) Length() int {
 	for range cs.Iter() {
 		i++
 	}
+
 	return i
 }
 
@@ -103,12 +104,13 @@ func RemoveIndex(s []DeploymentInfo, index int) []DeploymentInfo {
 }
 
 func (cs *ConcurrentSlice) IsInConcurrentDenyList(item DeploymentInfo) bool {
+	result := false
 	for inList := range cs.Iter() {
 		if item == inList.Value {
-			return true
+			result = true
 		}
 	}
-	return false
+	return result
 }
 
 func ConvertDeploymentToItem(deployment v1.Deployment) DeploymentInfo {
