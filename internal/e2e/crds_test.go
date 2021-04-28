@@ -139,11 +139,10 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 					css = CreateClusterScalingState("bau")
 					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
 
-					time.Sleep(time.Second * 10)
-
 					ss = CreateScalingState("peak", namespaceList[0].Name)
 					Expect(k8sClient.Create(context.Background(), &ss)).Should(Succeed())
 
+					time.Sleep(time.Second * 20)
 					// get the cssd back to modify
 					cssdList := &v1alpha1.ClusterScalingStateDefinitionList{}
 					Eventually(func() v1alpha1.ClusterScalingStateDefinitionList {
