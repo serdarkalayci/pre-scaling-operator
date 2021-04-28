@@ -172,7 +172,7 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 				time.Sleep(time.Second * 10)
 
 				if OpenshiftCluster {
-
+					time.Sleep(time.Second * 30)
 					for _, ns := range namespaceList {
 						for _, dc := range deploymentconfigList {
 							Eventually(func() ocv1.DeploymentConfig {
@@ -184,16 +184,15 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 						}
 					}
 
-					time.Sleep(time.Second * 30)
 					for k := 0; k < len(fetchedDeploymentConfigList); k++ {
-						Eventually(func() bool {
+						Eventually(func() int32 {
 							k8sClient.Get(context.Background(), updateKey(fetchedDeploymentConfigList[k].Name, fetchedDeploymentConfigList[k].Namespace, key), &fetchedDeploymentConfigList[k])
-							return fetchedDeploymentConfigList[k].Spec.Replicas == int32(expectedReplicas[k]) && fetchedDeploymentConfigList[k].Status.ReadyReplicas == int32(expectedReplicas[k])
-						}, timeout, interval).Should(Equal(true))
+							return fetchedDeploymentConfigList[k].Status.AvailableReplicas
+						}, timeout, interval).Should(Equal(int32(expectedReplicas[k])))
 					}
 
 				} else {
-
+					time.Sleep(time.Second * 20)
 					for _, ns := range namespaceList {
 						for _, dep := range deploymentList {
 							Eventually(func() v1.Deployment {
@@ -206,7 +205,6 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 
 					}
 
-					time.Sleep(time.Second * 10)
 					for k := 0; k < len(fetchedDeploymentList); k++ {
 						Eventually(func() int32 {
 							k8sClient.Get(context.Background(), updateKey(fetchedDeploymentList[k].Namespace, fetchedDeploymentList[k].Name, key), &fetchedDeploymentList[k])
