@@ -2,7 +2,6 @@ package resources
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -154,7 +153,6 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 	req.NamespacedName.Namespace = deployment.Namespace
 	req.NamespacedName.Name = deployment.Name
 	var err error
-
 
 	if g.GetDenyList().IsInConcurrentDenyList(deploymentItem) {
 		log.Info("Waiting for the deployment to be off the denylist.")
