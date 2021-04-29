@@ -254,7 +254,7 @@ func ScaleDeploymentConfig(ctx context.Context, _client client.Client, deploymen
 		}
 	} else {
 		// Rapid scale. No Step Scale
-		retryErr = DeploymentConfigScaler(ctx, _client, deploymentconfig, stepReplicaCount, req)
+		retryErr = DeploymentConfigScaler(ctx, _client, deploymentconfig, desiredReplicaCount, req)
 
 		if retryErr != nil {
 			log.Error(retryErr, "Unable to scale the deploymentconfig, err: %v")
