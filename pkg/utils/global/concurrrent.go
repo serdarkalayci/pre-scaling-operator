@@ -8,8 +8,11 @@ import (
 )
 
 type DeploymentInfo struct {
-	Namespace string
-	Name      string
+	Namespace       string
+	Name            string
+	Failure         bool
+	FailureMessage  string
+	DesiredReplicas int
 }
 
 // Global DenyList to check if the deployment is currently reconciles/step scaled
@@ -46,9 +49,15 @@ func NewConcurrentSlice() *ConcurrentSlice {
 	return cs
 }
 
-// Append adds an item to the concurrent slice
-func (cs *ConcurrentSlice) Append(item DeploymentInfo) {
-	if !cs.IsInConcurrentDenyList(item) {
+func (cs *ConcurrentSlice) UpdateOrAppend(item DeploymentInfo) {
+	if cs.IsInConcurrentDenyList(item) {
+		cs.RemoveFromDenyList(item)
+
+		cs.Lock()
+		defer cs.Unlock()
+
+		cs.items = append(cs.items, item)
+	} else {
 		cs.Lock()
 		defer cs.Unlock()
 
@@ -78,7 +87,7 @@ func (cs *ConcurrentSlice) Iter() <-chan ConcurrentSliceItem {
 func (cs *ConcurrentSlice) RemoveFromDenyList(item DeploymentInfo) {
 	i := 0
 	for inList := range cs.Iter() {
-		if item == inList.Value {
+		if item.Name == inList.Value.Name && item.Namespace == inList.Value.Namespace {
 			denylist.items = RemoveIndex(cs.items, i)
 		}
 		i++
@@ -107,23 +116,63 @@ func RemoveIndex(s []DeploymentInfo, index int) []DeploymentInfo {
 func (cs *ConcurrentSlice) IsInConcurrentDenyList(item DeploymentInfo) bool {
 	result := false
 	for inList := range cs.Iter() {
-		if item == inList.Value {
+		if item.Name == inList.Value.Name && item.Namespace == inList.Value.Namespace {
 			result = true
 		}
 	}
 	return result
 }
 
+func (cs *ConcurrentSlice) SetDeploymentInfoOnDenyList(item DeploymentInfo, failure bool, failureMessage string, desiredReplicas int) {
+
+	concurrencyItem, err := cs.GetDeploymentInfoFromDenyList(item)
+	if err != "Not Found" {
+		concurrencyItem.Failure = failure
+		concurrencyItem.FailureMessage = failureMessage
+		concurrencyItem.DesiredReplicas = desiredReplicas
+	}
+	cs.UpdateOrAppend(concurrencyItem)
+}
+
+func (cs *ConcurrentSlice) GetDeploymentInfoFromDenyList(item DeploymentInfo) (DeploymentInfo, string) {
+	result := DeploymentInfo{}
+	for inList := range cs.Iter() {
+		if item.Name == inList.Value.Name && item.Namespace == inList.Value.Namespace {
+			result = inList.Value
+		}
+	}
+	if result.Name != "" && result.Namespace != "" {
+		return result, ""
+	}
+	return DeploymentInfo{}, "Not Found"
+}
+
+func (cs *ConcurrentSlice) IsDeploymentInFailureState(item DeploymentInfo) (bool, string) {
+	itemToReturn, _ := cs.GetDeploymentInfoFromDenyList(item)
+	return itemToReturn.Failure, item.FailureMessage
+}
+
+func (cs *ConcurrentSlice) GetDesiredReplicasFromDenyList(item DeploymentInfo) int {
+	itemToReturn, _ := cs.GetDeploymentInfoFromDenyList(item)
+	return itemToReturn.DesiredReplicas
+}
+
 func ConvertDeploymentToItem(deployment v1.Deployment) DeploymentInfo {
 	return DeploymentInfo{
-		Name:      deployment.Name,
-		Namespace: deployment.Namespace,
+		Name:            deployment.Name,
+		Namespace:       deployment.Namespace,
+		Failure:         false,
+		FailureMessage:  "",
+		DesiredReplicas: -1,
 	}
 }
 
 func ConvertDeploymentConfigToItem(deploymentconfig ocv1.DeploymentConfig) DeploymentInfo {
 	return DeploymentInfo{
-		Name:      deploymentconfig.Name,
-		Namespace: deploymentconfig.Namespace,
+		Name:            deploymentconfig.Name,
+		Namespace:       deploymentconfig.Namespace,
+		Failure:         false,
+		FailureMessage:  "",
+		DesiredReplicas: -1,
 	}
 }

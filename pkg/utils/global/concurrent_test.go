@@ -44,7 +44,7 @@ func TestPutOnDenyListAndIsFound(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for _, item := range tt.args.deployment {
-				GetDenyList().Append(ConvertDeploymentToItem(item))
+				GetDenyList().UpdateOrAppend(ConvertDeploymentToItem(item))
 			}
 
 			for _, item := range tt.args.deployment {
@@ -175,7 +175,7 @@ func TestDenyList(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 
 			for _, item := range tt.args.deployment {
-				GetDenyList().Append(ConvertDeploymentToItem(item))
+				GetDenyList().UpdateOrAppend(ConvertDeploymentToItem(item))
 			}
 			listle := GetDenyList().Length()
 			if listle != tt.length {
@@ -204,9 +204,9 @@ func TestAddDuplicateAndPurge(t *testing.T) {
 		Namespace: "wob",
 	}
 
-	GetDenyList().Append(deploymentItem)
-	GetDenyList().Append(deploymentItemDuplicate)
-	GetDenyList().Append(secondDeploymentItem)
+	GetDenyList().UpdateOrAppend(deploymentItem)
+	GetDenyList().UpdateOrAppend(deploymentItemDuplicate)
+	GetDenyList().UpdateOrAppend(secondDeploymentItem)
 
 	if GetDenyList().Length() != 2 {
 		t.Errorf("Failed to put item on slice! Got  %v, Want %v", GetDenyList().Length(), 2)
@@ -243,11 +243,11 @@ func TestAddFiveAndDeleteMutiple(t *testing.T) {
 		Namespace: "wfob",
 	}
 
-	GetDenyList().Append(deploymentItem)
-	GetDenyList().Append(secondDeploymentItem)
-	GetDenyList().Append(thirdDeploymentItem)
-	GetDenyList().Append(fourthdeploymentItem)
-	GetDenyList().Append(fithDeploymentItem)
+	GetDenyList().UpdateOrAppend(deploymentItem)
+	GetDenyList().UpdateOrAppend(secondDeploymentItem)
+	GetDenyList().UpdateOrAppend(thirdDeploymentItem)
+	GetDenyList().UpdateOrAppend(fourthdeploymentItem)
+	GetDenyList().UpdateOrAppend(fithDeploymentItem)
 
 	if GetDenyList().Length() != 5 {
 		t.Errorf("Failed to put item on slice! Got  %v, Want %v", GetDenyList().Length(), 5)
@@ -312,7 +312,7 @@ func TestIsInList(t *testing.T) {
 		Namespace: "other",
 	}
 
-	GetDenyList().Append(theItemInList)
+	GetDenyList().UpdateOrAppend(theItemInList)
 
 	// Testing IsInConcurrenyDenyList (false case)
 	isSomeOtherInList := GetDenyList().IsInConcurrentDenyList(someOther)
