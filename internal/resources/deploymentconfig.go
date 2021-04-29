@@ -61,16 +61,21 @@ func DeploymentConfigScaler(ctx context.Context, _client client.Client, deployme
 		// Don't spam the api in case of conflict error
 		time.Sleep(time.Second * 1)
 
-		updateErr := _client.Update(ctx, &deploymentConfig, &client.UpdateOptions{})
-		if updateErr != nil {
-			return updateErr
-		}
-
 		// We need to get a newer version of the object from the client
 		deploymentconfig, err := DeploymentConfigGetter(ctx, _client, req)
 		_ = deploymentconfig
 		if err != nil {
 			log.Error(err, "Error getting refreshed deploymentconfig in conflict resolution")
+		}
+
+		// Skip if we couldn't get the deploymentconfig
+		if err == nil {
+			deploymentConfig.Spec.Replicas = replicas
+
+			updateErr := _client.Update(ctx, &deploymentConfig, &client.UpdateOptions{})
+			if updateErr != nil {
+				return updateErr
+			}
 		}
 		return err
 	})
@@ -204,7 +209,7 @@ func ScaleDeploymentConfig(ctx context.Context, _client client.Client, deploymen
 	var stepReplicaCount int32
 	var stepCondition bool = true
 	var retryErr error = nil
-
+	log.Info("Adding to denylist")
 	g.GetDenyList().Append(deploymentItem)
 	if rateLimitingEnabled {
 		for stepCondition && retryErr == nil {

@@ -55,22 +55,26 @@ func DeploymentScaler(ctx context.Context, _client client.Client, deployment v1.
 		}
 	}
 
-	deployment.Spec.Replicas = &replicas
-
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Don't spam the api in case of conflict error
 		time.Sleep(time.Second * 1)
-
-		updateErr := _client.Update(ctx, &deployment, &client.UpdateOptions{})
-		if updateErr != nil {
-			return updateErr
-		}
 
 		// We need to get a newer version of the object from the client
 		deployment, err := DeploymentGetter(ctx, _client, req)
 		_ = deployment
 		if err != nil {
 			log.Error(err, "Error getting refreshed deployment in conflict resolution")
+			return err
+		}
+
+		// Skip if we couldn't get the deployment
+		if err == nil {
+			deployment.Spec.Replicas = &replicas
+
+			updateErr := _client.Update(ctx, &deployment, &client.UpdateOptions{})
+			if updateErr != nil {
+				return updateErr
+			}
 		}
 		return err
 	})
@@ -202,7 +206,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 	var stepReplicaCount int32
 	var stepCondition bool = true
 	var retryErr error = nil
-
+	log.Info("Putting deployment on denylist")
 	g.GetDenyList().Append(deploymentItem)
 	if rateLimitingEnabled {
 		// Loop step by step until deployment has reached desiredreplica count. Fail when the deployment update failed too many times
