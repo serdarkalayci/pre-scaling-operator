@@ -66,7 +66,7 @@ func (r *DeploymentConfigWatcher) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	//We are certain that we have an object to reconcile, we need to get the state definitions
-	stateDefinitions, err := states.GetClusterScalingStateDefinitions(ctx, r.Client)
+	stateDefinitions, err := states.GetClusterScalingStates(ctx, r.Client)
 	if err != nil {
 		log.Error(err, "Failed to get ClusterStateDefinitions")
 		return ctrl.Result{}, err

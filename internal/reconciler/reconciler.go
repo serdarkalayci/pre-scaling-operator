@@ -39,6 +39,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	if err != nil {
 		return nsEvents, finalState.Name, err
 	}
+	rateLimitingEnabled := states.GetStepScaleSetting(ctx, _client)
 
 	// We now need to look for objects (currently supported deployments and deploymentConfigs) which are opted in,
 	// then use their annotations to determine the correct scale
@@ -94,7 +95,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 	if allowed {
 		for i, deployment := range deployments.Items {
-			err := resources.ScaleDeployment(ctx, _client, deployment, scaleReplicalist[i])
+			err := resources.ScaleDeployment(ctx, _client, deployment, scaleReplicalist[i], rateLimitingEnabled)
 
 			if err != nil {
 				log.Error(err, "Error scaling the deployment")
@@ -107,7 +108,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 					WithValues("deploymentconfig", deploymentConfig.Name).
 					WithValues("namespace", deploymentConfig.Namespace)
 
-				err := resources.ScaleDeploymentConfig(ctx, _client, deploymentConfig, scaleReplicalistDC[i])
+				err := resources.ScaleDeploymentConfig(ctx, _client, deploymentConfig, scaleReplicalistDC[i], rateLimitingEnabled)
 				if err != nil {
 					log.Error(err, "Error scaling the deploymentconfig")
 					continue
@@ -136,6 +137,7 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 		log.Error(err, "Error getting the state replicas")
 		return err
 	}
+	rateLimitingEnabled := states.GetStepScaleSetting(ctx, _client)
 	allowed, err := quotas.ResourceQuotaCheck(ctx, deployment.Namespace, resources.LimitsNeededDeployment(deployment, stateReplica.Replicas))
 	if err != nil {
 		log.Error(err, "Cannot calculate the resource quotas")
@@ -147,7 +149,7 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 	log.Info("Quota Check")
 
 	if allowed {
-		err = resources.ScaleDeployment(ctx, _client, deployment, stateReplica)
+		err = resources.ScaleDeployment(ctx, _client, deployment, stateReplica, rateLimitingEnabled)
 		if err != nil {
 			log.Error(err, "Error scaling the deployment")
 			return err
@@ -167,7 +169,7 @@ func ReconcileDeploymentConfig(ctx context.Context, _client client.Client, deplo
 		log.Error(err, "Error getting the state replicas")
 		return err
 	}
-
+	rateLimitingEnabled := states.GetStepScaleSetting(ctx, _client)
 	allowed, err := quotas.ResourceQuotaCheck(ctx, deploymentConfig.Namespace, resources.LimitsNeededDeploymentConfig(deploymentConfig, stateReplica.Replicas))
 	if err != nil {
 		log.Error(err, "Cannot calculate the resource quotas")
@@ -179,7 +181,7 @@ func ReconcileDeploymentConfig(ctx context.Context, _client client.Client, deplo
 	log.Info("Quota Check")
 
 	if allowed {
-		err = resources.ScaleDeploymentConfig(ctx, _client, deploymentConfig, stateReplica)
+		err = resources.ScaleDeploymentConfig(ctx, _client, deploymentConfig, stateReplica, rateLimitingEnabled)
 		if err != nil {
 			log.Error(err, "Error scaling the deploymentconfig")
 			return err

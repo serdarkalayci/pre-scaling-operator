@@ -156,7 +156,7 @@ func DeploymentStateReplicasList(state states.State, deployments v1.DeploymentLi
 	return stateReplicaList, err
 }
 
-func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.Deployment, stateReplica sr.StateReplica) error {
+func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.Deployment, stateReplica sr.StateReplica, rateLimitingEnabled bool) error {
 
 	log := ctrl.Log.
 		WithValues("deployment", deployment.Name).
@@ -204,8 +204,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 	var retryErr error = nil
 
 	g.GetDenyList().Append(deploymentItem)
-	var stepScaleEnabled = true
-	if stepScaleEnabled {
+	if rateLimitingEnabled {
 		// Loop step by step until deployment has reached desiredreplica count. Fail when the deployment update failed too many times
 		for stepCondition && retryErr == nil {
 

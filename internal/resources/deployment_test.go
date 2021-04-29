@@ -194,7 +194,7 @@ func TestDeploymentScaler(t *testing.T) {
 				},
 				replicas: 4,
 				req: reconcile.Request{
-					types.NamespacedName{
+					NamespacedName: types.NamespacedName{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -234,7 +234,7 @@ func TestDeploymentScaler(t *testing.T) {
 				},
 				replicas: 4,
 				req: reconcile.Request{
-					types.NamespacedName{
+					NamespacedName: types.NamespacedName{
 						Name:      "foo",
 						Namespace: "bar",
 					},
@@ -279,7 +279,7 @@ func TestDeploymentScaler(t *testing.T) {
 				},
 				replicas: 2,
 				req: reconcile.Request{
-					types.NamespacedName{
+					NamespacedName: types.NamespacedName{
 						Name:      "foo",
 						Namespace: "bar",
 					},

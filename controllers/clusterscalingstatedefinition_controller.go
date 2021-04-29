@@ -64,7 +64,7 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 		WithValues("reconciler kind", "ClusterScalingStatesDefinition").
 		WithValues("reconciler object", req.Name)
 
-	clusterStateDefinitions, err := states.GetClusterScalingStateDefinitions(ctx, r.Client)
+	clusterStateDefinitions, err := states.GetClusterScalingStates(ctx, r.Client)
 	if err != nil {
 		// If we encounter an error trying to retrieve the state definitions,
 		// we will not be able to compute anything else.

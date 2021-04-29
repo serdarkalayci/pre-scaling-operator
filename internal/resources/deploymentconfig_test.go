@@ -169,6 +169,7 @@ func TestDeploymentConfigScaler(t *testing.T) {
 		_client          client.Client
 		deploymentConfig v1.DeploymentConfig
 		replicas         int32
+		req              reconcile.Request
 	}
 
 	_ = v1.AddToScheme(scheme.Scheme)
@@ -189,7 +190,8 @@ func TestDeploymentConfigScaler(t *testing.T) {
 							APIVersion: "apps.openshift.io/v1",
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: "foo",
+							Name:      "foo",
+							Namespace: "bar",
 						},
 						Spec:   v1.DeploymentConfigSpec{},
 						Status: v1.DeploymentConfigStatus{},
@@ -202,12 +204,19 @@ func TestDeploymentConfigScaler(t *testing.T) {
 						APIVersion: "apps.openshift.io/v1",
 					},
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "foo",
+						Name:      "foo",
+						Namespace: "bar",
 					},
 					Spec:   v1.DeploymentConfigSpec{},
 					Status: v1.DeploymentConfigStatus{},
 				},
 				replicas: 4,
+				req: reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      "foo",
+						Namespace: "bar",
+					},
+				},
 			},
 			wantErr: false,
 		},
@@ -222,7 +231,8 @@ func TestDeploymentConfigScaler(t *testing.T) {
 							APIVersion: "apps.openshift.io/v1",
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: "foo",
+							Name:      "foo",
+							Namespace: "bar",
 						},
 						Spec:   v1.DeploymentConfigSpec{},
 						Status: v1.DeploymentConfigStatus{},
@@ -235,12 +245,19 @@ func TestDeploymentConfigScaler(t *testing.T) {
 						APIVersion: "apps.openshift.io/v1",
 					},
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "bar",
+						Name:      "bar",
+						Namespace: "foo",
 					},
 					Spec:   v1.DeploymentConfigSpec{},
 					Status: v1.DeploymentConfigStatus{},
 				},
 				replicas: 4,
+				req: reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      "foo",
+						Namespace: "bar",
+					},
+				},
 			},
 			wantErr: true,
 		},
@@ -255,7 +272,8 @@ func TestDeploymentConfigScaler(t *testing.T) {
 							APIVersion: "apps.openshift.io/v1",
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: "foo",
+							Name:      "foo",
+							Namespace: "bar",
 						},
 						Spec:   v1.DeploymentConfigSpec{},
 						Status: v1.DeploymentConfigStatus{},
@@ -269,6 +287,7 @@ func TestDeploymentConfigScaler(t *testing.T) {
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:        "foo",
+						Namespace:   "bar",
 						Annotations: map[string]string{"scaler/allow-autoscaling": "true"},
 					},
 					Spec: v1.DeploymentConfigSpec{
@@ -277,13 +296,19 @@ func TestDeploymentConfigScaler(t *testing.T) {
 					Status: v1.DeploymentConfigStatus{},
 				},
 				replicas: 2,
+				req: reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      "foo",
+						Namespace: "bar",
+					},
+				},
 			},
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := DeploymentConfigScaler(tt.args.ctx, tt.args._client, tt.args.deploymentConfig, tt.args.replicas); (err != nil) != tt.wantErr {
+			if err := DeploymentConfigScaler(tt.args.ctx, tt.args._client, tt.args.deploymentConfig, tt.args.replicas, tt.args.req); (err != nil) != tt.wantErr {
 				t.Errorf("DeploymentConfigScaler() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
