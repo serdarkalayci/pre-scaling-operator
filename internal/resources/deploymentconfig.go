@@ -172,6 +172,7 @@ func ScaleDeploymentConfig(ctx context.Context, _client client.Client, deploymen
 						log.Error(err, "Deployment waited to be out of denylist but couldn't get a refreshed object to Reconcile.")
 						return nil
 					}
+
 					stay = false
 				}
 			}

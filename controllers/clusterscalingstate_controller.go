@@ -115,6 +115,6 @@ func (r *ClusterScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.
 func (r *ClusterScalingStateReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&scalingv1alpha1.ClusterScalingState{}).
-		WithOptions(controller.Options{MaxConcurrentReconciles: 5}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: 1}).
 		Complete(r)
 }

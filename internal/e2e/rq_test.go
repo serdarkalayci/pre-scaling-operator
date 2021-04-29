@@ -146,11 +146,11 @@ var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 				}
 
 			},
-				// Structure:  ("Description of the case" , expectedReplicas)
-				table.Entry("CASE 1  | Should scale down from 3 to 2 | Enough Quota to scale down.", 2),
-				table.Entry("CASE 2  | Should not scale to 5 and stay at 1 | Quota has exceeded. ", 1),
-				table.Entry("CASE 3  | Should stay at 2 | Same replicas, no change.", 2),
-				table.Entry("CASE 4  | Should scale from 3 to 4 | Enough quota to scale up", 4),
+			// Structure:  ("Description of the case" , expectedReplicas)
+			// table.Entry("CASE 1  | Should scale down from 3 to 2 | Enough Quota to scale down.", 2),
+			// table.Entry("CASE 2  | Should not scale to 5 and stay at 1 | Quota has exceeded. ", 1),
+			// table.Entry("CASE 3  | Should stay at 2 | Same replicas, no change.", 2),
+			// table.Entry("CASE 4  | Should scale from 3 to 4 | Enough quota to scale up", 4),
 			)
 		})
 	})
