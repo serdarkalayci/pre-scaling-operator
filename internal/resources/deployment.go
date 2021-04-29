@@ -11,6 +11,7 @@ import (
 	"github.com/containersol/prescale-operator/internal/validations"
 	g "github.com/containersol/prescale-operator/pkg/utils/global"
 	"github.com/containersol/prescale-operator/pkg/utils/math"
+	"github.com/prometheus/common/log"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/util/retry"
@@ -44,7 +45,7 @@ func DeploymentGetter(ctx context.Context, _client client.Client, req ctrl.Reque
 }
 
 //DeploymentScaler scales the deployment to the desired replica number
-func DeploymentScaler(ctx context.Context, _client client.Client, deployment v1.Deployment, replicas int32) error {
+func DeploymentScaler(ctx context.Context, _client client.Client, deployment v1.Deployment, replicas int32, req reconcile.Request) error {
 
 	if v, found := deployment.GetAnnotations()["scaler/allow-autoscaling"]; found {
 		if v == "true" {
@@ -55,12 +56,24 @@ func DeploymentScaler(ctx context.Context, _client client.Client, deployment v1.
 	}
 
 	deployment.Spec.Replicas = &replicas
-	err := _client.Update(ctx, &deployment, &client.UpdateOptions{})
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Don't spam the api in case of conflict error
+		time.Sleep(time.Second * 1)
+
+		updateErr := _client.Update(ctx, &deployment, &client.UpdateOptions{})
+		if updateErr != nil {
+			return updateErr
+		}
+
+		// We need to get a newer version of the object from the client
+		deployment, err := DeploymentGetter(ctx, _client, req)
+		_ = deployment
+		if err != nil {
+			log.Error(err, "Error getting refreshed deployment in conflict resolution")
+		}
+		return err
+	})
 }
 
 //DeploymentOptinLabel returns true if the optin-label is found and is true for the deployment
@@ -191,67 +204,66 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 	var retryErr error = nil
 
 	g.GetDenyList().Append(deploymentItem)
+	var stepScaleEnabled = true
+	if stepScaleEnabled {
+		// Loop step by step until deployment has reached desiredreplica count. Fail when the deployment update failed too many times
+		for stepCondition && retryErr == nil {
 
-	// Loop step by step until deployment has reached desiredreplica count. Fail when the deployment update failed too many times
-	for stepCondition && retryErr == nil {
-
-		// decide if we need to step up or down
-		oldReplicaCount = *deployment.Spec.Replicas
-		if oldReplicaCount < desiredReplicaCount {
-			stepReplicaCount = oldReplicaCount + 1
-		} else {
-			stepReplicaCount = oldReplicaCount - 1
-		}
-
-		retryErr = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			// Don't spam the api in case of conflict error
-			time.Sleep(time.Second * 1)
-
-			updateErr := DeploymentScaler(ctx, _client, deployment, stepReplicaCount)
-
-			// We need to get a newer version of the object from the client
-			deployment, err = DeploymentGetter(ctx, _client, req)
-
-			if err != nil {
-				log.Error(err, "Error getting refreshed deployment in conflict resolution")
+			// decide if we need to step up or down
+			oldReplicaCount = *deployment.Spec.Replicas
+			if oldReplicaCount < desiredReplicaCount {
+				stepReplicaCount = oldReplicaCount + 1
+			} else {
+				stepReplicaCount = oldReplicaCount - 1
 			}
-			return updateErr
-		})
+
+			retryErr = DeploymentScaler(ctx, _client, deployment, stepReplicaCount, req)
+
+			if retryErr != nil {
+				log.Error(retryErr, "Unable to scale the deployment, err: %v")
+				g.GetDenyList().RemoveFromDenyList(deploymentItem)
+				return retryErr
+			}
+
+			// Wait until deployment is ready for the next step
+			for stay, timeout := true, time.After(time.Second*60); stay; {
+				select {
+				case <-timeout:
+					stay = false
+				default:
+					time.Sleep(time.Second * 5)
+					deployment, err = DeploymentGetter(ctx, _client, req)
+					if err != nil {
+						log.Error(err, "Error getting refreshed deployment in wait for Readiness loop")
+						g.GetDenyList().RemoveFromDenyList(deploymentItem)
+						return err
+					}
+					if deployment.Status.ReadyReplicas == stepReplicaCount {
+						stay = false
+					}
+				}
+			}
+
+			// check if desired is reached
+			if deployment.Status.ReadyReplicas == desiredReplicaCount {
+				stepCondition = false
+			}
+		}
+	} else {
+		// Rapid scale. No Step Scale
+		retryErr = DeploymentScaler(ctx, _client, deployment, stepReplicaCount, req)
+
 		if retryErr != nil {
 			log.Error(retryErr, "Unable to scale the deployment, err: %v")
 			g.GetDenyList().RemoveFromDenyList(deploymentItem)
 			return retryErr
 		}
-
-		// Wait until deployment is ready for the next step
-		for stay, timeout := true, time.After(time.Second*60); stay; {
-			select {
-			case <-timeout:
-				stay = false
-			default:
-				time.Sleep(time.Second * 5)
-				deployment, err = DeploymentGetter(ctx, _client, req)
-				if err != nil {
-					log.Error(err, "Error getting refreshed deployment in wait for Readiness loop")
-					g.GetDenyList().RemoveFromDenyList(deploymentItem)
-					return err
-				}
-				if deployment.Status.ReadyReplicas == stepReplicaCount {
-					stay = false
-				}
-			}
-		}
-
-		// check if desired is reached
-		if deployment.Status.ReadyReplicas == desiredReplicaCount {
-			log.WithValues("State", stateReplica.Name).
-				WithValues("Desired Replica Count", stateReplica.Replicas).
-				WithValues("Deployment Name", deployment.Name).
-				WithValues("Namespace", deployment.Namespace).
-				Info("Finished scaling deployment to desired replica count")
-			stepCondition = false
-		}
 	}
+	log.WithValues("State", stateReplica.Name).
+		WithValues("Desired Replica Count", stateReplica.Replicas).
+		WithValues("Deployment Name", deployment.Name).
+		WithValues("Namespace", deployment.Namespace).
+		Info("Finished scaling deployment to desired replica count")
 	g.GetDenyList().RemoveFromDenyList(deploymentItem)
 	return nil
 }
