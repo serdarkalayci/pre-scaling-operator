@@ -1,6 +1,7 @@
 package global
 
 import (
+	"reflect"
 	"testing"
 
 	v1 "k8s.io/api/apps/v1"
@@ -323,6 +324,89 @@ func TestIsInList(t *testing.T) {
 	isTheItemInList := GetDenyList().IsInConcurrentDenyList(theItemInList)
 	if !isTheItemInList {
 		t.Errorf("! Got  %v, Want %v", !isTheItemInList, true)
+	}
+
+	GetDenyList().PurgeDenyList()
+
+}
+
+func TestUpdateAndAppend(t *testing.T) {
+	theItemInList := DeploymentInfo{
+		Name:      "foo",
+		Namespace: "bar",
+	}
+
+	theUpdateItem := DeploymentInfo{
+		Name:            "foo",
+		Namespace:       "bar",
+		Failure:         true,
+		FailureMessage:  "A message",
+		DesiredReplicas: 1,
+	}
+
+	GetDenyList().UpdateOrAppend(theItemInList)
+	GetDenyList().UpdateOrAppend(theUpdateItem)
+	// Check if it updated and didn't add a new one to the list
+	if GetDenyList().Length() != 1 {
+		t.Errorf("! Got  %v, Want %v", GetDenyList().Length(), 1)
+	}
+
+	comparison1, _ := GetDenyList().GetDeploymentInfoFromDenyList(theItemInList)
+	comparison2, _ := GetDenyList().GetDeploymentInfoFromDenyList(theUpdateItem)
+
+	isEqual := reflect.DeepEqual(comparison1, comparison2)
+	if !isEqual {
+		t.Errorf("! Got  %v, Want %v", isEqual, true)
+	}
+
+	if comparison1.Name != "foo" || comparison1.Namespace != "bar" || comparison1.Failure != true || comparison1.FailureMessage != "A message" || comparison1.DesiredReplicas != 1 {
+		t.Errorf("! Got  %v, Want %v", true, false)
+	}
+
+	GetDenyList().PurgeDenyList()
+
+}
+
+func TestUpdateItemInList(t *testing.T) {
+	theItemInList := DeploymentInfo{
+		Name:      "foo",
+		Namespace: "bar",
+	}
+
+	notInList := DeploymentInfo{
+		Name:      "not",
+		Namespace: "there",
+	}
+
+	GetDenyList().UpdateOrAppend(theItemInList)
+	GetDenyList().SetDeploymentInfoOnDenyList(theItemInList, true, "A failure", 2)
+	// Check if it updated and didn't add a new one to the list
+	if GetDenyList().Length() != 1 {
+		t.Errorf("! Got  %v, Want %v", GetDenyList().Length(), 1)
+	}
+
+	comparison1, _ := GetDenyList().GetDeploymentInfoFromDenyList(theItemInList)
+
+	if comparison1.Name != "foo" || comparison1.Namespace != "bar" || comparison1.Failure != true || comparison1.FailureMessage != "A failure" || comparison1.DesiredReplicas != 2 {
+		t.Errorf("! Got  %v, Want %v", true, false)
+	}
+
+	failure, msg := GetDenyList().IsDeploymentInFailureState(theItemInList)
+	if failure == false || msg != "A failure" {
+		t.Errorf("! Got  %v, Want %v", failure, true)
+	}
+
+	desiredReplicas := GetDenyList().GetDesiredReplicasFromDenyList(theItemInList)
+	if desiredReplicas != 2 {
+		t.Errorf("! Got  %v, Want %v", desiredReplicas, 2)
+	}
+
+	item, err := GetDenyList().GetDeploymentInfoFromDenyList(notInList)
+	if item.Name != "" || item.Namespace != "" {
+		t.Errorf("! Got  %v, Want %v", "", item.Name)
+	}
+	if err != "Not Found" {
+		t.Errorf("! Got  %v, Want %v", "Not Found", err)
 	}
 
 	GetDenyList().PurgeDenyList()
