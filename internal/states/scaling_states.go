@@ -71,6 +71,9 @@ func GetNamespaceScalingStateName(ctx context.Context, _client client.Client, na
 func GetStepScaleSetting(ctx context.Context, _client client.Client) bool {
 	cssd, err := GetClusterScalingStateDefinitionsList(ctx, _client)
 	_ = err
+	if len(cssd.Items) == 0 {
+		return true
+	}
 	return cssd.Items[0].Config.RateLimiting
 }
 

@@ -198,6 +198,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 	oldReplicaCount = *deployment.Spec.Replicas
 	desiredReplicaCount := stateReplica.Replicas
 
+	// This might not be necessary anymore
 	if oldReplicaCount == stateReplica.Replicas {
 		log.Info("No Update on deployment. Desired replica count already matches current.")
 		return nil
@@ -207,17 +208,22 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 	var stepCondition bool = true
 	var retryErr error = nil
 	log.Info("Putting deployment on denylist")
-	g.GetDenyList().UpdateOrAppend(deploymentItem)
+	g.GetDenyList().SetDeploymentInfoOnDenyList(deploymentItem, false, "", int(desiredReplicaCount))
 	if rateLimitingEnabled {
 		// Loop step by step until deployment has reached desiredreplica count. Fail when the deployment update failed too many times
 		for stepCondition && retryErr == nil {
 
+			desiredReplicaCount = int32(g.GetDenyList().GetDesiredReplicasFromDenyList(deploymentItem))
 			// decide if we need to step up or down
 			oldReplicaCount = *deployment.Spec.Replicas
 			if oldReplicaCount < desiredReplicaCount {
 				stepReplicaCount = oldReplicaCount + 1
-			} else {
+			} else if oldReplicaCount > desiredReplicaCount {
 				stepReplicaCount = oldReplicaCount - 1
+			} else if oldReplicaCount == desiredReplicaCount {
+				log.Info("Finished scaling. Leaving early due to an update from another goroutine.")
+				g.GetDenyList().RemoveFromDenyList(deploymentItem)
+				return nil
 			}
 
 			retryErr = DeploymentScaler(ctx, _client, deployment, stepReplicaCount, req)

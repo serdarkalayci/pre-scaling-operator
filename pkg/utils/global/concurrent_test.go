@@ -405,8 +405,8 @@ func TestUpdateItemInList(t *testing.T) {
 	if item.Name != "" || item.Namespace != "" {
 		t.Errorf("! Got  %v, Want %v", "", item.Name)
 	}
-	if err != "Not Found" {
-		t.Errorf("! Got  %v, Want %v", "Not Found", err)
+	if err == nil {
+		t.Errorf("! Got  %v, Want %v", err, nil)
 	}
 
 	GetDenyList().PurgeDenyList()

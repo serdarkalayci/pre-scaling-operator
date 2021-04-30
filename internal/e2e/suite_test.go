@@ -222,6 +222,9 @@ func CreateClusterScalingStateDefinition() v1alpha1.ClusterScalingStateDefinitio
 			Name: "global-state-definition",
 		},
 		Spec: states,
+		Config: v1alpha1.ClusterScalingStateDefinitionConfiguration{
+			RateLimiting: true,
+		},
 	}
 
 	return *scalingState

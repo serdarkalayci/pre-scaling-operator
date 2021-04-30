@@ -124,17 +124,13 @@ func (cs *ConcurrentSlice) IsInConcurrentDenyList(item DeploymentInfo) bool {
 }
 
 func (cs *ConcurrentSlice) SetDeploymentInfoOnDenyList(item DeploymentInfo, failure bool, failureMessage string, desiredReplicas int) {
-
-	concurrencyItem, err := cs.GetDeploymentInfoFromDenyList(item)
-	if err != "Not Found" {
-		concurrencyItem.Failure = failure
-		concurrencyItem.FailureMessage = failureMessage
-		concurrencyItem.DesiredReplicas = desiredReplicas
-	}
-	cs.UpdateOrAppend(concurrencyItem)
+	item.Failure = failure
+	item.FailureMessage = failureMessage
+	item.DesiredReplicas = desiredReplicas
+	cs.UpdateOrAppend(item)
 }
 
-func (cs *ConcurrentSlice) GetDeploymentInfoFromDenyList(item DeploymentInfo) (DeploymentInfo, string) {
+func (cs *ConcurrentSlice) GetDeploymentInfoFromDenyList(item DeploymentInfo) (DeploymentInfo, error) {
 	result := DeploymentInfo{}
 	for inList := range cs.Iter() {
 		if item.Name == inList.Value.Name && item.Namespace == inList.Value.Namespace {
@@ -142,9 +138,11 @@ func (cs *ConcurrentSlice) GetDeploymentInfoFromDenyList(item DeploymentInfo) (D
 		}
 	}
 	if result.Name != "" && result.Namespace != "" {
-		return result, ""
+		return result, nil
 	}
-	return DeploymentInfo{}, "Not Found"
+	return DeploymentInfo{}, NotFound{
+		msg: "No deploymentInfo found!",
+	}
 }
 
 func (cs *ConcurrentSlice) IsDeploymentInFailureState(item DeploymentInfo) (bool, string) {

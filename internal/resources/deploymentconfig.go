@@ -210,16 +210,21 @@ func ScaleDeploymentConfig(ctx context.Context, _client client.Client, deploymen
 	var stepCondition bool = true
 	var retryErr error = nil
 	log.Info("Adding to denylist")
-	g.GetDenyList().UpdateOrAppend(deploymentItem)
+	g.GetDenyList().SetDeploymentInfoOnDenyList(deploymentItem, false, "", int(desiredReplicaCount))
 	if rateLimitingEnabled {
 		for stepCondition && retryErr == nil {
 
+			desiredReplicaCount = int32(g.GetDenyList().GetDesiredReplicasFromDenyList(deploymentItem))
 			// decide if we need to step up or down
 			oldReplicaCount = deploymentconfig.Spec.Replicas
 			if oldReplicaCount < desiredReplicaCount {
 				stepReplicaCount = oldReplicaCount + 1
-			} else {
+			} else if oldReplicaCount > desiredReplicaCount {
 				stepReplicaCount = oldReplicaCount - 1
+			} else if oldReplicaCount == desiredReplicaCount {
+				log.Info("Finished scaling. Leaving early due to an update from another goroutine.")
+				g.GetDenyList().RemoveFromDenyList(deploymentItem)
+				return nil
 			}
 			retryErr = DeploymentConfigScaler(ctx, _client, deploymentconfig, stepReplicaCount, req)
 			if retryErr != nil {

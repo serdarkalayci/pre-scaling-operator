@@ -9,6 +9,7 @@ import (
 	"github.com/containersol/prescale-operator/internal/resources"
 	"github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
+	g "github.com/containersol/prescale-operator/pkg/utils/global"
 	"github.com/containersol/prescale-operator/pkg/utils/math"
 	ocv1 "github.com/openshift/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
@@ -59,8 +60,6 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	//Here we calculate the resource limits we need from all deployments combined
 	limitsneeded = resources.LimitsNeededDeploymentList(deployments, scaleReplicalist)
 
-	log.WithValues("deploy to Openshift", c.OpenshiftCluster).
-		Info("Cluster")
 	if c.OpenshiftCluster {
 
 		deploymentConfigs, err = resources.DeploymentConfigLister(ctx, _client, namespace, c.OptInLabel)
@@ -89,12 +88,23 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 		return nsEvents, finalState.Name, err
 	}
 
-	log = ctrl.Log.
-		WithValues("Allowed", allowed)
-	log.Info("Namespace Quota Check")
-
 	if allowed {
 		for i, deployment := range deployments.Items {
+			deploymentItem, listErr := g.GetDenyList().GetDeploymentInfoFromDenyList(g.ConvertDeploymentToItem(deployment))
+			if listErr == nil {
+				if deploymentItem.DesiredReplicas != int(scaleReplicalist[i].Replicas) {
+					g.GetDenyList().SetDeploymentInfoOnDenyList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, int(scaleReplicalist[i].Replicas))
+
+					log.WithValues("Deployment: ", deploymentItem.Name).
+						WithValues("Namespace: ", deploymentItem.Namespace).
+						WithValues("DesiredReplicaount: ", deploymentItem.DesiredReplicas).
+						WithValues("Failure: ", deploymentItem.Failure).
+						WithValues("Failure message: ", deploymentItem.FailureMessage).
+						Info("Deployment is already being scaled at the moment. Updated desired replica count")
+				}
+				continue
+			}
+
 			err := resources.ScaleDeployment(ctx, _client, deployment, scaleReplicalist[i], rateLimitingEnabled)
 
 			if err != nil {
@@ -108,6 +118,20 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 					WithValues("deploymentconfig", deploymentConfig.Name).
 					WithValues("namespace", deploymentConfig.Namespace)
 
+				deploymentConfigItem, listErr := g.GetDenyList().GetDeploymentInfoFromDenyList(g.ConvertDeploymentConfigToItem(deploymentConfig))
+				if listErr == nil {
+					if deploymentConfigItem.DesiredReplicas != int(scaleReplicalistDC[i].Replicas) {
+						g.GetDenyList().SetDeploymentInfoOnDenyList(deploymentConfigItem, deploymentConfigItem.Failure, deploymentConfigItem.FailureMessage, int(scaleReplicalistDC[i].Replicas))
+
+						log.WithValues("Deployment: ", deploymentConfigItem.Name).
+							WithValues("Namespace: ", deploymentConfigItem.Namespace).
+							WithValues("DesiredReplicaount: ", deploymentConfigItem.DesiredReplicas).
+							WithValues("Failure: ", deploymentConfigItem.Failure).
+							WithValues("Failure message: ", deploymentConfigItem.FailureMessage).
+							Info("Deployment is already being scaled at the moment. Updated desired replica count")
+					}
+					continue
+				}
 				err := resources.ScaleDeploymentConfig(ctx, _client, deploymentConfig, scaleReplicalistDC[i], rateLimitingEnabled)
 				if err != nil {
 					log.Error(err, "Error scaling the deploymentconfig")
@@ -120,7 +144,6 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	}
 
 	if objectsToReconcile == 0 {
-		log.Info("No objects to reconcile. Doing Nothing.")
 		return nsEvents, finalState.Name, err
 	}
 
@@ -149,11 +172,26 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 	log.Info("Quota Check")
 
 	if allowed {
-		err = resources.ScaleDeployment(ctx, _client, deployment, stateReplica, rateLimitingEnabled)
-		if err != nil {
-			log.Error(err, "Error scaling the deployment")
-			return err
+		deploymentItem, listErr := g.GetDenyList().GetDeploymentInfoFromDenyList(g.ConvertDeploymentToItem(deployment))
+		if listErr == nil {
+			if deploymentItem.DesiredReplicas != int(stateReplica.Replicas) {
+				g.GetDenyList().SetDeploymentInfoOnDenyList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, int(stateReplica.Replicas))
+
+				log.WithValues("Deployment: ", deploymentItem.Name).
+					WithValues("Namespace: ", deploymentItem.Namespace).
+					WithValues("DesiredReplicaount: ", deploymentItem.DesiredReplicas).
+					WithValues("Failure: ", deploymentItem.Failure).
+					WithValues("Failure message: ", deploymentItem.FailureMessage).
+					Info("Deployment is already being scaled at the moment. Updated desired replica count")
+			}
+		} else {
+			err = resources.ScaleDeployment(ctx, _client, deployment, stateReplica, rateLimitingEnabled)
+			if err != nil {
+				log.Error(err, "Error scaling the deployment")
+				return err
+			}
 		}
+
 	}
 
 	return nil
@@ -181,10 +219,24 @@ func ReconcileDeploymentConfig(ctx context.Context, _client client.Client, deplo
 	log.Info("Quota Check")
 
 	if allowed {
-		err = resources.ScaleDeploymentConfig(ctx, _client, deploymentConfig, stateReplica, rateLimitingEnabled)
-		if err != nil {
-			log.Error(err, "Error scaling the deploymentconfig")
-			return err
+		deploymentItem, listErr := g.GetDenyList().GetDeploymentInfoFromDenyList(g.ConvertDeploymentConfigToItem(deploymentConfig))
+		if listErr == nil {
+			if deploymentItem.DesiredReplicas != int(stateReplica.Replicas) {
+				g.GetDenyList().SetDeploymentInfoOnDenyList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, int(stateReplica.Replicas))
+
+				log.WithValues("Deployment: ", deploymentItem.Name).
+					WithValues("Namespace: ", deploymentItem.Namespace).
+					WithValues("DesiredReplicaount: ", deploymentItem.DesiredReplicas).
+					WithValues("Failure: ", deploymentItem.Failure).
+					WithValues("Failure message: ", deploymentItem.FailureMessage).
+					Info("Deployment is already being scaled at the moment. Updated desired replica count")
+			}
+		} else {
+			err = resources.ScaleDeploymentConfig(ctx, _client, deploymentConfig, stateReplica, rateLimitingEnabled)
+			if err != nil {
+				log.Error(err, "Error scaling the deployment")
+				return err
+			}
 		}
 	}
 
