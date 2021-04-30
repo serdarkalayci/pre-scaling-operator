@@ -91,6 +91,8 @@ var _ = BeforeSuite(func() {
 		Paths: testEnv.CRDDirectoryPaths,
 		CRDs:  testEnv.CRDs,
 	}
+	options.MaxTime = time.Minute * 20
+
 	_, err = envtest.InstallCRDs(cfg, options)
 	Expect(err).NotTo(HaveOccurred())
 
