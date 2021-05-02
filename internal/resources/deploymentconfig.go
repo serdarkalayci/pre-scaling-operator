@@ -212,7 +212,7 @@ func ScaleDeploymentConfig(ctx context.Context, _client client.Client, deploymen
 	log.Info("Adding to denylist")
 	g.GetDenyList().SetDeploymentInfoOnDenyList(deploymentItem, false, "", int(desiredReplicaCount))
 	if rateLimitingEnabled {
-		for stepCondition && retryErr == nil {
+		for stepCondition {
 
 			desiredReplicaCount = int32(g.GetDenyList().GetDesiredReplicasFromDenyList(deploymentItem))
 			// decide if we need to step up or down

@@ -211,7 +211,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 	g.GetDenyList().SetDeploymentInfoOnDenyList(deploymentItem, false, "", int(desiredReplicaCount))
 	if rateLimitingEnabled {
 		// Loop step by step until deployment has reached desiredreplica count. Fail when the deployment update failed too many times
-		for stepCondition && retryErr == nil {
+		for stepCondition {
 
 			desiredReplicaCount = int32(g.GetDenyList().GetDesiredReplicasFromDenyList(deploymentItem))
 			// decide if we need to step up or down
