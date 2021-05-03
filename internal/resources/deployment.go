@@ -61,7 +61,6 @@ func DeploymentScaler(ctx context.Context, _client client.Client, deployment v1.
 
 		// We need to get a newer version of the object from the client
 		deployment, err := DeploymentGetter(ctx, _client, req)
-		_ = deployment
 		if err != nil {
 			log.Error(err, "Error getting refreshed deployment in conflict resolution")
 			return err

@@ -205,12 +205,30 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 
 					}
 
-					for k := 0; k < len(fetchedDeploymentList); k++ {
-						Eventually(func() int32 {
-							k8sClient.Get(context.Background(), updateKey(fetchedDeploymentList[k].Namespace, fetchedDeploymentList[k].Name, key), &fetchedDeploymentList[k])
-							return fetchedDeploymentList[k].Status.ReadyReplicas
-						}, timeout, interval).Should(Equal(int32(expectedReplicas[k])))
-					}
+					//ns1 - case1
+					Eventually(func() int32 {
+						k8sClient.Get(context.Background(), updateKey(fetchedDeploymentList[0].Namespace, fetchedDeploymentList[0].Name, key), &fetchedDeploymentList[0])
+						return fetchedDeploymentList[0].Status.ReadyReplicas
+					}, timeout, interval).Should(Equal(int32(expectedReplicas[0])))
+
+					//ns1 - case 2 (This one is never opted in)
+					Eventually(func() int32 {
+						k8sClient.Get(context.Background(), updateKey(fetchedDeploymentList[0].Namespace, fetchedDeploymentList[1].Name, key), &fetchedDeploymentList[1])
+						return fetchedDeploymentList[1].Status.ReadyReplicas
+					}, timeout, interval).Should(Equal(int32(expectedReplicas[1])))
+
+					//ns2
+					//ns2 - case 1
+					Eventually(func() int32 {
+						k8sClient.Get(context.Background(), updateKey(fetchedDeploymentList[1].Namespace, fetchedDeploymentList[2].Name, key), &fetchedDeploymentList[2])
+						return fetchedDeploymentList[2].Status.ReadyReplicas
+					}, timeout, interval).Should(Equal(int32(expectedReplicas[2])))
+
+					//ns2 - case 2 (this one is never opted in)
+					Eventually(func() int32 {
+						k8sClient.Get(context.Background(), updateKey(fetchedDeploymentList[1].Namespace, fetchedDeploymentList[3].Name, key), &fetchedDeploymentList[3])
+						return fetchedDeploymentList[3].Status.ReadyReplicas
+					}, timeout, interval).Should(Equal(int32(expectedReplicas[3])))
 				}
 
 			},

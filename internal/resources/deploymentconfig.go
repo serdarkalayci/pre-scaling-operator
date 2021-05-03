@@ -55,15 +55,12 @@ func DeploymentConfigScaler(ctx context.Context, _client client.Client, deployme
 		}
 	}
 
-	deploymentConfig.Spec.Replicas = replicas
-
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Don't spam the api in case of conflict error
 		time.Sleep(time.Second * 1)
 
 		// We need to get a newer version of the object from the client
-		deploymentconfig, err := DeploymentConfigGetter(ctx, _client, req)
-		_ = deploymentconfig
+		deploymentConfig, err := DeploymentConfigGetter(ctx, _client, req)
 		if err != nil {
 			log.Error(err, "Error getting refreshed deploymentconfig in conflict resolution")
 		}
@@ -104,9 +101,9 @@ func DeploymentConfigStateReplicas(state states.State, deploymentconfig v1.Deplo
 	if err != nil {
 		// TODO here we should do priority filtering, and go down one level of priority to find the lowest set one.
 		// We will ignore any that are not set
-		log.WithValues("set states", stateReplicas).
-			WithValues("namespace state", state.Name).
-			Info("State could not be found")
+		// log.WithValues("set states", stateReplicas).
+		// 	WithValues("namespace state", state.Name).
+		// 	Info("State could not be found")
 		return sr.StateReplica{}, err
 	}
 	return stateReplica, nil
@@ -149,9 +146,9 @@ func DeploymentConfigStateReplicasList(state states.State, deploymentconfigs v1.
 		if err != nil {
 			// TODO here we should do priority filtering, and go down one level of priority to find the lowest set one.
 			// We will ignore any that are not set
-			log.WithValues("set states", stateReplicas).
-				WithValues("namespace state", state.Name).
-				Info("State could not be found")
+			// log.WithValues("set states", stateReplicas).
+			// 	WithValues("namespace state", state.Name).
+			// 	Info("State could not be found")
 			return []sr.StateReplica{}, err
 		}
 
@@ -226,6 +223,7 @@ func ScaleDeploymentConfig(ctx context.Context, _client client.Client, deploymen
 				g.GetDenyList().RemoveFromDenyList(deploymentItem)
 				return nil
 			}
+			// Do the scaling
 			retryErr = DeploymentConfigScaler(ctx, _client, deploymentconfig, stepReplicaCount, req)
 			if retryErr != nil {
 				log.Error(retryErr, "Unable to scale the deploymentconfig, err: %v")
