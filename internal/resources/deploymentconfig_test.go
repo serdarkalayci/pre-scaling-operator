@@ -259,7 +259,7 @@ func TestDeploymentConfigScaler(t *testing.T) {
 					},
 				},
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "TestAutoscaler",
