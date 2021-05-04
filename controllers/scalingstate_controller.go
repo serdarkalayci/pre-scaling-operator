@@ -93,5 +93,6 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 func (r *ScalingStateReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&scalingv1alpha1.ScalingState{}).
+		Owns(&scalingv1alpha1.ClusterScalingState{}).
 		Complete(r)
 }
