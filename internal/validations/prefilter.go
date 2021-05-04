@@ -29,8 +29,17 @@ func PreFilter(r record.EventRecorder) predicate.Predicate {
 
 			generateOptInLabelUpdateEvent(e, r, newoptin, oldoptin)
 
+			item := g.DeploymentInfo{
+				Name:      deploymentName,
+				Namespace: nameSpace,
+			}
+
 			// Deployment opted out. Don't do anything
-			if !newoptin {
+			if !newoptin  {
+				if g.GetDenyList().IsInConcurrentDenyList(item) {
+					// The deployment is being scaled at the moment! Notify scaler to abort.
+					g.GetDenyList().SetDeploymentInfoOnDenyList(item, true, "Opt-In is false!", -1)
+				}
 				return false
 			}
 
@@ -39,10 +48,6 @@ func PreFilter(r record.EventRecorder) predicate.Predicate {
 
 			// don't reconcile if the stepscale annotation is present.
 			//stepScaleActive := AssessStepScaleAnnotation(e)
-			item := g.DeploymentInfo{
-				Name:      deploymentName,
-				Namespace: nameSpace,
-			}
 
 			// Don't reconcile on any change except when Annotation may have changed while the deployment was on the deny list.
 			if g.GetDenyList().IsInConcurrentDenyList(item) && !annotationchange {

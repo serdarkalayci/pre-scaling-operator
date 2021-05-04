@@ -145,9 +145,9 @@ func (cs *ConcurrentSlice) GetDeploymentInfoFromDenyList(item DeploymentInfo) (D
 	}
 }
 
-func (cs *ConcurrentSlice) IsDeploymentInFailureState(item DeploymentInfo) (bool, string) {
+func (cs *ConcurrentSlice) IsDeploymentInFailureState(item DeploymentInfo) bool {
 	itemToReturn, _ := cs.GetDeploymentInfoFromDenyList(item)
-	return itemToReturn.Failure, itemToReturn.FailureMessage
+	return itemToReturn.Failure
 }
 
 func (cs *ConcurrentSlice) GetDesiredReplicasFromDenyList(item DeploymentInfo) int {

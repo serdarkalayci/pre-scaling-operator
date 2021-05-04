@@ -20,6 +20,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+type DeploymentScaleError struct {
+	msg string
+}
+
+func (err DeploymentScaleError) Error() string {
+	return err.msg
+}
+
 //DeploymentLister lists all deployments in a namespace
 func DeploymentLister(ctx context.Context, _client client.Client, namespace string, OptInLabel map[string]string) (v1.DeploymentList, error) {
 
@@ -68,7 +76,18 @@ func DeploymentScaler(ctx context.Context, _client client.Client, deployment v1.
 		if err == nil {
 			deployment.Spec.Replicas = &replicas
 
-			updateErr := _client.Update(ctx, &deployment, &client.UpdateOptions{})
+			deploymentItem := g.DeploymentInfo{
+				Name:      deployment.Name,
+				Namespace: deployment.Namespace,
+			}
+			var updateErr error = nil
+			if !g.GetDenyList().IsDeploymentInFailureState(deploymentItem) {
+				updateErr = _client.Update(ctx, &deployment, &client.UpdateOptions{})
+			} else {
+				return DeploymentScaleError{
+					msg: "Error scaling the Deployment!. The Deployment is in failure state!",
+				}
+			}
 			if updateErr != nil {
 				return updateErr
 			}

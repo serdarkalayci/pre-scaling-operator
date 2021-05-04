@@ -20,6 +20,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+type DeploymentConfigScaleError struct {
+	msg string
+}
+
+func (err DeploymentConfigScaleError) Error() string {
+	return err.msg
+}
+
 //DeploymentConfigLister lists all deploymentconfigs in a namespace
 func DeploymentConfigLister(ctx context.Context, _client client.Client, namespace string, OptInLabel map[string]string) (v1.DeploymentConfigList, error) {
 
@@ -69,7 +77,19 @@ func DeploymentConfigScaler(ctx context.Context, _client client.Client, deployme
 		if err == nil {
 			deploymentConfig.Spec.Replicas = replicas
 
-			updateErr := _client.Update(ctx, &deploymentConfig, &client.UpdateOptions{})
+			deploymentItem := g.DeploymentInfo{
+				Name:      deploymentConfig.Name,
+				Namespace: deploymentConfig.Namespace,
+			}
+			var updateErr error = nil
+			if !g.GetDenyList().IsDeploymentInFailureState(deploymentItem) {
+				updateErr = _client.Update(ctx, &deploymentConfig, &client.UpdateOptions{})
+			} else {
+				return DeploymentConfigScaleError{
+					msg: "Error scaling the deploymentconfig. The deploymentconfig is in failure state!",
+				}
+			}
+
 			if updateErr != nil {
 				return updateErr
 			}
