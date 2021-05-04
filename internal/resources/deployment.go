@@ -56,7 +56,6 @@ func DeploymentScaler(ctx context.Context, _client client.Client, deployment v1.
 	}
 
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		// Don't spam the api in case of conflict error
 		time.Sleep(time.Second * 1)
 
 		// We need to get a newer version of the object from the client
@@ -159,7 +158,7 @@ func DeploymentStateReplicasList(state states.State, deployments v1.DeploymentLi
 	return stateReplicaList, err
 }
 
-func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.Deployment, stateReplica sr.StateReplica, rateLimitingEnabled bool) error {
+func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.Deployment, stateReplica sr.StateReplica, rateLimitingEnabled bool, whereFrom string) error {
 
 	log := ctrl.Log.
 		WithValues("deployment", deployment.Name).
@@ -209,6 +208,11 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 	log.Info("Putting deployment on denylist")
 	g.GetDenyList().SetDeploymentInfoOnDenyList(deploymentItem, false, "", int(desiredReplicaCount))
 	if rateLimitingEnabled {
+		log.WithValues("Deployment: ", deploymentItem.Name).
+			WithValues("Namespace: ", deploymentItem.Namespace).
+			WithValues("DesiredReplicaount: ", deploymentItem.DesiredReplicas).
+			WithValues("Wherefrom: ", whereFrom).
+			Info("GOING TO STEP SCALE")
 		// Loop step by step until deployment has reached desiredreplica count. Fail when the deployment update failed too many times
 		for stepCondition {
 
@@ -224,6 +228,12 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 				g.GetDenyList().RemoveFromDenyList(deploymentItem)
 				return nil
 			}
+			log.WithValues("Deployment: ", deploymentItem.Name).
+				WithValues("Namespace: ", deploymentItem.Namespace).
+				WithValues("DesiredReplicaount: ", deploymentItem.DesiredReplicas).
+				WithValues("StepReplicatound: ", desiredReplicaCount).
+				WithValues("Wherefrom: ", whereFrom).
+				Info("STEP SCALING")
 
 			retryErr = DeploymentScaler(ctx, _client, deployment, stepReplicaCount, req)
 
