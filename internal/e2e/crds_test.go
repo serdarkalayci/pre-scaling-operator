@@ -169,10 +169,10 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 					Expect(k8sClient.Update(context.Background(), &cssdMofified)).Should(Succeed())
 				}
 
-				time.Sleep(time.Second * 10)
+				// Give the operator time to get to the states
+				time.Sleep(time.Second * 60)
 
 				if OpenshiftCluster {
-					time.Sleep(time.Second * 40)
 					for _, ns := range namespaceList {
 						for _, dc := range deploymentconfigList {
 							Eventually(func() ocv1.DeploymentConfig {
@@ -192,7 +192,6 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 					}
 
 				} else {
-					time.Sleep(time.Second * 40)
 					for _, ns := range namespaceList {
 						for _, dep := range deploymentList {
 							Eventually(func() v1.Deployment {
@@ -205,43 +204,12 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 
 					}
 
-					_ = fetchedDeploymentList
-					_ = key
-					_ = expectedReplicas
-					_ = fetchedDeploymentList
-
-					// We check the deployments that need to scale the least first. This is why these checks are out of order.
-					//ns2 - case 2 (this one is never opted in)
-					Eventually(func() int32 {
-						k8sClient.Get(context.Background(), updateKey(fetchedDeploymentList[1].Namespace, fetchedDeploymentList[3].Name, key), &fetchedDeploymentList[3])
-						return fetchedDeploymentList[3].Status.ReadyReplicas
-					}, timeout, interval).Should(Equal(int32(expectedReplicas[3])))
-
-					//ns1 - case 2 (This one is never opted in)
-					Eventually(func() int32 {
-						k8sClient.Get(context.Background(), updateKey(fetchedDeploymentList[0].Namespace, fetchedDeploymentList[1].Name, key), &fetchedDeploymentList[1])
-						return fetchedDeploymentList[1].Status.ReadyReplicas
-					}, timeout, interval).Should(Equal(int32(expectedReplicas[1])))
-
-					//ns2
-					//ns2 - case 1
-					Eventually(func() int32 {
-						k8sClient.Get(context.Background(), updateKey(fetchedDeploymentList[1].Namespace, fetchedDeploymentList[2].Name, key), &fetchedDeploymentList[2])
-						return fetchedDeploymentList[2].Status.ReadyReplicas
-					}, timeout, interval).Should(Equal(int32(expectedReplicas[2])))
-
-					_ = fetchedDeploymentList[0].Namespace
-					_ = fetchedDeploymentList[0].Name
-					_ = key
-					_ = expectedReplicas[0]
-					_ = fetchedDeploymentList[0].Status.ReadyReplicas
-
-					//ns1 - case1
-					Eventually(func() int32 {
-						k8sClient.Get(context.Background(), updateKey(fetchedDeploymentList[0].Namespace, fetchedDeploymentList[0].Name, key), &fetchedDeploymentList[0])
-						return fetchedDeploymentList[0].Status.ReadyReplicas
-					}, timeout, interval).Should(Equal(int32(expectedReplicas[0])))
-
+					for k := 0; k < len(fetchedDeploymentList); k++ {
+						Eventually(func() int32 {
+							k8sClient.Get(context.Background(), updateKey(fetchedDeploymentList[k].Namespace, fetchedDeploymentList[k].Name, key), &fetchedDeploymentList[k])
+							return *fetchedDeploymentList[k].Spec.Replicas
+						}, timeout, interval).Should(Equal(int32(expectedReplicas[k])))
+					}
 				}
 
 			},

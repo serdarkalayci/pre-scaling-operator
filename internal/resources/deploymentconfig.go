@@ -159,7 +159,7 @@ func DeploymentConfigStateReplicasList(state states.State, deploymentconfigs v1.
 	return stateReplicaList, err
 }
 
-func ScaleDeploymentConfig(ctx context.Context, _client client.Client, deploymentconfig v1.DeploymentConfig, stateReplica sr.StateReplica, rateLimitingEnabled bool) error {
+func ScaleDeploymentConfig(ctx context.Context, _client client.Client, deploymentconfig v1.DeploymentConfig, stateReplica sr.StateReplica, rateLimitingEnabled bool, whereFrom string) error {
 	log := ctrl.Log.
 		WithValues("deploymentconfig", deploymentconfig.Name).
 		WithValues("namespace", deploymentconfig.Namespace)
@@ -209,6 +209,11 @@ func ScaleDeploymentConfig(ctx context.Context, _client client.Client, deploymen
 	log.Info("Adding to denylist")
 	g.GetDenyList().SetDeploymentInfoOnDenyList(deploymentItem, false, "", int(desiredReplicaCount))
 	if rateLimitingEnabled {
+		log.WithValues("Deployment: ", deploymentItem.Name).
+			WithValues("Namespace: ", deploymentItem.Namespace).
+			WithValues("DesiredReplicaount: ", deploymentItem.DesiredReplicas).
+			WithValues("Wherefrom: ", whereFrom).
+			Info("Going into step scaler")
 		for stepCondition {
 
 			desiredReplicaCount = int32(g.GetDenyList().GetDesiredReplicasFromDenyList(deploymentItem))
@@ -223,6 +228,13 @@ func ScaleDeploymentConfig(ctx context.Context, _client client.Client, deploymen
 				g.GetDenyList().RemoveFromDenyList(deploymentItem)
 				return nil
 			}
+			log.WithValues("Deployment: ", deploymentItem.Name).
+				WithValues("Namespace: ", deploymentItem.Namespace).
+				WithValues("DesiredReplicaount on item:  ", deploymentItem.DesiredReplicas).
+				WithValues("Desiredreplicacount", desiredReplicaCount).
+				WithValues("Stepreplicacount", stepReplicaCount).
+				WithValues("Wherefrom: ", whereFrom).
+				Info("Step scaling!")
 			// Do the scaling
 			retryErr = DeploymentConfigScaler(ctx, _client, deploymentconfig, stepReplicaCount, req)
 			if retryErr != nil {

@@ -62,7 +62,6 @@ func DeploymentScaler(ctx context.Context, _client client.Client, deployment v1.
 		deployment, err := DeploymentGetter(ctx, _client, req)
 		if err != nil {
 			log.Error(err, "Error getting refreshed deployment in conflict resolution")
-			return err
 		}
 
 		// Skip if we couldn't get the deployment
@@ -212,7 +211,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 			WithValues("Namespace: ", deploymentItem.Namespace).
 			WithValues("DesiredReplicaount: ", deploymentItem.DesiredReplicas).
 			WithValues("Wherefrom: ", whereFrom).
-			Info("GOING TO STEP SCALE")
+			Info("Going into step scaler..")
 		// Loop step by step until deployment has reached desiredreplica count. Fail when the deployment update failed too many times
 		for stepCondition {
 
@@ -230,10 +229,11 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 			}
 			log.WithValues("Deployment: ", deploymentItem.Name).
 				WithValues("Namespace: ", deploymentItem.Namespace).
-				WithValues("DesiredReplicaount: ", deploymentItem.DesiredReplicas).
-				WithValues("StepReplicatound: ", desiredReplicaCount).
+				WithValues("DesiredReplicaount on item:  ", deploymentItem.DesiredReplicas).
+				WithValues("Desiredreplicacount", desiredReplicaCount).
+				WithValues("Stepreplicacount", stepReplicaCount).
 				WithValues("Wherefrom: ", whereFrom).
-				Info("STEP SCALING")
+				Info("Step Scaling!")
 
 			retryErr = DeploymentScaler(ctx, _client, deployment, stepReplicaCount, req)
 
