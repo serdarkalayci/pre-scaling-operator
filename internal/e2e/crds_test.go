@@ -135,24 +135,24 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 
 					ss = CreateScalingState("bau", namespaceList[1].Name)
 					Expect(k8sClient.Create(context.Background(), &ss)).Should(Succeed())
-				} else if casenumber == -1 {
-					// css = CreateClusterScalingState("bau")
-					// Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
-
-					// ss = CreateScalingState("peak", namespaceList[0].Name)
-					// Expect(k8sClient.Create(context.Background(), &ss)).Should(Succeed())
-
-					// time.Sleep(time.Second * 20)
-					// // get the cssd back to modify
-					// cssdList := &v1alpha1.ClusterScalingStateDefinitionList{}
-					// Eventually(func() v1alpha1.ClusterScalingStateDefinitionList {
-					// 	k8sClient.List(context.Background(), cssdList)
-					// 	return *cssdList
-					// }, timeout, interval).Should(Not(BeNil()))
-
-					// cssdMofified := getModifiedClusterScalingStateDefinition(cssdList.Items[0], false, true)
-					// Expect(k8sClient.Update(context.Background(), &cssdMofified)).Should(Succeed())
 				} else if casenumber == 5 {
+					css = CreateClusterScalingState("bau")
+					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
+
+					ss = CreateScalingState("peak", namespaceList[0].Name)
+					Expect(k8sClient.Create(context.Background(), &ss)).Should(Succeed())
+
+					time.Sleep(time.Second * 20)
+					// get the cssd back to modify
+					cssdList := &v1alpha1.ClusterScalingStateDefinitionList{}
+					Eventually(func() v1alpha1.ClusterScalingStateDefinitionList {
+						k8sClient.List(context.Background(), cssdList)
+						return *cssdList
+					}, timeout, interval).Should(Not(BeNil()))
+
+					cssdMofified := getModifiedClusterScalingStateDefinition(cssdList.Items[0], false, true)
+					Expect(k8sClient.Update(context.Background(), &cssdMofified)).Should(Succeed())
+				} else if casenumber == 6 {
 					css = CreateClusterScalingState("peak")
 					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
 
@@ -219,7 +219,7 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 				table.Entry("CASE 3  | Apply SS with higher prio than an existing CSS", []int{4, 1, 2, 1}),
 				table.Entry("CASE 4  | Apply CSS with higher prio than an existing SS", []int{4, 1, 4, 1}),
 				//table.Entry("CASE 5  | Swap Prio in CSSD", []int{2, 1, 2, 1}),
-				table.Entry("CASE 5  | Remove states in CSSD", []int{4, 1, 4, 1}),
+				//table.Entry("CASE 6  | Remove states in CSSD", []int{4, 1, 4, 1}),
 			)
 		})
 	})
