@@ -391,8 +391,8 @@ func TestUpdateItemInList(t *testing.T) {
 		t.Errorf("! Got  %v, Want %v", true, false)
 	}
 
-	failure, msg := GetDenyList().IsDeploymentInFailureState(theItemInList)
-	if failure == false || msg != "A failure" {
+	failure := GetDenyList().IsDeploymentInFailureState(theItemInList)
+	if failure == false {
 		t.Errorf("! Got  %v, Want %v", failure, true)
 	}
 
