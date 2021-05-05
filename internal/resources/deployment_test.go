@@ -155,6 +155,7 @@ func TestDeploymentScaler(t *testing.T) {
 		_client    client.Client
 		deployment v1.Deployment
 		replicas   int32
+		req        reconcile.Request
 	}
 	tests := []struct {
 		name    string
@@ -172,7 +173,8 @@ func TestDeploymentScaler(t *testing.T) {
 							APIVersion: "apps/v1",
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: "foo",
+							Name:      "foo",
+							Namespace: "bar",
 						},
 						Spec:   v1.DeploymentSpec{},
 						Status: v1.DeploymentStatus{},
@@ -184,12 +186,19 @@ func TestDeploymentScaler(t *testing.T) {
 						APIVersion: "apps/v1",
 					},
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "foo",
+						Name:      "foo",
+						Namespace: "bar",
 					},
 					Spec:   v1.DeploymentSpec{},
 					Status: v1.DeploymentStatus{},
 				},
 				replicas: 4,
+				req: reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      "foo",
+						Namespace: "bar",
+					},
+				},
 			},
 			wantErr: false,
 		},
@@ -204,7 +213,8 @@ func TestDeploymentScaler(t *testing.T) {
 							APIVersion: "apps/v1",
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: "foo",
+							Name:      "foo",
+							Namespace: "bar",
 						},
 						Spec:   v1.DeploymentSpec{},
 						Status: v1.DeploymentStatus{},
@@ -216,14 +226,21 @@ func TestDeploymentScaler(t *testing.T) {
 						APIVersion: "apps/v1",
 					},
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "bar",
+						Name:      "bar",
+						Namespace: "foo",
 					},
 					Spec:   v1.DeploymentSpec{},
 					Status: v1.DeploymentStatus{},
 				},
 				replicas: 4,
+				req: reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      "foo",
+						Namespace: "bar",
+					},
+				},
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "TestAutoscaler",
@@ -236,7 +253,8 @@ func TestDeploymentScaler(t *testing.T) {
 							APIVersion: "apps/v1",
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: "foo",
+							Name:      "foo",
+							Namespace: "bar",
 						},
 						Spec:   v1.DeploymentSpec{},
 						Status: v1.DeploymentStatus{},
@@ -249,6 +267,7 @@ func TestDeploymentScaler(t *testing.T) {
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:        "foo",
+						Namespace:   "bar",
 						Annotations: map[string]string{"scaler/allow-autoscaling": "true"},
 					},
 					Spec: v1.DeploymentSpec{
@@ -259,13 +278,19 @@ func TestDeploymentScaler(t *testing.T) {
 					},
 				},
 				replicas: 2,
+				req: reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      "foo",
+						Namespace: "bar",
+					},
+				},
 			},
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := DeploymentScaler(tt.args.ctx, tt.args._client, tt.args.deployment, tt.args.replicas); (err != nil) != tt.wantErr {
+			if err := DeploymentScaler(tt.args.ctx, tt.args._client, tt.args.deployment, tt.args.replicas, tt.args.req); (err != nil) != tt.wantErr {
 				t.Errorf("DeploymentScaler() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -601,56 +626,6 @@ func TestLimitsNeededDeploymentList(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := LimitsNeededDeploymentList(tt.args.deployments, tt.args.scaleReplicalist); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("LimitsNeededDeploymentList() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestScaleDeployment(t *testing.T) {
-	type args struct {
-		ctx          context.Context
-		_client      client.Client
-		deployment   v1.Deployment
-		stateReplica sr.StateReplica
-	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "TestScalingDeployment",
-			args: args{
-				ctx:     context.TODO(),
-				_client: fake.NewClientBuilder().Build(),
-				deployment: v1.Deployment{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "Deployment",
-						APIVersion: "apps/v1",
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "foo",
-						Namespace: "bar",
-					},
-					Spec: v1.DeploymentSpec{
-						Replicas: new(int32),
-					},
-					Status: v1.DeploymentStatus{
-						Replicas: 5,
-					},
-				},
-				stateReplica: sr.StateReplica{
-					Name:     "test",
-					Replicas: 7,
-				},
-			},
-			wantErr: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := ScaleDeployment(tt.args.ctx, tt.args._client, tt.args.deployment, tt.args.stateReplica); (err != nil) != tt.wantErr {
-				t.Errorf("ScaleDeployment() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

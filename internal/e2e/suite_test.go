@@ -91,6 +91,8 @@ var _ = BeforeSuite(func() {
 		Paths: testEnv.CRDDirectoryPaths,
 		CRDs:  testEnv.CRDs,
 	}
+	options.MaxTime = time.Minute * 20
+
 	_, err = envtest.InstallCRDs(cfg, options)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -222,6 +224,9 @@ func CreateClusterScalingStateDefinition() v1alpha1.ClusterScalingStateDefinitio
 			Name: "global-state-definition",
 		},
 		Spec: states,
+		Config: v1alpha1.ClusterScalingStateDefinitionConfiguration{
+			RateLimiting: true,
+		},
 	}
 
 	return *scalingState

@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 
 	"github.com/containersol/prescale-operator/api/v1alpha1"
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
@@ -61,7 +62,7 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		WithValues("reconciler namespace", req.Namespace).
 		WithValues("reconciler object", req.Name)
 
-	clusterStateDefinitions, err := states.GetClusterScalingStateDefinitions(ctx, r.Client)
+	clusterStateDefinitions, err := states.GetClusterScalingStates(ctx, r.Client)
 	if err != nil {
 		// If we encounter an error trying to retrieve the state definitions,
 		// we will not be able to compute anything else.
@@ -93,6 +94,7 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 func (r *ScalingStateReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&scalingv1alpha1.ScalingState{}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: 1}).
 		Owns(&scalingv1alpha1.ClusterScalingState{}).
 		Complete(r)
 }

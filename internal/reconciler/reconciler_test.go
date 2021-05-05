@@ -78,7 +78,7 @@ func TestReconcileNamespace(t *testing.T) {
 				},
 				clusterState: states.State{},
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 	}
 

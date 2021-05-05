@@ -5,6 +5,7 @@ import (
 	"reflect"
 
 	"github.com/containersol/prescale-operator/pkg/utils/annotations"
+	g "github.com/containersol/prescale-operator/pkg/utils/global"
 	"github.com/containersol/prescale-operator/pkg/utils/labels"
 	ocv1 "github.com/openshift/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
@@ -20,7 +21,7 @@ func PreFilter(r record.EventRecorder) predicate.Predicate {
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			// Ignore updates to CR status in which case metadata.Generation does not change
 			deploymentName := e.ObjectNew.GetName()
-
+			nameSpace := e.ObjectNew.GetNamespace()
 			var oldoptin, newoptin, replicaChange, annotationchange bool
 
 			oldoptin = labels.GetLabelValue(e.ObjectOld.GetLabels(), "scaler/opt-in")
@@ -28,13 +29,30 @@ func PreFilter(r record.EventRecorder) predicate.Predicate {
 
 			generateOptInLabelUpdateEvent(e, r, newoptin, oldoptin)
 
+			item := g.DeploymentInfo{
+				Name:      deploymentName,
+				Namespace: nameSpace,
+			}
+
 			// Deployment opted out. Don't do anything
-			if !newoptin {
+			if !newoptin  {
+				if g.GetDenyList().IsInConcurrentDenyList(item) {
+					// The deployment is being scaled at the moment! Notify scaler to abort.
+					g.GetDenyList().SetDeploymentInfoOnDenyList(item, true, "Opt-In is false!", -1)
+				}
 				return false
 			}
 
 			replicaChange = AssesReplicaChange(e)
 			annotationchange = AssessAnnotationChange(e)
+
+			// don't reconcile if the stepscale annotation is present.
+			//stepScaleActive := AssessStepScaleAnnotation(e)
+
+			// Don't reconcile on any change except when Annotation may have changed while the deployment was on the deny list.
+			if g.GetDenyList().IsInConcurrentDenyList(item) && !annotationchange {
+				return false
+			}
 
 			// eval if we need to reconcile.
 			if !annotationchange && !replicaChange && newoptin && oldoptin {
@@ -75,9 +93,8 @@ func PreFilter(r record.EventRecorder) predicate.Predicate {
 
 func AssessAnnotationChange(e event.UpdateEvent) bool {
 	// Check for changes in relevant annotations.
-	var annotationsnew, annotationsold map[string]string
-	annotationsnew = annotations.FilterByKeyPrefix("scaler", e.ObjectNew.GetAnnotations())
-	annotationsold = annotations.FilterByKeyPrefix("scaler", e.ObjectOld.GetAnnotations())
+	annotationsnew := annotations.FilterByKeyPrefix("scaler", e.ObjectNew.GetAnnotations())
+	annotationsold := annotations.FilterByKeyPrefix("scaler", e.ObjectOld.GetAnnotations())
 
 	eq := reflect.DeepEqual(annotationsnew, annotationsold)
 

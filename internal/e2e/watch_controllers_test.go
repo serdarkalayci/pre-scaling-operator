@@ -19,7 +19,7 @@ import (
 
 var _ = Describe("e2e Test for the main operator functionalities", func() {
 
-	const timeout = time.Second * 25
+	const timeout = time.Second * 70
 	const interval = time.Millisecond * 200
 
 	var casenumber = 1
@@ -51,6 +51,8 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 	})
 
 	AfterEach(func() {
+		// Wait until all potential wait-loops in the step scaler are finished.
+		time.Sleep(time.Second * 11)
 		// Tear down the deployment or deploymentconfig
 		if OpenshiftCluster {
 			Expect(k8sClient.Delete(context.Background(), &deploymentconfig)).Should(Succeed())
@@ -106,13 +108,13 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 					By("Then a deployment is updated")
 					Expect(k8sClient.Update(context.Background(), &fetchedDeploymentConfig)).Should(Succeed())
 
-					time.Sleep(time.Second * 2)
+					time.Sleep(time.Second * 5)
 
 					var replicas32 int32 = int32(expectedReplicas)
 
 					Eventually(func() int32 {
 						k8sClient.Get(context.Background(), key, &fetchedDeploymentConfig)
-						return fetchedDeploymentConfig.Spec.Replicas
+						return fetchedDeploymentConfig.Status.AvailableReplicas
 					}, timeout, interval).Should(Equal(replicas32))
 
 				} else {
@@ -141,14 +143,14 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 					By("Then a deployment is updated")
 					Expect(k8sClient.Update(context.Background(), &fetchedDeployment)).Should(Succeed())
 
-					time.Sleep(time.Second * 2)
+					time.Sleep(time.Second * 5)
 
 					var replicas32 int32 = int32(expectedReplicas)
-
-					Eventually(func() int32 {
+					Eventually(func() bool {
 						k8sClient.Get(context.Background(), key, &fetchedDeployment)
-						return *fetchedDeployment.Spec.Replicas
-					}, timeout, interval).Should(Equal(replicas32))
+						return *fetchedDeployment.Spec.Replicas == replicas32 && fetchedDeployment.Status.ReadyReplicas == replicas32
+					}, timeout, interval).Should(Equal(true))
+
 				}
 
 			},

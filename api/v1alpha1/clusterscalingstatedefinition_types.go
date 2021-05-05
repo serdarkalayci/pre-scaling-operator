@@ -40,6 +40,11 @@ type ClusterScalingStateDefinitionStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
 }
 
+// ClusterScalingStateDefinitionConfiguration sets configuration for the Scaler operator
+type ClusterScalingStateDefinitionConfiguration struct {
+	RateLimiting bool `json:"rateLimiting"`
+}
+
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:path=clusterscalingstatedefinitions,scope=Cluster
@@ -49,8 +54,9 @@ type ClusterScalingStateDefinition struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   []States                            `json:"spec,omitempty"`
-	Status ClusterScalingStateDefinitionStatus `json:"status,omitempty"`
+	Spec   []States                                   `json:"spec,omitempty"`
+	Status ClusterScalingStateDefinitionStatus        `json:"status,omitempty"`
+	Config ClusterScalingStateDefinitionConfiguration `json:"config,omitempty"`
 }
 
 // +kubebuilder:object:root=true

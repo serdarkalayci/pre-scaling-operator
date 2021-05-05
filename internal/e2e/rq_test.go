@@ -20,7 +20,7 @@ import (
 
 var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 
-	const timeout = time.Second * 60
+	const timeout = time.Second * 80
 	const interval = time.Millisecond * 500
 
 	var casenumber = 1
@@ -56,6 +56,8 @@ var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 	})
 
 	AfterEach(func() {
+		// Wait until all potential wait-loops in the step scaler are finished.
+		time.Sleep(time.Second * 11)
 		// Tear down the deployment or deploymentconfig
 		if OpenshiftCluster {
 			Expect(k8sClient.Delete(context.Background(), &deploymentconfig)).Should(Succeed())
@@ -112,7 +114,7 @@ var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 
 					Eventually(func() int32 {
 						k8sClient.Get(context.Background(), key, &fetchedDeploymentConfig)
-						return fetchedDeploymentConfig.Spec.Replicas
+						return fetchedDeploymentConfig.Status.AvailableReplicas
 					}, timeout, interval).Should(Equal(replicas32))
 
 				} else {
@@ -137,10 +139,10 @@ var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 
 					var replicas32 int32 = int32(expectedReplicas)
 
-					Eventually(func() int32 {
+					Eventually(func() bool {
 						k8sClient.Get(context.Background(), key, &fetchedDeployment)
-						return *fetchedDeployment.Spec.Replicas
-					}, timeout, interval).Should(Equal(replicas32))
+						return *fetchedDeployment.Spec.Replicas == replicas32 && fetchedDeployment.Status.ReadyReplicas == replicas32
+					}, timeout, interval).Should(Equal(true))
 				}
 
 			},

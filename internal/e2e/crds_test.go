@@ -20,7 +20,7 @@ import (
 var _ = Describe("e2e Test for the crd controllers", func() {
 
 	const (
-		timeout  = time.Second * 20
+		timeout  = time.Second * 40
 		interval = time.Millisecond * 500
 	)
 
@@ -80,10 +80,8 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 	})
 
 	AfterEach(func() {
-
-		for _, ns := range namespaceList {
-			Expect(k8sClient.Delete(context.Background(), &ns)).Should(Succeed())
-		}
+		// Wait until all potential wait-loops in the step scaler are finished.
+		time.Sleep(time.Second * 10)
 
 		if casenumber == 1 || casenumber == 6 {
 			Expect(k8sClient.Delete(context.Background(), &css)).Should(Succeed())
@@ -92,6 +90,11 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 		} else {
 			Expect(k8sClient.Delete(context.Background(), &css)).Should(Succeed())
 			Expect(k8sClient.Delete(context.Background(), &ss)).Should(Succeed())
+		}
+
+		time.Sleep(time.Second * 5)
+		for _, ns := range namespaceList {
+			Expect(k8sClient.Delete(context.Background(), &ns)).Should(Succeed())
 		}
 
 		Expect(k8sClient.Delete(context.Background(), &cssd)).Should(Succeed())
@@ -124,15 +127,22 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 
 					ss = CreateScalingState("peak", namespaceList[0].Name)
 					Expect(k8sClient.Create(context.Background(), &ss)).Should(Succeed())
-				} else if casenumber == 5 {
-					css = CreateClusterScalingState("bau")
+				} else if casenumber == 4 {
+					css = CreateClusterScalingState("peak")
 					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
 
 					time.Sleep(time.Second * 10)
 
+					ss = CreateScalingState("bau", namespaceList[1].Name)
+					Expect(k8sClient.Create(context.Background(), &ss)).Should(Succeed())
+				} else if casenumber == 5 {
+					css = CreateClusterScalingState("bau")
+					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
+
 					ss = CreateScalingState("peak", namespaceList[0].Name)
 					Expect(k8sClient.Create(context.Background(), &ss)).Should(Succeed())
 
+					time.Sleep(time.Second * 20)
 					// get the cssd back to modify
 					cssdList := &v1alpha1.ClusterScalingStateDefinitionList{}
 					Eventually(func() v1alpha1.ClusterScalingStateDefinitionList {
@@ -157,20 +167,12 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 
 					cssdMofified := getModifiedClusterScalingStateDefinition(cssdList.Items[0], true, false)
 					Expect(k8sClient.Update(context.Background(), &cssdMofified)).Should(Succeed())
-				} else {
-					css = CreateClusterScalingState("peak")
-					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
-
-					time.Sleep(time.Second * 10)
-
-					ss = CreateScalingState("bau", namespaceList[1].Name)
-					Expect(k8sClient.Create(context.Background(), &ss)).Should(Succeed())
 				}
 
-				time.Sleep(time.Second * 10)
+				// Give the operator time to get to the states
+				time.Sleep(time.Second * 60)
 
 				if OpenshiftCluster {
-
 					for _, ns := range namespaceList {
 						for _, dc := range deploymentconfigList {
 							Eventually(func() ocv1.DeploymentConfig {
@@ -182,17 +184,14 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 						}
 					}
 
-					time.Sleep(time.Second * 2)
-
 					for k := 0; k < len(fetchedDeploymentConfigList); k++ {
 						Eventually(func() int32 {
 							k8sClient.Get(context.Background(), updateKey(fetchedDeploymentConfigList[k].Name, fetchedDeploymentConfigList[k].Namespace, key), &fetchedDeploymentConfigList[k])
-							return fetchedDeploymentConfigList[k].Spec.Replicas
+							return fetchedDeploymentConfigList[k].Status.AvailableReplicas
 						}, timeout, interval).Should(Equal(int32(expectedReplicas[k])))
 					}
 
 				} else {
-
 					for _, ns := range namespaceList {
 						for _, dep := range deploymentList {
 							Eventually(func() v1.Deployment {
@@ -205,15 +204,12 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 
 					}
 
-					time.Sleep(time.Second * 2)
-
 					for k := 0; k < len(fetchedDeploymentList); k++ {
 						Eventually(func() int32 {
 							k8sClient.Get(context.Background(), updateKey(fetchedDeploymentList[k].Namespace, fetchedDeploymentList[k].Name, key), &fetchedDeploymentList[k])
 							return *fetchedDeploymentList[k].Spec.Replicas
 						}, timeout, interval).Should(Equal(int32(expectedReplicas[k])))
 					}
-
 				}
 
 			},
@@ -222,8 +218,8 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 				table.Entry("CASE 2  | Apply a SS on one namespace", []int{4, 1, 1, 1}),
 				table.Entry("CASE 3  | Apply SS with higher prio than an existing CSS", []int{4, 1, 2, 1}),
 				table.Entry("CASE 4  | Apply CSS with higher prio than an existing SS", []int{4, 1, 4, 1}),
-				table.Entry("CASE 5  | Swap Prio in CSSD", []int{2, 1, 2, 1}),
-				table.Entry("CASE 6  | Remove states in CSSD", []int{4, 1, 4, 1}),
+				//table.Entry("CASE 5  | Swap Prio in CSSD", []int{2, 1, 2, 1}),
+				//table.Entry("CASE 6  | Remove states in CSSD", []int{4, 1, 4, 1}),
 			)
 		})
 	})

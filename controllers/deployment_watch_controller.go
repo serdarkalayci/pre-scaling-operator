@@ -65,7 +65,7 @@ func (r *DeploymentWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// We are certain that we have an object to reconcile, we need to get the state definitions
-	stateDefinitions, err := states.GetClusterScalingStateDefinitions(ctx, r.Client)
+	stateDefinitions, err := states.GetClusterScalingStates(ctx, r.Client)
 	if err != nil {
 		log.Error(err, "Failed to get ClusterStateDefinitions")
 		return ctrl.Result{}, err
@@ -74,7 +74,6 @@ func (r *DeploymentWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// We need to calculate the desired state before we try to reconcile the deployment
 	finalState, err := reconciler.GetAppliedState(ctx, r.Client, req.Namespace, stateDefinitions, states.State{})
 	if err != nil {
-		log.Error(err, "Cannot determine applied state for namespace")
 		return ctrl.Result{}, err
 	}
 
@@ -94,5 +93,6 @@ func (r *DeploymentWatcher) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.Deployment{}).
 		WithEventFilter(validations.PreFilter(r.Recorder)).
+		WithOptions(controller.Options{MaxConcurrentReconciles: 1}).
 		Complete(r)
 }

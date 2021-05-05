@@ -68,25 +68,40 @@ func GetNamespaceScalingStateName(ctx context.Context, _client client.Client, na
 	return scalingStates.Items[0].Spec.State, nil
 }
 
-func GetClusterScalingStateDefinitions(ctx context.Context, _client client.Client) (States, error) {
-	// When a ScalingState is created or updated,
-	// we need to check both it and the ClusterState in order to determine the actual state the namespace should be in.
+func GetStepScaleSetting(ctx context.Context, _client client.Client) bool {
+	cssd, err := GetClusterScalingStateDefinitionsList(ctx, _client)
+	_ = err
+	if len(cssd.Items) == 0 {
+		return true
+	}
+	return cssd.Items[0].Config.RateLimiting
+}
+
+func GetClusterScalingStateDefinitionsList(ctx context.Context, _client client.Client) (scalingv1alpha1.ClusterScalingStateDefinitionList, error) {
 	cssd := &scalingv1alpha1.ClusterScalingStateDefinitionList{}
 	_client.List(ctx, cssd, &client.ListOptions{})
-
 	if len(cssd.Items) == 0 {
-		return States{}, NotFound{
+		return scalingv1alpha1.ClusterScalingStateDefinitionList{}, NotFound{
 			msg: "No cluster state definitions found",
 		}
 	}
 
 	if len(cssd.Items) >= 2 {
-		return States{}, TooMany{
+		return scalingv1alpha1.ClusterScalingStateDefinitionList{}, TooMany{
 			msg:   "Too many cluster states found",
 			count: len(cssd.Items),
 		}
 	}
+	return *cssd, nil
+}
 
+func GetClusterScalingStates(ctx context.Context, _client client.Client) (States, error) {
+	// When a ScalingState is created or updated,
+	// we need to check both it and the ClusterState in order to determine the actual state the namespace should be in.
+	cssd, err := GetClusterScalingStateDefinitionsList(ctx, _client)
+	if err != nil {
+		return States{}, err
+	}
 	clusterStateDefinitions := States{}
 	for _, state := range cssd.Items[0].Spec {
 		clusterStateDefinitions = append(clusterStateDefinitions, State{
