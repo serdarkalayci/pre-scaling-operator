@@ -95,5 +95,6 @@ func (r *ScalingStateReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&scalingv1alpha1.ScalingState{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 1}).
+		Owns(&scalingv1alpha1.ClusterScalingState{}).
 		Complete(r)
 }
