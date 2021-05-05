@@ -187,7 +187,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 	req.NamespacedName.Name = deployment.Name
 	var err error
 
-	if g.GetDenyList().IsInConcurrentDenyList(deploymentItem) {
+	if g.GetDenyList().IsInConcurrentList(deploymentItem) {
 		log.Info("Waiting for the deployment to be off the denylist.")
 		for stay, timeout := true, time.After(time.Second*120); stay; {
 			select {
@@ -196,7 +196,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 				return nil
 			default:
 				time.Sleep(time.Second * 10)
-				if !g.GetDenyList().IsInConcurrentDenyList(deploymentItem) {
+				if !g.GetDenyList().IsInConcurrentList(deploymentItem) {
 					// Refresh deployment to get a new object to reconcile
 
 					deployment, err = DeploymentGetter(ctx, _client, req)
@@ -224,7 +224,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 	var stepCondition bool = true
 	var retryErr error = nil
 	log.Info("Putting deployment on denylist")
-	g.GetDenyList().SetDeploymentInfoOnDenyList(deploymentItem, false, "", int(desiredReplicaCount))
+	g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, false, "", int(desiredReplicaCount))
 	if rateLimitingEnabled {
 		log.WithValues("Deployment: ", deploymentItem.Name).
 			WithValues("Namespace: ", deploymentItem.Namespace).
@@ -234,7 +234,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 		// Loop step by step until deployment has reached desiredreplica count. Fail when the deployment update failed too many times
 		for stepCondition {
 
-			desiredReplicaCount = int32(g.GetDenyList().GetDesiredReplicasFromDenyList(deploymentItem))
+			desiredReplicaCount = int32(g.GetDenyList().GetDesiredReplicasFromList(deploymentItem))
 			// decide if we need to step up or down
 			oldReplicaCount = *deployment.Spec.Replicas
 			if oldReplicaCount < desiredReplicaCount {
@@ -243,7 +243,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 				stepReplicaCount = oldReplicaCount - 1
 			} else if oldReplicaCount == desiredReplicaCount {
 				log.Info("Finished scaling. Leaving early due to an update from another goroutine.")
-				g.GetDenyList().RemoveFromDenyList(deploymentItem)
+				g.GetDenyList().RemoveFromList(deploymentItem)
 				return nil
 			}
 			log.WithValues("Deployment: ", deploymentItem.Name).
@@ -258,7 +258,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 
 			if retryErr != nil {
 				log.Error(retryErr, "Unable to scale the deployment, err: %v")
-				g.GetDenyList().RemoveFromDenyList(deploymentItem)
+				g.GetDenyList().RemoveFromList(deploymentItem)
 				return retryErr
 			}
 
@@ -272,7 +272,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 					deployment, err = DeploymentGetter(ctx, _client, req)
 					if err != nil {
 						log.Error(err, "Error getting refreshed deployment in wait for Readiness loop")
-						g.GetDenyList().RemoveFromDenyList(deploymentItem)
+						g.GetDenyList().RemoveFromList(deploymentItem)
 						return err
 					}
 					if deployment.Status.ReadyReplicas == stepReplicaCount {
@@ -292,7 +292,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 
 		if retryErr != nil {
 			log.Error(retryErr, "Unable to scale the deployment, err: %v")
-			g.GetDenyList().RemoveFromDenyList(deploymentItem)
+			g.GetDenyList().RemoveFromList(deploymentItem)
 			return retryErr
 		}
 	}
@@ -301,7 +301,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 		WithValues("Deployment Name", deployment.Name).
 		WithValues("Namespace", deployment.Namespace).
 		Info("Finished scaling deployment to desired replica count")
-	g.GetDenyList().RemoveFromDenyList(deploymentItem)
+	g.GetDenyList().RemoveFromList(deploymentItem)
 	return nil
 }
 

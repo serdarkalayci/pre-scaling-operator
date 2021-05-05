@@ -90,10 +90,10 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 	if allowed {
 		for i, deployment := range deployments.Items {
-			deploymentItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromDenyList(g.ConvertDeploymentToItem(deployment))
+			deploymentItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(g.ConvertDeploymentToItem(deployment))
 			if notFoundErr == nil {
 				if deploymentItem.DesiredReplicas != int(scaleReplicalist[i].Replicas) {
-					g.GetDenyList().SetDeploymentInfoOnDenyList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, int(scaleReplicalist[i].Replicas))
+					g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, int(scaleReplicalist[i].Replicas))
 
 					log.WithValues("Deployment: ", deploymentItem.Name).
 						WithValues("Namespace: ", deploymentItem.Namespace).
@@ -118,10 +118,10 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 					WithValues("deploymentconfig", deploymentConfig.Name).
 					WithValues("namespace", deploymentConfig.Namespace)
 
-				deploymentConfigItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromDenyList(g.ConvertDeploymentConfigToItem(deploymentConfig))
+				deploymentConfigItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(g.ConvertDeploymentConfigToItem(deploymentConfig))
 				if notFoundErr == nil {
 					if deploymentConfigItem.DesiredReplicas != int(scaleReplicalistDC[i].Replicas) {
-						g.GetDenyList().SetDeploymentInfoOnDenyList(deploymentConfigItem, deploymentConfigItem.Failure, deploymentConfigItem.FailureMessage, int(scaleReplicalistDC[i].Replicas))
+						g.GetDenyList().SetDeploymentInfoOnList(deploymentConfigItem, deploymentConfigItem.Failure, deploymentConfigItem.FailureMessage, int(scaleReplicalistDC[i].Replicas))
 
 						log.WithValues("Deployment: ", deploymentConfigItem.Name).
 							WithValues("Namespace: ", deploymentConfigItem.Namespace).
@@ -172,10 +172,10 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 	log.Info("Quota Check")
 
 	if allowed {
-		deploymentItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromDenyList(g.ConvertDeploymentToItem(deployment))
+		deploymentItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(g.ConvertDeploymentToItem(deployment))
 		if notFoundErr == nil {
 			if deploymentItem.DesiredReplicas != int(stateReplica.Replicas) {
-				g.GetDenyList().SetDeploymentInfoOnDenyList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, int(stateReplica.Replicas))
+				g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, int(stateReplica.Replicas))
 
 				log.WithValues("Deployment: ", deploymentItem.Name).
 					WithValues("Namespace: ", deploymentItem.Namespace).
@@ -219,10 +219,10 @@ func ReconcileDeploymentConfig(ctx context.Context, _client client.Client, deplo
 	log.Info("Quota Check")
 
 	if allowed {
-		deploymentItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromDenyList(g.ConvertDeploymentConfigToItem(deploymentConfig))
+		deploymentItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(g.ConvertDeploymentConfigToItem(deploymentConfig))
 		if notFoundErr == nil {
 			if deploymentItem.DesiredReplicas != int(stateReplica.Replicas) {
-				g.GetDenyList().SetDeploymentInfoOnDenyList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, int(stateReplica.Replicas))
+				g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, int(stateReplica.Replicas))
 
 				log.WithValues("Deployment: ", deploymentItem.Name).
 					WithValues("Namespace: ", deploymentItem.Namespace).

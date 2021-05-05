@@ -49,8 +49,8 @@ func TestPutOnDenyListAndIsFound(t *testing.T) {
 			}
 
 			for _, item := range tt.args.deployment {
-				if GetDenyList().IsInConcurrentDenyList(ConvertDeploymentToItem(item)) != true {
-					t.Errorf("The item is not in the DenyList! Got  %v, Want %v", GetDenyList().IsInConcurrentDenyList(ConvertDeploymentToItem(item)), tt.result)
+				if GetDenyList().IsInConcurrentList(ConvertDeploymentToItem(item)) != true {
+					t.Errorf("The item is not in the DenyList! Got  %v, Want %v", GetDenyList().IsInConcurrentList(ConvertDeploymentToItem(item)), tt.result)
 				}
 			}
 		})
@@ -183,7 +183,7 @@ func TestDenyList(t *testing.T) {
 				t.Errorf("The length is not correct! Got  %v, Want %v", listle, tt.length)
 			}
 
-			GetDenyList().PurgeDenyList()
+			GetDenyList().PurgeList()
 		})
 	}
 
@@ -213,7 +213,7 @@ func TestAddDuplicateAndPurge(t *testing.T) {
 		t.Errorf("Failed to put item on slice! Got  %v, Want %v", GetDenyList().Length(), 2)
 	}
 
-	GetDenyList().PurgeDenyList()
+	GetDenyList().PurgeList()
 
 	if GetDenyList().Length() != 0 {
 		t.Errorf("The slice didn't get purged correctly! Got  %v, Want %v", GetDenyList().Length(), 0)
@@ -254,8 +254,8 @@ func TestAddFiveAndDeleteMutiple(t *testing.T) {
 		t.Errorf("Failed to put item on slice! Got  %v, Want %v", GetDenyList().Length(), 5)
 	}
 
-	GetDenyList().RemoveFromDenyList(secondDeploymentItem)
-	isSecondItemInList := GetDenyList().IsInConcurrentDenyList(secondDeploymentItem)
+	GetDenyList().RemoveFromList(secondDeploymentItem)
+	isSecondItemInList := GetDenyList().IsInConcurrentList(secondDeploymentItem)
 	if isSecondItemInList {
 		t.Errorf("The item is still on the list!! Got  %v, Want %v", isSecondItemInList, false)
 	}
@@ -265,14 +265,14 @@ func TestAddFiveAndDeleteMutiple(t *testing.T) {
 	}
 
 	// delete one that isn't on the list anymore, and that is
-	GetDenyList().RemoveFromDenyList(secondDeploymentItem)
-	GetDenyList().RemoveFromDenyList(thirdDeploymentItem)
-	isSecondItemInList = GetDenyList().IsInConcurrentDenyList(secondDeploymentItem)
+	GetDenyList().RemoveFromList(secondDeploymentItem)
+	GetDenyList().RemoveFromList(thirdDeploymentItem)
+	isSecondItemInList = GetDenyList().IsInConcurrentList(secondDeploymentItem)
 	if isSecondItemInList {
 		t.Errorf("The item is still on the list!! Got  %v, Want %v", isSecondItemInList, false)
 	}
 
-	isThirdItemInList := GetDenyList().IsInConcurrentDenyList(thirdDeploymentItem)
+	isThirdItemInList := GetDenyList().IsInConcurrentList(thirdDeploymentItem)
 	if isThirdItemInList {
 		t.Errorf("The item is still on the list!! Got  %v, Want %v", isThirdItemInList, false)
 	}
@@ -282,11 +282,11 @@ func TestAddFiveAndDeleteMutiple(t *testing.T) {
 	}
 
 	//delete two at once
-	GetDenyList().RemoveFromDenyList(fourthdeploymentItem)
-	GetDenyList().RemoveFromDenyList(fithDeploymentItem)
+	GetDenyList().RemoveFromList(fourthdeploymentItem)
+	GetDenyList().RemoveFromList(fithDeploymentItem)
 
-	isFourthItemInList := GetDenyList().IsInConcurrentDenyList(fourthdeploymentItem)
-	isFifthItemInList := GetDenyList().IsInConcurrentDenyList(fithDeploymentItem)
+	isFourthItemInList := GetDenyList().IsInConcurrentList(fourthdeploymentItem)
+	isFifthItemInList := GetDenyList().IsInConcurrentList(fithDeploymentItem)
 	if isFourthItemInList {
 		t.Errorf("The item is still on the list!! Got  %v, Want %v", isFourthItemInList, false)
 	}
@@ -299,7 +299,7 @@ func TestAddFiveAndDeleteMutiple(t *testing.T) {
 		t.Errorf("The item didn't get removed properly!! Got  %v, Want %v", GetDenyList().Length(), 1)
 	}
 
-	GetDenyList().PurgeDenyList()
+	GetDenyList().PurgeList()
 }
 
 func TestIsInList(t *testing.T) {
@@ -316,17 +316,17 @@ func TestIsInList(t *testing.T) {
 	GetDenyList().UpdateOrAppend(theItemInList)
 
 	// Testing IsInConcurrenyDenyList (false case)
-	isSomeOtherInList := GetDenyList().IsInConcurrentDenyList(someOther)
+	isSomeOtherInList := GetDenyList().IsInConcurrentList(someOther)
 	if isSomeOtherInList {
 		t.Errorf("! Got  %v, Want %v", isSomeOtherInList, false)
 	}
 
-	isTheItemInList := GetDenyList().IsInConcurrentDenyList(theItemInList)
+	isTheItemInList := GetDenyList().IsInConcurrentList(theItemInList)
 	if !isTheItemInList {
 		t.Errorf("! Got  %v, Want %v", !isTheItemInList, true)
 	}
 
-	GetDenyList().PurgeDenyList()
+	GetDenyList().PurgeList()
 
 }
 
@@ -351,8 +351,8 @@ func TestUpdateAndAppend(t *testing.T) {
 		t.Errorf("! Got  %v, Want %v", GetDenyList().Length(), 1)
 	}
 
-	comparison1, _ := GetDenyList().GetDeploymentInfoFromDenyList(theItemInList)
-	comparison2, _ := GetDenyList().GetDeploymentInfoFromDenyList(theUpdateItem)
+	comparison1, _ := GetDenyList().GetDeploymentInfoFromList(theItemInList)
+	comparison2, _ := GetDenyList().GetDeploymentInfoFromList(theUpdateItem)
 
 	isEqual := reflect.DeepEqual(comparison1, comparison2)
 	if !isEqual {
@@ -363,7 +363,7 @@ func TestUpdateAndAppend(t *testing.T) {
 		t.Errorf("! Got  %v, Want %v", true, false)
 	}
 
-	GetDenyList().PurgeDenyList()
+	GetDenyList().PurgeList()
 
 }
 
@@ -379,13 +379,13 @@ func TestUpdateItemInList(t *testing.T) {
 	}
 
 	GetDenyList().UpdateOrAppend(theItemInList)
-	GetDenyList().SetDeploymentInfoOnDenyList(theItemInList, true, "A failure", 2)
+	GetDenyList().SetDeploymentInfoOnList(theItemInList, true, "A failure", 2)
 	// Check if it updated and didn't add a new one to the list
 	if GetDenyList().Length() != 1 {
 		t.Errorf("! Got  %v, Want %v", GetDenyList().Length(), 1)
 	}
 
-	comparison1, _ := GetDenyList().GetDeploymentInfoFromDenyList(theItemInList)
+	comparison1, _ := GetDenyList().GetDeploymentInfoFromList(theItemInList)
 
 	if comparison1.Name != "foo" || comparison1.Namespace != "bar" || comparison1.Failure != true || comparison1.FailureMessage != "A failure" || comparison1.DesiredReplicas != 2 {
 		t.Errorf("! Got  %v, Want %v", true, false)
@@ -396,12 +396,12 @@ func TestUpdateItemInList(t *testing.T) {
 		t.Errorf("! Got  %v, Want %v", failure, true)
 	}
 
-	desiredReplicas := GetDenyList().GetDesiredReplicasFromDenyList(theItemInList)
+	desiredReplicas := GetDenyList().GetDesiredReplicasFromList(theItemInList)
 	if desiredReplicas != 2 {
 		t.Errorf("! Got  %v, Want %v", desiredReplicas, 2)
 	}
 
-	item, err := GetDenyList().GetDeploymentInfoFromDenyList(notInList)
+	item, err := GetDenyList().GetDeploymentInfoFromList(notInList)
 	if item.Name != "" || item.Namespace != "" {
 		t.Errorf("! Got  %v, Want %v", "", item.Name)
 	}
@@ -409,6 +409,6 @@ func TestUpdateItemInList(t *testing.T) {
 		t.Errorf("! Got  %v, Want %v", err, nil)
 	}
 
-	GetDenyList().PurgeDenyList()
+	GetDenyList().PurgeList()
 
 }

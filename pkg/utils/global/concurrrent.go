@@ -8,15 +8,19 @@ import (
 )
 
 type DeploymentInfo struct {
-	Namespace       string
-	Name            string
-	Failure         bool
-	FailureMessage  string
-	DesiredReplicas int
+	Namespace          string
+	Name               string
+	IsDeploymentConfig bool
+	Failure            bool
+	FailureMessage     string
+	DesiredReplicas    int
 }
 
 // Global DenyList to check if the deployment is currently reconciles/step scaled
 var denylist *ConcurrentSlice
+
+// Global ReconcileList hold deployment/deploymenconfig information to make reconcile decisions
+var reconcileList *ConcurrentSlice
 
 // ConcurrentSlice type that can be safely shared between goroutines
 type ConcurrentSlice struct {
@@ -29,6 +33,14 @@ type ConcurrentSlice struct {
 type ConcurrentSliceItem struct {
 	Index int
 	Value DeploymentInfo
+}
+
+func GetReconcileList() *ConcurrentSlice {
+	if reconcileList == nil {
+		reconcileList = NewConcurrentSlice()
+		return reconcileList
+	}
+	return reconcileList
 }
 
 func GetDenyList() *ConcurrentSlice {
@@ -50,8 +62,8 @@ func NewConcurrentSlice() *ConcurrentSlice {
 }
 
 func (cs *ConcurrentSlice) UpdateOrAppend(item DeploymentInfo) {
-	if cs.IsInConcurrentDenyList(item) {
-		cs.RemoveFromDenyList(item)
+	if cs.IsInConcurrentList(item) {
+		cs.RemoveFromList(item)
 
 		cs.Lock()
 		defer cs.Unlock()
@@ -84,7 +96,7 @@ func (cs *ConcurrentSlice) Iter() <-chan ConcurrentSliceItem {
 	return c
 }
 
-func (cs *ConcurrentSlice) RemoveFromDenyList(item DeploymentInfo) {
+func (cs *ConcurrentSlice) RemoveFromList(item DeploymentInfo) {
 	i := 0
 	for inList := range cs.Iter() {
 		if item.Name == inList.Value.Name && item.Namespace == inList.Value.Namespace {
@@ -94,7 +106,7 @@ func (cs *ConcurrentSlice) RemoveFromDenyList(item DeploymentInfo) {
 	}
 }
 
-func (cs *ConcurrentSlice) PurgeDenyList() {
+func (cs *ConcurrentSlice) PurgeList() {
 	for range cs.Iter() {
 		cs.items = RemoveIndex(cs.items, 0)
 	}
@@ -113,7 +125,7 @@ func RemoveIndex(s []DeploymentInfo, index int) []DeploymentInfo {
 	return append(s[:index], s[index+1:]...)
 }
 
-func (cs *ConcurrentSlice) IsInConcurrentDenyList(item DeploymentInfo) bool {
+func (cs *ConcurrentSlice) IsInConcurrentList(item DeploymentInfo) bool {
 	result := false
 	for inList := range cs.Iter() {
 		if item.Name == inList.Value.Name && item.Namespace == inList.Value.Namespace {
@@ -123,14 +135,14 @@ func (cs *ConcurrentSlice) IsInConcurrentDenyList(item DeploymentInfo) bool {
 	return result
 }
 
-func (cs *ConcurrentSlice) SetDeploymentInfoOnDenyList(item DeploymentInfo, failure bool, failureMessage string, desiredReplicas int) {
+func (cs *ConcurrentSlice) SetDeploymentInfoOnList(item DeploymentInfo, failure bool, failureMessage string, desiredReplicas int) {
 	item.Failure = failure
 	item.FailureMessage = failureMessage
 	item.DesiredReplicas = desiredReplicas
 	cs.UpdateOrAppend(item)
 }
 
-func (cs *ConcurrentSlice) GetDeploymentInfoFromDenyList(item DeploymentInfo) (DeploymentInfo, error) {
+func (cs *ConcurrentSlice) GetDeploymentInfoFromList(item DeploymentInfo) (DeploymentInfo, error) {
 	result := DeploymentInfo{}
 	for inList := range cs.Iter() {
 		if item.Name == inList.Value.Name && item.Namespace == inList.Value.Namespace {
@@ -146,12 +158,12 @@ func (cs *ConcurrentSlice) GetDeploymentInfoFromDenyList(item DeploymentInfo) (D
 }
 
 func (cs *ConcurrentSlice) IsDeploymentInFailureState(item DeploymentInfo) bool {
-	itemToReturn, _ := cs.GetDeploymentInfoFromDenyList(item)
+	itemToReturn, _ := cs.GetDeploymentInfoFromList(item)
 	return itemToReturn.Failure
 }
 
-func (cs *ConcurrentSlice) GetDesiredReplicasFromDenyList(item DeploymentInfo) int {
-	itemToReturn, _ := cs.GetDeploymentInfoFromDenyList(item)
+func (cs *ConcurrentSlice) GetDesiredReplicasFromList(item DeploymentInfo) int {
+	itemToReturn, _ := cs.GetDeploymentInfoFromList(item)
 	return itemToReturn.DesiredReplicas
 }
 
