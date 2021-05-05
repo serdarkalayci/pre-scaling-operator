@@ -5,15 +5,21 @@ import (
 
 	ocv1 "github.com/openshift/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 type DeploymentInfo struct {
 	Namespace          string
 	Name               string
+	Annotations        map[string]string
+	Labels             map[string]string
 	IsDeploymentConfig bool
 	Failure            bool
 	FailureMessage     string
-	DesiredReplicas    int
+	SpecReplica        int32
+	ReadyReplicas      int32
+	DesiredReplicas    int32
+	ResourceList       corev1.ResourceList
 }
 
 // Global DenyList to check if the deployment is currently reconciles/step scaled
@@ -135,7 +141,7 @@ func (cs *ConcurrentSlice) IsInConcurrentList(item DeploymentInfo) bool {
 	return result
 }
 
-func (cs *ConcurrentSlice) SetDeploymentInfoOnList(item DeploymentInfo, failure bool, failureMessage string, desiredReplicas int) {
+func (cs *ConcurrentSlice) SetDeploymentInfoOnList(item DeploymentInfo, failure bool, failureMessage string, desiredReplicas int32) {
 	item.Failure = failure
 	item.FailureMessage = failureMessage
 	item.DesiredReplicas = desiredReplicas
@@ -162,27 +168,39 @@ func (cs *ConcurrentSlice) IsDeploymentInFailureState(item DeploymentInfo) bool 
 	return itemToReturn.Failure
 }
 
-func (cs *ConcurrentSlice) GetDesiredReplicasFromList(item DeploymentInfo) int {
+func (cs *ConcurrentSlice) GetDesiredReplicasFromList(item DeploymentInfo) int32 {
 	itemToReturn, _ := cs.GetDeploymentInfoFromList(item)
 	return itemToReturn.DesiredReplicas
 }
 
 func ConvertDeploymentToItem(deployment v1.Deployment) DeploymentInfo {
 	return DeploymentInfo{
-		Name:            deployment.Name,
-		Namespace:       deployment.Namespace,
-		Failure:         false,
-		FailureMessage:  "",
-		DesiredReplicas: -1,
+		Name:               deployment.Name,
+		Namespace:          deployment.Namespace,
+		Annotations:        deployment.Annotations,
+		Labels:             deployment.Labels,
+		IsDeploymentConfig: true,
+		Failure:            false,
+		FailureMessage:     "",
+		SpecReplica:        *deployment.Spec.Replicas,
+		ReadyReplicas:      deployment.Status.AvailableReplicas,
+		DesiredReplicas:    -1,
+		ResourceList:       deployment.Spec.Template.Spec.Containers[0].Resources.Limits,
 	}
 }
 
-func ConvertDeploymentConfigToItem(deploymentconfig ocv1.DeploymentConfig) DeploymentInfo {
+func ConvertDeploymentConfigToItem(deploymentConfig ocv1.DeploymentConfig) DeploymentInfo {
 	return DeploymentInfo{
-		Name:            deploymentconfig.Name,
-		Namespace:       deploymentconfig.Namespace,
-		Failure:         false,
-		FailureMessage:  "",
-		DesiredReplicas: -1,
+		Name:               deploymentConfig.Name,
+		Namespace:          deploymentConfig.Namespace,
+		Annotations:        deploymentConfig.Annotations,
+		Labels:             deploymentConfig.Labels,
+		IsDeploymentConfig: true,
+		Failure:            false,
+		FailureMessage:     "",
+		SpecReplica:        deploymentConfig.Spec.Replicas,
+		ReadyReplicas:      deploymentConfig.Status.AvailableReplicas,
+		DesiredReplicas:    -1,
+		ResourceList:       deploymentConfig.Spec.Template.Spec.Containers[0].Resources.Limits,
 	}
 }

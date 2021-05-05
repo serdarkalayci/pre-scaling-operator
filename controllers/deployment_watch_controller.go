@@ -18,6 +18,7 @@ import (
 	"github.com/containersol/prescale-operator/internal/reconciler"
 	"github.com/containersol/prescale-operator/internal/states"
 	"github.com/containersol/prescale-operator/internal/validations"
+	g "github.com/containersol/prescale-operator/pkg/utils/global"
 
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/apps/v1"
@@ -63,6 +64,7 @@ func (r *DeploymentWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "Failed to get the deployment data")
 		return ctrl.Result{}, err
 	}
+	deploymentItem := g.ConvertDeploymentToItem(deployment)
 
 	// We are certain that we have an object to reconcile, we need to get the state definitions
 	stateDefinitions, err := states.GetClusterScalingStates(ctx, r.Client)
@@ -78,7 +80,8 @@ func (r *DeploymentWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// After we have the deployment and state data, we are ready to reconcile the deployment
-	err = reconciler.ReconcileDeployment(ctx, r.Client, deployment, finalState)
+
+	err = reconciler.ReconcileDeploymentOrDeploymentConfig(ctx, r.Client, deploymentItem, finalState)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

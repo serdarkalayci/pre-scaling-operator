@@ -224,7 +224,7 @@ func ScaleDeployment(ctx context.Context, _client client.Client, deployment v1.D
 	var stepCondition bool = true
 	var retryErr error = nil
 	log.Info("Putting deployment on denylist")
-	g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, false, "", int(desiredReplicaCount))
+	g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, false, "", desiredReplicaCount)
 	if rateLimitingEnabled {
 		log.WithValues("Deployment: ", deploymentItem.Name).
 			WithValues("Namespace: ", deploymentItem.Namespace).

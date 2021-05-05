@@ -12,7 +12,6 @@ import (
 	g "github.com/containersol/prescale-operator/pkg/utils/global"
 	"github.com/containersol/prescale-operator/pkg/utils/math"
 	ocv1 "github.com/openshift/api/apps/v1"
-	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -92,8 +91,8 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 		for i, deployment := range deployments.Items {
 			deploymentItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(g.ConvertDeploymentToItem(deployment))
 			if notFoundErr == nil {
-				if deploymentItem.DesiredReplicas != int(scaleReplicalist[i].Replicas) {
-					g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, int(scaleReplicalist[i].Replicas))
+				if deploymentItem.DesiredReplicas != scaleReplicalist[i].Replicas {
+					g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, scaleReplicalist[i].Replicas)
 
 					log.WithValues("Deployment: ", deploymentItem.Name).
 						WithValues("Namespace: ", deploymentItem.Namespace).
@@ -120,8 +119,8 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 				deploymentConfigItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(g.ConvertDeploymentConfigToItem(deploymentConfig))
 				if notFoundErr == nil {
-					if deploymentConfigItem.DesiredReplicas != int(scaleReplicalistDC[i].Replicas) {
-						g.GetDenyList().SetDeploymentInfoOnList(deploymentConfigItem, deploymentConfigItem.Failure, deploymentConfigItem.FailureMessage, int(scaleReplicalistDC[i].Replicas))
+					if deploymentConfigItem.DesiredReplicas != scaleReplicalistDC[i].Replicas {
+						g.GetDenyList().SetDeploymentInfoOnList(deploymentConfigItem, deploymentConfigItem.Failure, deploymentConfigItem.FailureMessage, scaleReplicalistDC[i].Replicas)
 
 						log.WithValues("Deployment: ", deploymentConfigItem.Name).
 							WithValues("Namespace: ", deploymentConfigItem.Namespace).
@@ -150,18 +149,18 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	return nsEvents, finalState.Name, err
 }
 
-func ReconcileDeployment(ctx context.Context, _client client.Client, deployment v1.Deployment, state states.State) error {
+func ReconcileDeploymentOrDeploymentConfig(ctx context.Context, _client client.Client, deploymentItem g.DeploymentInfo, state states.State) error {
 	log := ctrl.Log.
-		WithValues("deployment", deployment.Name).
-		WithValues("namespace", deployment.Namespace)
+		WithValues("deploymentItem", deploymentItem.Name).
+		WithValues("namespace", deploymentItem.Namespace)
 
-	stateReplica, err := resources.DeploymentStateReplicas(state, deployment)
+	stateReplica, err := resources.StateReplicas(state, deploymentItem)
 	if err != nil {
 		log.Error(err, "Error getting the state replicas")
 		return err
 	}
-	rateLimitingEnabled := states.GetStepScaleSetting(ctx, _client)
-	allowed, err := quotas.ResourceQuotaCheck(ctx, deployment.Namespace, resources.LimitsNeededDeployment(deployment, stateReplica.Replicas))
+
+	allowed, err := quotas.ResourceQuotaCheck(ctx, deploymentItem.Namespace, resources.LimitsNeeded(deploymentItem, stateReplica.Replicas))
 	if err != nil {
 		log.Error(err, "Cannot calculate the resource quotas")
 		return err
@@ -172,10 +171,10 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 	log.Info("Quota Check")
 
 	if allowed {
-		deploymentItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(g.ConvertDeploymentToItem(deployment))
+		deploymentItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(deploymentItem)
 		if notFoundErr == nil {
-			if deploymentItem.DesiredReplicas != int(stateReplica.Replicas) {
-				g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, int(stateReplica.Replicas))
+			if deploymentItem.DesiredReplicas != stateReplica.Replicas {
+				g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, stateReplica.Replicas)
 
 				log.WithValues("Deployment: ", deploymentItem.Name).
 					WithValues("Namespace: ", deploymentItem.Namespace).
@@ -185,7 +184,7 @@ func ReconcileDeployment(ctx context.Context, _client client.Client, deployment 
 					Info("Deployment is already being scaled at the moment. Updated desired replica count")
 			}
 		} else {
-			err = resources.ScaleDeployment(ctx, _client, deployment, stateReplica, rateLimitingEnabled, "deployScaler")
+			err = resources.Scale(ctx, _client, deploymentItem, stateReplica, "deployScaler")
 			if err != nil {
 				log.Error(err, "Error scaling the deployment")
 				return err
@@ -221,8 +220,8 @@ func ReconcileDeploymentConfig(ctx context.Context, _client client.Client, deplo
 	if allowed {
 		deploymentItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(g.ConvertDeploymentConfigToItem(deploymentConfig))
 		if notFoundErr == nil {
-			if deploymentItem.DesiredReplicas != int(stateReplica.Replicas) {
-				g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, int(stateReplica.Replicas))
+			if deploymentItem.DesiredReplicas != stateReplica.Replicas {
+				g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, stateReplica.Replicas)
 
 				log.WithValues("Deployment: ", deploymentItem.Name).
 					WithValues("Namespace: ", deploymentItem.Namespace).
