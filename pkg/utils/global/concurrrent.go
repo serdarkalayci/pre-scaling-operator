@@ -179,7 +179,7 @@ func ConvertDeploymentToItem(deployment v1.Deployment) DeploymentInfo {
 		Namespace:          deployment.Namespace,
 		Annotations:        deployment.Annotations,
 		Labels:             deployment.Labels,
-		IsDeploymentConfig: true,
+		IsDeploymentConfig: false,
 		Failure:            false,
 		FailureMessage:     "",
 		SpecReplica:        *deployment.Spec.Replicas,

@@ -16,6 +16,7 @@ import (
 	"context"
 
 	"github.com/containersol/prescale-operator/internal/reconciler"
+	"github.com/containersol/prescale-operator/internal/resources"
 	"github.com/containersol/prescale-operator/internal/states"
 	"github.com/containersol/prescale-operator/internal/validations"
 	g "github.com/containersol/prescale-operator/pkg/utils/global"
@@ -58,8 +59,7 @@ func (r *DeploymentWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		WithValues("reconciler namespace", req.Namespace).
 		WithValues("reconciler object", req.Name)
 	// Fetch the deployment data
-	deployment := v1.Deployment{}
-	err := r.Client.Get(ctx, req.NamespacedName, &deployment)
+	deployment, err := resources.DeploymentGetter(ctx, r.Client, req)
 	if err != nil {
 		log.Error(err, "Failed to get the deployment data")
 		return ctrl.Result{}, err

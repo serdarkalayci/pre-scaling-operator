@@ -53,10 +53,6 @@ func Scaler(ctx context.Context, _client client.Client, deploymentItem g.Deploym
 		if err == nil {
 			deploymentItem.SpecReplica = replicas
 
-			deploymentItem := g.DeploymentInfo{
-				Name:      deploymentItem.Name,
-				Namespace: deploymentItem.Namespace,
-			}
 			var updateErr error = nil
 			if !g.GetDenyList().IsDeploymentInFailureState(deploymentItem) {
 				//updateErr = _client.Update(ctx, &deploymentItem, &client.UpdateOptions{})
@@ -104,16 +100,16 @@ func StateReplicas(state states.State, deploymentItem g.DeploymentInfo) (sr.Stat
 	return stateReplica, nil
 }
 
-func StateReplicasList(state states.State, deployments v1.DeploymentList) ([]sr.StateReplica, error) {
+func StateReplicasList(state states.State, deployments []g.DeploymentInfo) ([]sr.StateReplica, error) {
 
 	var stateReplicaList []sr.StateReplica
 	var err error
 
-	for _, deploymentItem := range deployments.Items {
+	for _, deploymentItem := range deployments {
 		log := ctrl.Log.
 			WithValues("deploymentItem", deploymentItem.Name).
 			WithValues("namespace", deploymentItem.Namespace)
-		stateReplicas, err := sr.NewStateReplicasFromAnnotations(deploymentItem.GetAnnotations())
+		stateReplicas, err := sr.NewStateReplicasFromAnnotations(deploymentItem.Annotations)
 		if err != nil {
 			log.WithValues("deploymentItem", deploymentItem.Name).
 				WithValues("namespace", deploymentItem.Namespace).
@@ -121,7 +117,7 @@ func StateReplicasList(state states.State, deployments v1.DeploymentList) ([]sr.
 			return []sr.StateReplica{}, err
 		}
 
-		optIn, err := DeploymentOptinLabel(deploymentItem)
+		optIn, err := OptinLabel(deploymentItem)
 		if err != nil {
 			if strings.Contains(err.Error(), c.LabelNotFound) {
 				return []sr.StateReplica{}, nil
@@ -285,11 +281,11 @@ func LimitsNeeded(deploymentItem g.DeploymentInfo, replicas int32) corev1.Resour
 	return math.Mul(math.ReplicaCalc(replicas, deploymentItem.SpecReplica), deploymentItem.ResourceList)
 }
 
-func LimitsNeededList(deployments v1.DeploymentList, scaleReplicalist []sr.StateReplica) corev1.ResourceList {
+func LimitsNeededList(deployments []g.DeploymentInfo, scaleReplicalist []sr.StateReplica) corev1.ResourceList {
 
 	var limitsneeded corev1.ResourceList
-	for i, deploymentItem := range deployments.Items {
-		limitsneeded = math.Add(limitsneeded, math.Mul(math.ReplicaCalc(scaleReplicalist[i].Replicas, *deploymentItem.Spec.Replicas), deploymentItem.Spec.Template.Spec.Containers[0].Resources.Limits))
+	for i, deploymentItem := range deployments {
+		limitsneeded = math.Add(limitsneeded, math.Mul(math.ReplicaCalc(scaleReplicalist[i].Replicas, deploymentItem.SpecReplica), deploymentItem.ResourceList))
 	}
 	return limitsneeded
 }
@@ -318,34 +314,61 @@ func GetDeploymentItem(ctx context.Context, _client client.Client, deploymentInf
 	return itemToReturn, nil
 }
 
-// func GetDeploymentConfig(ctx context.Context, _client client.Client, req ctrl.Request) (g.DeploymentInfo, error) {
-// 	if
-// 	// deployment := v1.Deployment{}
-// 	// err := _client.Get(ctx, req.NamespacedName, &deployment)
-// 	// if err != nil {
-// 	// 	return v1.Deployment{}, err
-// 	// }
-// 	return g.DeploymentInfo{}, nil
+//DeploymentLister lists all deployments in a namespace
+func DeploymentItemLister(ctx context.Context, _client client.Client, namespace string, OptInLabel map[string]string) ([]g.DeploymentInfo, error) {
 
-// }
+	returnList := []g.DeploymentInfo{}
+	deployments := v1.DeploymentList{}
+	deploymentconfigs := ocv1.DeploymentConfigList{}
+	err := _client.List(ctx, &deployments, client.MatchingLabels(OptInLabel), client.InNamespace(namespace))
+	if err != nil {
+		return []g.DeploymentInfo{}, err
+	}
 
-// func GetDeployment(ctx context.Context, _client client.Client, req ctrl.Request) (g.DeploymentInfo, error) {
-// 	if
-// 	// deployment := v1.Deployment{}
-// 	// err := _client.Get(ctx, req.NamespacedName, &deployment)
-// 	// if err != nil {
-// 	// 	return v1.Deployment{}, err
-// 	// }
-// 	return g.DeploymentInfo{}, nil
+	if c.OpenshiftCluster {
+		err := _client.List(ctx, &deploymentconfigs, client.MatchingLabels(OptInLabel), client.InNamespace(namespace))
+		if err != nil {
+			return []g.DeploymentInfo{}, err
+		}
+	}
 
-// }
+	for _, deployment := range deployments.Items {
+		returnList = append(returnList, g.ConvertDeploymentToItem(deployment))
+	}
+
+	for _, deploymentConfig := range deploymentconfigs.Items {
+		returnList = append(returnList, g.ConvertDeploymentConfigToItem(deploymentConfig))
+	}
+
+	return returnList, nil
+
+}
 
 func UpdateDeploymentOrDeploymentConfig(ctx context.Context, _client client.Client, deploymentItem g.DeploymentInfo) error {
-	// deployment := v1.Deployment{}
-	// err := _client.Get(ctx, req.NamespacedName, &deployment)
-	// if err != nil {
-	// 	return v1.Deployment{}, err
-	// }
-	return nil
+	var req reconcile.Request
+	req.NamespacedName.Namespace = deploymentItem.Namespace
+	req.NamespacedName.Name = deploymentItem.Name
 
+	var updateErr error = nil
+	var getErr error = nil
+	deployment := v1.Deployment{}
+	deploymentConfig := ocv1.DeploymentConfig{}
+
+	if deploymentItem.IsDeploymentConfig {
+		deploymentConfig, getErr = DeploymentConfigGetter(ctx, _client, req)
+		if getErr != nil {
+			return getErr
+		}
+		deploymentConfig.Spec.Replicas = deploymentItem.SpecReplica
+		updateErr = _client.Update(ctx, &deploymentConfig, &client.UpdateOptions{})
+	} else {
+		deployment, getErr = DeploymentGetter(ctx, _client, req)
+		if getErr != nil {
+			return getErr
+		}
+		deployment.Spec.Replicas = &deploymentItem.SpecReplica
+		updateErr = _client.Update(ctx, &deployment, &client.UpdateOptions{})
+	}
+
+	return updateErr
 }
