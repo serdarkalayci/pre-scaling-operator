@@ -78,7 +78,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 				continue
 			}
 
-			err := resources.Scale(ctx, _client, deployment, scaleReplicalist[i], "NSSCALER")
+			err := resources.ScaleOrStepScale(ctx, _client, deployment, scaleReplicalist[i], "NSSCALER")
 
 			if err != nil {
 				log.Error(err, "Error scaling the deployment")
@@ -130,7 +130,7 @@ func ReconcileDeploymentOrDeploymentConfig(ctx context.Context, _client client.C
 					Info("Deployment is already being scaled at the moment. Updated desired replica count")
 			}
 		} else {
-			err = resources.Scale(ctx, _client, deploymentItem, stateReplica, "deployScaler")
+			err = resources.ScaleOrStepScale(ctx, _client, deploymentItem, stateReplica, "deployScaler")
 			if err != nil {
 				log.Error(err, "Error scaling the deployment")
 				return err

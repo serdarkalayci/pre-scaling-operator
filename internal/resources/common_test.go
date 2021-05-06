@@ -271,7 +271,7 @@ func TestScaler(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := Scaler(tt.args.ctx, tt.args._client, tt.args.deploymentItem, tt.args.replicas); (err != nil) != tt.wantErr {
+			if err := DoScaling(tt.args.ctx, tt.args._client, tt.args.deploymentItem, tt.args.replicas); (err != nil) != tt.wantErr {
 				t.Errorf("DeploymentScaler() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

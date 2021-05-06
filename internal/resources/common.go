@@ -29,8 +29,7 @@ func (err ScaleError) Error() string {
 	return err.msg
 }
 
-//DeploymentScaler scales the deploymentItem to the desired replica number
-func Scaler(ctx context.Context, _client client.Client, deploymentItem g.DeploymentInfo, replicas int32) error {
+func DoScaling(ctx context.Context, _client client.Client, deploymentItem g.DeploymentInfo, replicas int32) error {
 
 	if v, found := deploymentItem.Annotations["scaler/allow-autoscaling"]; found {
 		if v == "true" {
@@ -55,7 +54,12 @@ func Scaler(ctx context.Context, _client client.Client, deploymentItem g.Deploym
 
 			var updateErr error = nil
 			if !g.GetDenyList().IsDeploymentInFailureState(deploymentItem) {
-				//updateErr = _client.Update(ctx, &deploymentItem, &client.UpdateOptions{})
+				exists, labelErr := OptinLabel(deploymentItem)
+				if !exists || labelErr != nil {
+					return DeploymentScaleError{
+						msg: "Error scaling the Deployment! The deployment is opted out!",
+					}
+				}
 				updateErr = UpdateDeploymentOrDeploymentConfig(ctx, _client, deploymentItem)
 			} else {
 				return DeploymentScaleError{
@@ -150,7 +154,7 @@ func StateReplicasList(state states.State, deployments []g.DeploymentInfo) ([]sr
 	return stateReplicaList, err
 }
 
-func Scale(ctx context.Context, _client client.Client, deploymentItem g.DeploymentInfo, stateReplica sr.StateReplica, whereFrom string) error {
+func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem g.DeploymentInfo, stateReplica sr.StateReplica, whereFrom string) error {
 
 	log := ctrl.Log.
 		WithValues("deploymentItem", deploymentItem.Name).
@@ -225,7 +229,7 @@ func Scale(ctx context.Context, _client client.Client, deploymentItem g.Deployme
 				WithValues("Wherefrom: ", whereFrom).
 				Info("Step Scaling!")
 
-			retryErr = Scaler(ctx, _client, deploymentItem, stepReplicaCount)
+			retryErr = DoScaling(ctx, _client, deploymentItem, stepReplicaCount)
 
 			if retryErr != nil {
 				log.Error(retryErr, "Unable to scale the deploymentItem, err: %v")
@@ -259,7 +263,7 @@ func Scale(ctx context.Context, _client client.Client, deploymentItem g.Deployme
 		}
 	} else {
 		// Rapid scale. No Step Scale
-		retryErr = Scaler(ctx, _client, deploymentItem, desiredReplicaCount)
+		retryErr = DoScaling(ctx, _client, deploymentItem, desiredReplicaCount)
 
 		if retryErr != nil {
 			log.Error(retryErr, "Unable to scale the deploymentItem, err: %v")

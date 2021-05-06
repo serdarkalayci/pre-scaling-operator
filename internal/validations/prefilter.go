@@ -38,6 +38,11 @@ func PreFilter(r record.EventRecorder) predicate.Predicate {
 			if !newoptin {
 				if g.GetDenyList().IsInConcurrentList(item) {
 					// The deployment is being scaled at the moment! Notify scaler to abort.
+					log := ctrl.Log.
+						WithValues("Name", item.Name).
+						WithValues("Namespace", item.Namespace).
+						WithValues("NewOptIn", newoptin)
+					log.Info("The deployment has been opted out and is being scaled at the moment. Trying to intercept the step scaler to stop scaling!")
 					g.GetDenyList().SetDeploymentInfoOnList(item, true, "Opt-In is false!", -1)
 				}
 				return false
