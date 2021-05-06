@@ -157,6 +157,7 @@ func TestScaler(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "foo",
 							Namespace: "bar",
+							Labels:    map[string]string{"scaler/opt-in": "true"},
 						},
 						Spec:   v1.DeploymentSpec{},
 						Status: v1.DeploymentStatus{},
@@ -166,6 +167,7 @@ func TestScaler(t *testing.T) {
 					Name:        "foo",
 					Namespace:   "bar",
 					SpecReplica: 4,
+					Labels:      map[string]string{"scaler/opt-in": "true"},
 				},
 				deployment: v1.Deployment{
 					TypeMeta: metav1.TypeMeta{
@@ -196,6 +198,7 @@ func TestScaler(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "foo",
 							Namespace: "bar",
+							Labels:    map[string]string{"scaler/opt-in": "true"},
 						},
 						Spec:   v1.DeploymentSpec{},
 						Status: v1.DeploymentStatus{},
@@ -205,6 +208,7 @@ func TestScaler(t *testing.T) {
 					Name:        "bar",
 					Namespace:   "foo",
 					SpecReplica: 4,
+					Labels:      map[string]string{"scaler/opt-in": "true"},
 				},
 				deployment: v1.Deployment{
 					TypeMeta: metav1.TypeMeta{
@@ -214,6 +218,7 @@ func TestScaler(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "bar",
 						Namespace: "foo",
+						Labels:    map[string]string{"scaler/opt-in": "true"},
 					},
 					Spec:   v1.DeploymentSpec{},
 					Status: v1.DeploymentStatus{},
@@ -235,6 +240,7 @@ func TestScaler(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "foo",
 							Namespace: "bar",
+							Labels:    map[string]string{"scaler/opt-in": "true"},
 						},
 						Spec:   v1.DeploymentSpec{},
 						Status: v1.DeploymentStatus{},
@@ -246,6 +252,7 @@ func TestScaler(t *testing.T) {
 					Annotations:   map[string]string{"scaler/allow-autoscaling": "true"},
 					SpecReplica:   0,
 					ReadyReplicas: 5,
+					Labels:        map[string]string{"scaler/opt-in": "true"},
 				},
 				deployment: v1.Deployment{
 					TypeMeta: metav1.TypeMeta{
