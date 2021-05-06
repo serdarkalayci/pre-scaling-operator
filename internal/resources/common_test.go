@@ -12,10 +12,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 func TestLister(t *testing.T) {
@@ -28,7 +26,7 @@ func TestLister(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    v1.DeploymentList
+		want    []g.DeploymentInfo
 		wantErr bool
 	}{
 		{
@@ -39,14 +37,7 @@ func TestLister(t *testing.T) {
 				namespace:  "default",
 				OptInLabel: map[string]string{},
 			},
-			want: v1.DeploymentList{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "DeploymentList",
-					APIVersion: "apps/v1",
-				},
-				ListMeta: metav1.ListMeta{},
-				Items:    []v1.Deployment{},
-			},
+			want:    []g.DeploymentInfo{},
 			wantErr: false,
 		},
 	}
@@ -64,98 +55,89 @@ func TestLister(t *testing.T) {
 	}
 }
 
-// func TestGetter(t *testing.T) {
-// 	type args struct {
-// 		ctx     context.Context
-// 		_client client.Client
-// 		req     ctrl.Request
-// 	}
-// 	tests := []struct {
-// 		name    string
-// 		args    args
-// 		want    v1.Deployment
-// 		wantErr bool
-// 	}{
-// 		{
-// 			name: "TestGetter",
-// 			args: args{
-// 				ctx: context.TODO(),
-// 				_client: fake.NewClientBuilder().
-// 					WithObjects(&v1.Deployment{
-// 						TypeMeta: metav1.TypeMeta{
-// 							Kind:       "Deployment",
-// 							APIVersion: "apps/v1",
-// 						},
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "test",
-// 						},
-// 						Spec:   v1.DeploymentSpec{},
-// 						Status: v1.DeploymentStatus{},
-// 					}).
-// 					Build(),
-// 				req: reconcile.Request{
-// 					NamespacedName: types.NamespacedName{
-// 						Name: "test",
-// 					},
-// 				},
-// 			},
-// 			want: v1.Deployment{
-// 				TypeMeta: metav1.TypeMeta{
-// 					Kind:       "Deployment",
-// 					APIVersion: "apps/v1",
-// 				},
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name: "test",
-// 				},
-// 				Spec:   v1.DeploymentSpec{},
-// 				Status: v1.DeploymentStatus{},
-// 			},
-// 			wantErr: false,
-// 		},
-// 		{
-// 			name: "TestEmptyGetter",
-// 			args: args{
-// 				ctx: context.TODO(),
-// 				_client: fake.NewClientBuilder().
-// 					WithObjects(&v1.Deployment{
-// 						TypeMeta: metav1.TypeMeta{
-// 							Kind:       "Deployment",
-// 							APIVersion: "apps/v1",
-// 						},
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "test",
-// 						},
-// 						Spec:   v1.DeploymentSpec{},
-// 						Status: v1.DeploymentStatus{},
-// 					}).
-// 					Build(),
-// 				req: reconcile.Request{},
-// 			},
-// 			want:    v1.Deployment{},
-// 			wantErr: true,
-// 		},
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			got, err := GetDeploymentItem(tt.args.ctx, tt.args._client, tt.args.req)
-// 			if (err != nil) != tt.wantErr {
-// 				t.Errorf("DeploymentGetter() error = %v, wantErr %v", err, tt.wantErr)
-// 				return
-// 			}
-// 			if !reflect.DeepEqual(got, tt.want) {
-// 				t.Errorf("DeploymentGetter() = %v, want %v", got, tt.want)
-// 			}
-// 		})
-// 	}
-// }
+func TestGetter(t *testing.T) {
+	type args struct {
+		ctx     context.Context
+		_client client.Client
+		want    g.DeploymentInfo
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    g.DeploymentInfo
+		wantErr bool
+	}{
+		{
+			name: "TestGetter",
+			args: args{
+				ctx: context.TODO(),
+				_client: fake.NewClientBuilder().
+					WithObjects(&v1.Deployment{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       "Deployment",
+							APIVersion: "apps/v1",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "test",
+							Namespace: "bar",
+						},
+						Spec:   v1.DeploymentSpec{},
+						Status: v1.DeploymentStatus{},
+					}).
+					Build(),
+				want: g.DeploymentInfo{
+					Name:               "test",
+					Namespace:          "bar",
+					IsDeploymentConfig: false,
+					SpecReplica:        0,
+					ReadyReplicas:      0,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "TestEmptyGetter",
+			args: args{
+				ctx: context.TODO(),
+				_client: fake.NewClientBuilder().
+					WithObjects(&v1.Deployment{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       "Deployment",
+							APIVersion: "apps/v1",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "test",
+						},
+						Spec:   v1.DeploymentSpec{},
+						Status: v1.DeploymentStatus{},
+					}).
+					Build(),
+				want: g.DeploymentInfo{},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := GetDeploymentItem(tt.args.ctx, tt.args._client, tt.args.want)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DeploymentGetter() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.args.want) {
+				t.Errorf("DeploymentGetter() = %v, want %v", got, tt.args.want)
+			}
+		})
+	}
+}
 
 func TestScaler(t *testing.T) {
 	type args struct {
-		ctx        context.Context
-		_client    client.Client
-		deployment v1.Deployment
-		replicas   int32
-		req        reconcile.Request
+		ctx            context.Context
+		_client        client.Client
+		deploymentItem g.DeploymentInfo
+		deployment     v1.Deployment
+		replicas       int32
 	}
 	tests := []struct {
 		name    string
@@ -180,6 +162,11 @@ func TestScaler(t *testing.T) {
 						Status: v1.DeploymentStatus{},
 					}).
 					Build(),
+				deploymentItem: g.DeploymentInfo{
+					Name:        "foo",
+					Namespace:   "bar",
+					SpecReplica: 4,
+				},
 				deployment: v1.Deployment{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Deployment",
@@ -193,12 +180,6 @@ func TestScaler(t *testing.T) {
 					Status: v1.DeploymentStatus{},
 				},
 				replicas: 4,
-				req: reconcile.Request{
-					NamespacedName: types.NamespacedName{
-						Name:      "foo",
-						Namespace: "bar",
-					},
-				},
 			},
 			wantErr: false,
 		},
@@ -220,6 +201,11 @@ func TestScaler(t *testing.T) {
 						Status: v1.DeploymentStatus{},
 					}).
 					Build(),
+				deploymentItem: g.DeploymentInfo{
+					Name:        "bar",
+					Namespace:   "foo",
+					SpecReplica: 4,
+				},
 				deployment: v1.Deployment{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Deployment",
@@ -233,14 +219,8 @@ func TestScaler(t *testing.T) {
 					Status: v1.DeploymentStatus{},
 				},
 				replicas: 4,
-				req: reconcile.Request{
-					NamespacedName: types.NamespacedName{
-						Name:      "foo",
-						Namespace: "bar",
-					},
-				},
 			},
-			wantErr: false,
+			wantErr: true,
 		},
 		{
 			name: "TestAutoscaler",
@@ -260,6 +240,13 @@ func TestScaler(t *testing.T) {
 						Status: v1.DeploymentStatus{},
 					}).
 					Build(),
+				deploymentItem: g.DeploymentInfo{
+					Name:          "foo",
+					Namespace:     "bar",
+					Annotations:   map[string]string{"scaler/allow-autoscaling": "true"},
+					SpecReplica:   0,
+					ReadyReplicas: 5,
+				},
 				deployment: v1.Deployment{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Deployment",
@@ -278,19 +265,13 @@ func TestScaler(t *testing.T) {
 					},
 				},
 				replicas: 2,
-				req: reconcile.Request{
-					NamespacedName: types.NamespacedName{
-						Name:      "foo",
-						Namespace: "bar",
-					},
-				},
 			},
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := Scaler(tt.args.ctx, tt.args._client, g.ConvertDeploymentToItem(tt.args.deployment), tt.args.replicas); (err != nil) != tt.wantErr {
+			if err := Scaler(tt.args.ctx, tt.args._client, tt.args.deploymentItem, tt.args.replicas); (err != nil) != tt.wantErr {
 				t.Errorf("DeploymentScaler() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -379,129 +360,115 @@ func TestStateReplicas(t *testing.T) {
 	}
 }
 
-// func TestStateReplicasList(t *testing.T) {
-// 	type args struct {
-// 		state       states.State
-// 		deployments v1.DeploymentList
-// 	}
-// 	tests := []struct {
-// 		name    string
-// 		args    args
-// 		want    []sr.StateReplica
-// 		wantErr bool
-// 	}{
-// 		{
-// 			name: "TestOptedOutDeployment",
-// 			args: args{
-// 				state: states.State{
-// 					Name: "foo",
-// 				},
-// 				deployments: v1.DeploymentList{
-// 					TypeMeta: metav1.TypeMeta{},
-// 					ListMeta: metav1.ListMeta{},
-// 					Items: []v1.Deployment{
-// 						{
-// 							TypeMeta: metav1.TypeMeta{
-// 								Kind:       "Deployment",
-// 								APIVersion: "apps/v1",
-// 							},
-// 							ObjectMeta: metav1.ObjectMeta{
-// 								Name: "foo",
-// 								Labels: map[string]string{
-// 									"scaler/opt-in": "false",
-// 								},
-// 								Annotations: map[string]string{
-// 									"scaler/state-foo-replicas":     "2",
-// 									"scaler/state-default-replicas": "1",
-// 								},
-// 							},
-// 						},
-// 						{
-// 							TypeMeta: metav1.TypeMeta{
-// 								Kind:       "Deployment",
-// 								APIVersion: "apps/v1",
-// 							},
-// 							ObjectMeta: metav1.ObjectMeta{
-// 								Name: "bar",
-// 								Labels: map[string]string{
-// 									"scaler/opt-in": "false",
-// 								},
-// 								Annotations: map[string]string{
-// 									"scaler/state-foo-replicas":     "5",
-// 									"scaler/state-default-replicas": "3",
-// 								},
-// 							},
-// 						},
-// 					},
-// 				},
-// 			},
-// 			want: []sr.StateReplica{
-// 				{
-// 					Name:     "default",
-// 					Replicas: 1,
-// 				},
-// 				{
-// 					Name:     "default",
-// 					Replicas: 3,
-// 				},
-// 			},
-// 			wantErr: false,
-// 		},
-// 		{
-// 			name: "TestAbsentReplicaState",
-// 			args: args{
-// 				state: states.State{
-// 					Name: "foo",
-// 				},
-// 				deployments: v1.DeploymentList{
-// 					TypeMeta: metav1.TypeMeta{},
-// 					ListMeta: metav1.ListMeta{},
-// 					Items: []v1.Deployment{
-// 						{
-// 							TypeMeta: metav1.TypeMeta{
-// 								Kind:       "Deployment",
-// 								APIVersion: "apps/v1",
-// 							},
-// 							ObjectMeta: metav1.ObjectMeta{
-// 								Name: "foo",
-// 								Labels: map[string]string{
-// 									"scaler/opt-in": "false",
-// 								},
-// 							},
-// 						},
-// 						{
-// 							TypeMeta: metav1.TypeMeta{
-// 								Kind:       "Deployment",
-// 								APIVersion: "apps/v1",
-// 							},
-// 							ObjectMeta: metav1.ObjectMeta{
-// 								Name: "bar",
-// 								Labels: map[string]string{
-// 									"scaler/opt-in": "false",
-// 								},
-// 							},
-// 						},
-// 					},
-// 				},
-// 			},
-// 			want:    []sr.StateReplica{},
-// 			wantErr: true,
-// 		},
-// 	}
+func TestStateReplicasList(t *testing.T) {
+	type args struct {
+		state           states.State
+		deploymentItems []g.DeploymentInfo
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []sr.StateReplica
+		wantErr bool
+	}{
+		{
+			name: "TestOptedOutDeployment",
+			args: args{
+				state: states.State{
+					Name: "foo",
+				},
+				deploymentItems: []g.DeploymentInfo{
+					{
+						Name:      "foo",
+						Namespace: "bar",
+						Annotations: map[string]string{
+							"scaler/state-foo-replicas":     "2",
+							"scaler/state-default-replicas": "1"},
+						Labels:             map[string]string{"scaler/opt-in": "false"},
+						SpecReplica:        1,
+						IsDeploymentConfig: false,
+						Failure:            false,
+						FailureMessage:     "",
+						ReadyReplicas:      1,
+						DesiredReplicas:    2,
+					},
+					{
+						Name:      "foo2",
+						Namespace: "bar2",
+						Annotations: map[string]string{
+							"scaler/state-foo-replicas":     "5",
+							"scaler/state-default-replicas": "3"},
+						Labels:             map[string]string{"scaler/opt-in": "false"},
+						SpecReplica:        1,
+						IsDeploymentConfig: false,
+						Failure:            false,
+						FailureMessage:     "",
+						ReadyReplicas:      1,
+						DesiredReplicas:    2,
+					},
+				},
+			},
+			want: []sr.StateReplica{
+				{
+					Name:     "default",
+					Replicas: 1,
+				},
+				{
+					Name:     "default",
+					Replicas: 3,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "TestAbsentReplicaState",
+			args: args{
+				state: states.State{
+					Name: "foo",
+				},
+				deploymentItems: []g.DeploymentInfo{
+					{
+						Name:               "foo",
+						Namespace:          "bar",
+						Labels:             map[string]string{"scaler/opt-in": "false"},
+						SpecReplica:        1,
+						IsDeploymentConfig: false,
+						Failure:            false,
+						FailureMessage:     "",
+						ReadyReplicas:      1,
+						DesiredReplicas:    2,
+					},
+					{
+						Name:               "foo2",
+						Namespace:          "bar2",
+						Labels:             map[string]string{"scaler/opt-in": "false"},
+						SpecReplica:        1,
+						IsDeploymentConfig: false,
+						Failure:            false,
+						FailureMessage:     "",
+						ReadyReplicas:      1,
+						DesiredReplicas:    2,
+					},
+				},
+			},
+			want:    []sr.StateReplica{},
+			wantErr: true,
+		},
+	}
 
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			got, err := StateReplicasList(tt.args.state, tt.args.deployments)
-// 			if (err != nil) != tt.wantErr {
-// 				t.Errorf("StateReplicasList() error = %v, wantErr %v", err, tt.wantErr)
-// 				return
-// 			}
-// 			if !reflect.DeepEqual(got, tt.want) {
-// 				t.Errorf("DeploymentStateReplicasList() = %v, want %v", got, tt.want)
-// 			}
-// 		})
-// 	}
-// }
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := StateReplicasList(tt.args.state, tt.args.deploymentItems)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("StateReplicasList() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DeploymentStateReplicasList() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 
 func TestLimitsNeeded(t *testing.T) {
 	type args struct {
@@ -549,84 +516,50 @@ func TestLimitsNeeded(t *testing.T) {
 	}
 }
 
-// func TestLimitsNeededList(t *testing.T) {
-// 	type args struct {
-// 		deployments      v1.DeploymentList
-// 		scaleReplicalist []sr.StateReplica
-// 	}
-// 	tests := []struct {
-// 		name string
-// 		args args
-// 		want corev1.ResourceList
-// 	}{
-// 		{
-// 			name: "TestLimitsNeededList",
-// 			args: args{
-// 				deployments: v1.DeploymentList{
-// 					TypeMeta: metav1.TypeMeta{},
-// 					ListMeta: metav1.ListMeta{},
-// 					Items: []v1.Deployment{
-// 						{
-// 							Spec: v1.DeploymentSpec{
-// 								Replicas: new(int32),
-// 								Template: corev1.PodTemplateSpec{
-// 									ObjectMeta: metav1.ObjectMeta{},
-// 									Spec: corev1.PodSpec{
-// 										Containers: []corev1.Container{
-// 											{
-// 												Resources: corev1.ResourceRequirements{
-// 													Limits: map[corev1.ResourceName]resource.Quantity{},
-// 												},
-// 											},
-// 										},
-// 									},
-// 								},
-// 							},
-// 							Status: v1.DeploymentStatus{
-// 								Replicas: 3,
-// 							},
-// 						},
-// 						{
-// 							Spec: v1.DeploymentSpec{
-// 								Replicas: new(int32),
-// 								Template: corev1.PodTemplateSpec{
-// 									ObjectMeta: metav1.ObjectMeta{},
-// 									Spec: corev1.PodSpec{
-// 										Containers: []corev1.Container{
-// 											{
-// 												Resources: corev1.ResourceRequirements{
-// 													Limits: map[corev1.ResourceName]resource.Quantity{},
-// 												},
-// 											},
-// 										},
-// 									},
-// 								},
-// 							},
-// 							Status: v1.DeploymentStatus{
-// 								Replicas: 3,
-// 							},
-// 						},
-// 					},
-// 				},
-// 				scaleReplicalist: []sr.StateReplica{
-// 					{
-// 						Name:     "foo",
-// 						Replicas: 3,
-// 					},
-// 					{
-// 						Name:     "bar",
-// 						Replicas: 4,
-// 					},
-// 				},
-// 			},
-// 			want: map[corev1.ResourceName]resource.Quantity{},
-// 		},
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			if got := LimitsNeededList(tt.args.deployments, tt.args.scaleReplicalist); !reflect.DeepEqual(got, tt.want) {
-// 				t.Errorf("LimitsNeededDeploymentList() = %v, want %v", got, tt.want)
-// 			}
-// 		})
-// 	}
-// }
+func TestLimitsNeededList(t *testing.T) {
+	type args struct {
+		deploymentItems  []g.DeploymentInfo
+		scaleReplicalist []sr.StateReplica
+	}
+	tests := []struct {
+		name string
+		args args
+		want corev1.ResourceList
+	}{
+		{
+			name: "TestLimitsNeededList",
+			args: args{
+				deploymentItems: []g.DeploymentInfo{
+					{
+						Name:         "foo",
+						ResourceList: map[corev1.ResourceName]resource.Quantity{},
+						SpecReplica:  3,
+					},
+					{
+						Name:         "bar",
+						ResourceList: map[corev1.ResourceName]resource.Quantity{},
+						SpecReplica:  3,
+					},
+				},
+				scaleReplicalist: []sr.StateReplica{
+					{
+						Name:     "foo",
+						Replicas: 3,
+					},
+					{
+						Name:     "bar",
+						Replicas: 4,
+					},
+				},
+			},
+			want: map[corev1.ResourceName]resource.Quantity{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := LimitsNeededList(tt.args.deploymentItems, tt.args.scaleReplicalist); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("LimitsNeededDeploymentList() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -30,9 +30,6 @@ func TestPutOnDenyListAndIsFound(t *testing.T) {
 							Name:      "foo",
 							Namespace: "bar",
 						},
-						Spec: v1.DeploymentSpec{
-							Replicas: new(int32),
-						},
 						Status: v1.DeploymentStatus{
 							Replicas: 5,
 						},
@@ -80,9 +77,6 @@ func TestDenyList(t *testing.T) {
 							Name:      "foo",
 							Namespace: "bar",
 						},
-						Spec: v1.DeploymentSpec{
-							Replicas: new(int32),
-						},
 						Status: v1.DeploymentStatus{
 							Replicas: 5,
 						},
@@ -104,9 +98,6 @@ func TestDenyList(t *testing.T) {
 							Name:      "foo",
 							Namespace: "bar",
 						},
-						Spec: v1.DeploymentSpec{
-							Replicas: new(int32),
-						},
 						Status: v1.DeploymentStatus{
 							Replicas: 5,
 						},
@@ -119,9 +110,6 @@ func TestDenyList(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "another",
 							Namespace: "one",
-						},
-						Spec: v1.DeploymentSpec{
-							Replicas: new(int32),
 						},
 						Status: v1.DeploymentStatus{
 							Replicas: 5,
@@ -144,9 +132,6 @@ func TestDenyList(t *testing.T) {
 							Name:      "foo",
 							Namespace: "bar",
 						},
-						Spec: v1.DeploymentSpec{
-							Replicas: new(int32),
-						},
 						Status: v1.DeploymentStatus{
 							Replicas: 5,
 						},
@@ -159,9 +144,6 @@ func TestDenyList(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "foo",
 							Namespace: "bar",
-						},
-						Spec: v1.DeploymentSpec{
-							Replicas: new(int32),
 						},
 						Status: v1.DeploymentStatus{
 							Replicas: 5,

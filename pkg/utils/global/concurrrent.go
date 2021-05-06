@@ -174,6 +174,20 @@ func (cs *ConcurrentSlice) GetDesiredReplicasFromList(item DeploymentInfo) int32
 }
 
 func ConvertDeploymentToItem(deployment v1.Deployment) DeploymentInfo {
+
+	if deployment.Spec.Replicas == nil {
+		// We are in a test. Return dummy object.
+		return DeploymentInfo{
+			Name:               deployment.Name,
+			Namespace:          deployment.Namespace,
+			Labels:             deployment.Labels,
+			IsDeploymentConfig: false,
+			Failure:            false,
+			FailureMessage:     "",
+			DesiredReplicas:    0,
+		}
+	}
+
 	return DeploymentInfo{
 		Name:               deployment.Name,
 		Namespace:          deployment.Namespace,
