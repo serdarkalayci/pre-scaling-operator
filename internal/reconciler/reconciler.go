@@ -37,7 +37,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 	// We now need to look for objects (currently supported deployments and deploymentConfigs) which are opted in,
 	// then use their annotations to determine the correct scale
-	deployments, err := resources.DeploymentItemLister(ctx, _client, namespace, c.OptInLabel)
+	deployments, err := resources.ScalingItemLister(ctx, _client, namespace, c.OptInLabel)
 	if err != nil {
 		log.Error(err, "Cannot list deployments in namespace")
 		return nsEvents, finalState.Name, err
@@ -74,7 +74,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 					continue
 				}
 				if deploymentItem.DesiredReplicas != scaleReplicalist[i].Replicas {
-					g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, scaleReplicalist[i].Replicas)
+					g.GetDenyList().SetScalingItemOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, scaleReplicalist[i].Replicas)
 
 					log.WithValues("Name: ", deploymentItem.Name).
 						WithValues("Namespace: ", deploymentItem.Namespace).
@@ -105,18 +105,18 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	return nsEvents, finalState.Name, err
 }
 
-func ReconcileDeploymentOrDeploymentConfig(ctx context.Context, _client client.Client, deploymentItem g.DeploymentInfo, state states.State, forceReconcile bool) error {
+func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingItem g.ScalingInfo, state states.State, forceReconcile bool) error {
 	log := ctrl.Log.
-		WithValues("deploymentItem", deploymentItem.Name).
-		WithValues("namespace", deploymentItem.Namespace)
+		WithValues("deploymentItem", scalingItem.Name).
+		WithValues("namespace", scalingItem.Namespace)
 
-	stateReplica, err := resources.StateReplicas(state, deploymentItem)
+	stateReplica, err := resources.StateReplicas(state, scalingItem)
 	if err != nil {
 		log.Error(err, "Error getting the state replicas")
 		return err
 	}
 
-	allowed, err := quotas.ResourceQuotaCheck(ctx, deploymentItem.Namespace, resources.LimitsNeeded(deploymentItem, stateReplica.Replicas))
+	allowed, err := quotas.ResourceQuotaCheck(ctx, scalingItem.Namespace, resources.LimitsNeeded(scalingItem, stateReplica.Replicas))
 	if err != nil {
 		log.Error(err, "Cannot calculate the resource quotas")
 		return err
@@ -127,11 +127,11 @@ func ReconcileDeploymentOrDeploymentConfig(ctx context.Context, _client client.C
 	log.Info("Quota Check")
 
 	if allowed {
-		deploymentItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(deploymentItem)
+		deploymentItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(scalingItem)
 
-		if notFoundErr == nil && !forceReconcile{
-			if forceReconcile{
-				
+		if notFoundErr == nil && !forceReconcile {
+			if forceReconcile {
+
 			}
 			if deploymentItem.Failure {
 				log.WithValues("Deployment: ", deploymentItem.Name).
@@ -143,7 +143,7 @@ func ReconcileDeploymentOrDeploymentConfig(ctx context.Context, _client client.C
 				return nil
 			}
 			if deploymentItem.DesiredReplicas != stateReplica.Replicas {
-				g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, stateReplica.Replicas)
+				g.GetDenyList().SetScalingItemOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, stateReplica.Replicas)
 
 				log.WithValues("Deployment: ", deploymentItem.Name).
 					WithValues("Namespace: ", deploymentItem.Namespace).

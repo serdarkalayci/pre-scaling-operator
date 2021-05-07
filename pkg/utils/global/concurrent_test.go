@@ -190,17 +190,17 @@ func TestDenyList(t *testing.T) {
 }
 
 func TestAddDuplicateAndPurge(t *testing.T) {
-	deploymentItem := DeploymentInfo{
+	deploymentItem := ScalingInfo{
 		Name:      "foo",
 		Namespace: "bar",
 	}
 
-	deploymentItemDuplicate := DeploymentInfo{
+	deploymentItemDuplicate := ScalingInfo{
 		Name:      "foo",
 		Namespace: "bar",
 	}
 
-	secondDeploymentItem := DeploymentInfo{
+	secondDeploymentItem := ScalingInfo{
 		Name:      "woop",
 		Namespace: "wob",
 	}
@@ -221,25 +221,25 @@ func TestAddDuplicateAndPurge(t *testing.T) {
 }
 
 func TestAddFiveAndDeleteMutiple(t *testing.T) {
-	deploymentItem := DeploymentInfo{
+	deploymentItem := ScalingInfo{
 		Name:      "first",
 		Namespace: "bar",
 	}
-	secondDeploymentItem := DeploymentInfo{
+	secondDeploymentItem := ScalingInfo{
 		Name:      "second",
 		Namespace: "wob",
 	}
 
-	thirdDeploymentItem := DeploymentInfo{
+	thirdDeploymentItem := ScalingInfo{
 		Name:      "third",
 		Namespace: "woooob",
 	}
 
-	fourthdeploymentItem := DeploymentInfo{
+	fourthdeploymentItem := ScalingInfo{
 		Name:      "fourth",
 		Namespace: "baaar",
 	}
-	fithDeploymentItem := DeploymentInfo{
+	fithDeploymentItem := ScalingInfo{
 		Name:      "fifth",
 		Namespace: "wfob",
 	}
@@ -303,12 +303,12 @@ func TestAddFiveAndDeleteMutiple(t *testing.T) {
 }
 
 func TestIsInList(t *testing.T) {
-	theItemInList := DeploymentInfo{
+	theItemInList := ScalingInfo{
 		Name:      "foo",
 		Namespace: "bar",
 	}
 
-	someOther := DeploymentInfo{
+	someOther := ScalingInfo{
 		Name:      "some",
 		Namespace: "other",
 	}
@@ -331,12 +331,12 @@ func TestIsInList(t *testing.T) {
 }
 
 func TestUpdateAndAppend(t *testing.T) {
-	theItemInList := DeploymentInfo{
+	theItemInList := ScalingInfo{
 		Name:      "foo",
 		Namespace: "bar",
 	}
 
-	theUpdateItem := DeploymentInfo{
+	theUpdateItem := ScalingInfo{
 		Name:            "foo",
 		Namespace:       "bar",
 		Failure:         true,
@@ -368,18 +368,18 @@ func TestUpdateAndAppend(t *testing.T) {
 }
 
 func TestUpdateItemInList(t *testing.T) {
-	theItemInList := DeploymentInfo{
+	theItemInList := ScalingInfo{
 		Name:      "foo",
 		Namespace: "bar",
 	}
 
-	notInList := DeploymentInfo{
+	notInList := ScalingInfo{
 		Name:      "not",
 		Namespace: "there",
 	}
 
 	GetDenyList().UpdateOrAppend(theItemInList)
-	GetDenyList().SetDeploymentInfoOnList(theItemInList, true, "A failure", 2)
+	GetDenyList().SetScalingItemOnList(theItemInList, true, "A failure", 2)
 	// Check if it updated and didn't add a new one to the list
 	if GetDenyList().Length() != 1 {
 		t.Errorf("! Got  %v, Want %v", GetDenyList().Length(), 1)

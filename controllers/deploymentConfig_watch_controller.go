@@ -81,7 +81,7 @@ func (r *DeploymentConfigWatcher) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	// After we have the deploymentconfig and state data, we are ready to reconcile the deploymentconfig
-	err = reconciler.ReconcileDeploymentOrDeploymentConfig(ctx, r.Client, deploymentItem, finalState, false)
+	err = reconciler.ReconcileScalingItem(ctx, r.Client, deploymentItem, finalState, false)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

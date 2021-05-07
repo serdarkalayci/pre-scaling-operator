@@ -12,9 +12,9 @@ import (
 func RectifyDeploymentsInFailureState(client client.Client) {
 
 	log := ctrl.Log
-	var failureList []g.DeploymentInfo
+	var failureList []g.ScalingInfo
 	for _, deployment := range failureList {
-		err := ReconcileDeploymentOrDeploymentConfig(context.TODO(), client, deployment, states.State{}, true)
+		err := ReconcileScalingItem(context.TODO(), client, deployment, states.State{}, true)
 		if err != nil {
 			log.WithValues("Deployment", deployment.Name).
 				WithValues("Namespace", deployment.Namespace).

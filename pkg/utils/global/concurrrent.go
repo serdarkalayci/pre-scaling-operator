@@ -8,7 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-type DeploymentInfo struct {
+type ScalingInfo struct {
 	Namespace          string
 	Name               string
 	Annotations        map[string]string
@@ -33,14 +33,14 @@ var reconcileList *ConcurrentSlice
 // ConcurrentSlice type that can be safely shared between goroutines
 type ConcurrentSlice struct {
 	sync.RWMutex
-	items []DeploymentInfo
+	items []ScalingInfo
 }
 
 // ConcurrentSliceItem contains the index/value pair of an item in a
 // concurrent slice
 type ConcurrentSliceItem struct {
 	Index int
-	Value DeploymentInfo
+	Value ScalingInfo
 }
 
 func GetReconcileList() *ConcurrentSlice {
@@ -62,14 +62,14 @@ func GetDenyList() *ConcurrentSlice {
 // NewConcurrentSlice creates a new concurrent slice
 func NewConcurrentSlice() *ConcurrentSlice {
 	cs := &ConcurrentSlice{
-		items: make([]DeploymentInfo, 0),
+		items: make([]ScalingInfo, 0),
 	}
 
 	denylist = cs
 	return cs
 }
 
-func (cs *ConcurrentSlice) UpdateOrAppend(item DeploymentInfo) {
+func (cs *ConcurrentSlice) UpdateOrAppend(item ScalingInfo) {
 	if cs.IsInConcurrentList(item) {
 		cs.RemoveFromList(item)
 
@@ -104,7 +104,7 @@ func (cs *ConcurrentSlice) Iter() <-chan ConcurrentSliceItem {
 	return c
 }
 
-func (cs *ConcurrentSlice) RemoveFromList(item DeploymentInfo) {
+func (cs *ConcurrentSlice) RemoveFromList(item ScalingInfo) {
 	i := 0
 	for inList := range cs.Iter() {
 		if item.Name == inList.Value.Name && item.Namespace == inList.Value.Namespace {
@@ -129,11 +129,11 @@ func (cs *ConcurrentSlice) Length() int {
 	return i
 }
 
-func RemoveIndex(s []DeploymentInfo, index int) []DeploymentInfo {
+func RemoveIndex(s []ScalingInfo, index int) []ScalingInfo {
 	return append(s[:index], s[index+1:]...)
 }
 
-func (cs *ConcurrentSlice) IsInConcurrentList(item DeploymentInfo) bool {
+func (cs *ConcurrentSlice) IsInConcurrentList(item ScalingInfo) bool {
 	result := false
 	for inList := range cs.Iter() {
 		if item.Name == inList.Value.Name && item.Namespace == inList.Value.Namespace {
@@ -143,7 +143,7 @@ func (cs *ConcurrentSlice) IsInConcurrentList(item DeploymentInfo) bool {
 	return result
 }
 
-func (cs *ConcurrentSlice) IsBeingScaled(item DeploymentInfo) bool {
+func (cs *ConcurrentSlice) IsBeingScaled(item ScalingInfo) bool {
 	result := false
 	for inList := range cs.Iter() {
 		if item.Name == inList.Value.Name && item.Namespace == inList.Value.Namespace && inList.Value.IsBeingScaled {
@@ -153,15 +153,15 @@ func (cs *ConcurrentSlice) IsBeingScaled(item DeploymentInfo) bool {
 	return result
 }
 
-func (cs *ConcurrentSlice) SetDeploymentInfoOnList(item DeploymentInfo, failure bool, failureMessage string, desiredReplicas int32) {
+func (cs *ConcurrentSlice) SetScalingItemOnList(item ScalingInfo, failure bool, failureMessage string, desiredReplicas int32) {
 	item.Failure = failure
 	item.FailureMessage = failureMessage
 	item.DesiredReplicas = desiredReplicas
 	cs.UpdateOrAppend(item)
 }
 
-func (cs *ConcurrentSlice) GetDeploymentInfoFromList(item DeploymentInfo) (DeploymentInfo, error) {
-	result := DeploymentInfo{}
+func (cs *ConcurrentSlice) GetDeploymentInfoFromList(item ScalingInfo) (ScalingInfo, error) {
+	result := ScalingInfo{}
 	for inList := range cs.Iter() {
 		if item.Name == inList.Value.Name && item.Namespace == inList.Value.Namespace {
 			result = inList.Value
@@ -177,17 +177,17 @@ func (cs *ConcurrentSlice) GetDeploymentInfoFromList(item DeploymentInfo) (Deplo
 	}
 }
 
-func (cs *ConcurrentSlice) IsDeploymentInFailureState(item DeploymentInfo) bool {
+func (cs *ConcurrentSlice) IsDeploymentInFailureState(item ScalingInfo) bool {
 	itemToReturn, _ := cs.GetDeploymentInfoFromList(item)
 	return itemToReturn.Failure
 }
 
-func (cs *ConcurrentSlice) GetDesiredReplicasFromList(item DeploymentInfo) int32 {
+func (cs *ConcurrentSlice) GetDesiredReplicasFromList(item ScalingInfo) int32 {
 	itemToReturn, _ := cs.GetDeploymentInfoFromList(item)
 	return itemToReturn.DesiredReplicas
 }
 
-func ConvertDeploymentToItem(deployment v1.Deployment) DeploymentInfo {
+func ConvertDeploymentToItem(deployment v1.Deployment) ScalingInfo {
 
 	// In some cases containers[] and conditions are empty[] that would lead to nullpointer exceptions.
 	var conditionReason = ""
@@ -202,7 +202,7 @@ func ConvertDeploymentToItem(deployment v1.Deployment) DeploymentInfo {
 		resourceList = deployment.Spec.Template.Spec.Containers[0].Resources.Limits
 	}
 
-	return DeploymentInfo{
+	return ScalingInfo{
 		Name:               deployment.Name,
 		Namespace:          deployment.Namespace,
 		Annotations:        deployment.Annotations,
@@ -218,8 +218,8 @@ func ConvertDeploymentToItem(deployment v1.Deployment) DeploymentInfo {
 	}
 }
 
-func ConvertDeploymentConfigToItem(deploymentConfig ocv1.DeploymentConfig) DeploymentInfo {
-	return DeploymentInfo{
+func ConvertDeploymentConfigToItem(deploymentConfig ocv1.DeploymentConfig) ScalingInfo {
+	return ScalingInfo{
 		Name:               deploymentConfig.Name,
 		Namespace:          deploymentConfig.Namespace,
 		Annotations:        deploymentConfig.Annotations,

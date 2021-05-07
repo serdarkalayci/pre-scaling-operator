@@ -26,7 +26,7 @@ func TestLister(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    []g.DeploymentInfo
+		want    []g.ScalingInfo
 		wantErr bool
 	}{
 		{
@@ -37,13 +37,13 @@ func TestLister(t *testing.T) {
 				namespace:  "default",
 				OptInLabel: map[string]string{},
 			},
-			want:    []g.DeploymentInfo{},
+			want:    []g.ScalingInfo{},
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := DeploymentItemLister(tt.args.ctx, tt.args._client, tt.args.namespace, tt.args.OptInLabel)
+			got, err := ScalingItemLister(tt.args.ctx, tt.args._client, tt.args.namespace, tt.args.OptInLabel)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DeploymentLister() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -59,12 +59,12 @@ func TestGetter(t *testing.T) {
 	type args struct {
 		ctx     context.Context
 		_client client.Client
-		want    g.DeploymentInfo
+		want    g.ScalingInfo
 	}
 	tests := []struct {
 		name    string
 		args    args
-		want    g.DeploymentInfo
+		want    g.ScalingInfo
 		wantErr bool
 	}{
 		{
@@ -87,7 +87,7 @@ func TestGetter(t *testing.T) {
 						Status: v1.DeploymentStatus{},
 					}).
 					Build(),
-				want: g.DeploymentInfo{
+				want: g.ScalingInfo{
 					Name:               "test",
 					Namespace:          "bar",
 					IsDeploymentConfig: false,
@@ -118,20 +118,20 @@ func TestGetter(t *testing.T) {
 						Status: v1.DeploymentStatus{},
 					}).
 					Build(),
-				want: g.DeploymentInfo{},
+				want: g.ScalingInfo{},
 			},
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetDeploymentItem(tt.args.ctx, tt.args._client, tt.args.want)
+			got, err := GetScalingItem(tt.args.ctx, tt.args._client, tt.args.want)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("DeploymentGetter() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ScalingItemGetter() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.args.want) {
-				t.Errorf("DeploymentGetter() = %v, want %v", got, tt.args.want)
+				t.Errorf("ScalingItemGetter() = %v, want %v", got, tt.args.want)
 			}
 		})
 	}
@@ -139,11 +139,11 @@ func TestGetter(t *testing.T) {
 
 func TestScaler(t *testing.T) {
 	type args struct {
-		ctx            context.Context
-		_client        client.Client
-		deploymentItem g.DeploymentInfo
-		deployment     v1.Deployment
-		replicas       int32
+		ctx         context.Context
+		_client     client.Client
+		scalingItem g.ScalingInfo
+		deployment  v1.Deployment
+		replicas    int32
 	}
 	tests := []struct {
 		name    string
@@ -171,7 +171,7 @@ func TestScaler(t *testing.T) {
 						Status: v1.DeploymentStatus{},
 					}).
 					Build(),
-				deploymentItem: g.DeploymentInfo{
+				scalingItem: g.ScalingInfo{
 					Name:        "foo",
 					Namespace:   "bar",
 					SpecReplica: 4,
@@ -216,7 +216,7 @@ func TestScaler(t *testing.T) {
 						Status: v1.DeploymentStatus{},
 					}).
 					Build(),
-				deploymentItem: g.DeploymentInfo{
+				scalingItem: g.ScalingInfo{
 					Name:        "bar",
 					Namespace:   "foo",
 					SpecReplica: 4,
@@ -262,7 +262,7 @@ func TestScaler(t *testing.T) {
 						Status: v1.DeploymentStatus{},
 					}).
 					Build(),
-				deploymentItem: g.DeploymentInfo{
+				scalingItem: g.ScalingInfo{
 					Name:          "foo",
 					Namespace:     "bar",
 					Annotations:   map[string]string{"scaler/allow-autoscaling": "true"},
@@ -294,8 +294,8 @@ func TestScaler(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := DoScaling(tt.args.ctx, tt.args._client, tt.args.deploymentItem, tt.args.replicas); (err != nil) != tt.wantErr {
-				t.Errorf("DeploymentScaler() error = %v, wantErr %v", err, tt.wantErr)
+			if err := DoScaling(tt.args.ctx, tt.args._client, tt.args.scalingItem, tt.args.replicas); (err != nil) != tt.wantErr {
+				t.Errorf("Scaler() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -346,7 +346,7 @@ func TestOptinLabel(t *testing.T) {
 func TestStateReplicas(t *testing.T) {
 	type args struct {
 		state          states.State
-		deploymentItem g.DeploymentInfo
+		deploymentItem g.ScalingInfo
 	}
 	tests := []struct {
 		name    string
@@ -360,7 +360,7 @@ func TestStateReplicas(t *testing.T) {
 				state: states.State{
 					Name: "foo",
 				},
-				deploymentItem: g.DeploymentInfo{
+				deploymentItem: g.ScalingInfo{
 					Name:        "foo",
 					Namespace:   "bar",
 					Annotations: map[string]string{},
@@ -387,7 +387,7 @@ func TestStateReplicas(t *testing.T) {
 func TestStateReplicasList(t *testing.T) {
 	type args struct {
 		state           states.State
-		deploymentItems []g.DeploymentInfo
+		deploymentItems []g.ScalingInfo
 	}
 	tests := []struct {
 		name    string
@@ -401,7 +401,7 @@ func TestStateReplicasList(t *testing.T) {
 				state: states.State{
 					Name: "foo",
 				},
-				deploymentItems: []g.DeploymentInfo{
+				deploymentItems: []g.ScalingInfo{
 					{
 						Name:      "foo",
 						Namespace: "bar",
@@ -450,7 +450,7 @@ func TestStateReplicasList(t *testing.T) {
 				state: states.State{
 					Name: "foo",
 				},
-				deploymentItems: []g.DeploymentInfo{
+				deploymentItems: []g.ScalingInfo{
 					{
 						Name:               "foo",
 						Namespace:          "bar",
@@ -542,7 +542,7 @@ func TestLimitsNeeded(t *testing.T) {
 
 func TestLimitsNeededList(t *testing.T) {
 	type args struct {
-		deploymentItems  []g.DeploymentInfo
+		deploymentItems  []g.ScalingInfo
 		scaleReplicalist []sr.StateReplica
 	}
 	tests := []struct {
@@ -553,7 +553,7 @@ func TestLimitsNeededList(t *testing.T) {
 		{
 			name: "TestLimitsNeededList",
 			args: args{
-				deploymentItems: []g.DeploymentInfo{
+				deploymentItems: []g.ScalingInfo{
 					{
 						Name:         "foo",
 						ResourceList: map[corev1.ResourceName]resource.Quantity{},

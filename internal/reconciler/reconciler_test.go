@@ -94,7 +94,7 @@ func TestReconcileDeployment(t *testing.T) {
 	type args struct {
 		ctx            context.Context
 		_client        client.Client
-		deploymentItem g.DeploymentInfo
+		deploymentItem g.ScalingInfo
 		state          states.State
 		optIn          bool
 	}
@@ -114,7 +114,7 @@ func TestReconcileDeployment(t *testing.T) {
 					NewClientBuilder().
 					WithScheme(scheme.Scheme).
 					Build(),
-				deploymentItem: g.DeploymentInfo{
+				deploymentItem: g.ScalingInfo{
 					Name:               "foo",
 					Namespace:          "bar",
 					Annotations:        map[string]string{},
@@ -136,7 +136,7 @@ func TestReconcileDeployment(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := ReconcileDeploymentOrDeploymentConfig(tt.args.ctx, tt.args._client, tt.args.deploymentItem, tt.args.state, false); (err != nil) != tt.wantErr {
+			if err := ReconcileScalingItem(tt.args.ctx, tt.args._client, tt.args.deploymentItem, tt.args.state, false); (err != nil) != tt.wantErr {
 				t.Errorf("ReconcileDeployment() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -310,7 +310,7 @@ func TestReconcileDeploymentConfig(t *testing.T) {
 	type args struct {
 		ctx            context.Context
 		_client        client.Client
-		deploymentItem g.DeploymentInfo
+		deploymentItem g.ScalingInfo
 		state          states.State
 		optIn          bool
 	}
@@ -330,7 +330,7 @@ func TestReconcileDeploymentConfig(t *testing.T) {
 					NewClientBuilder().
 					WithScheme(scheme.Scheme).
 					Build(),
-				deploymentItem: g.DeploymentInfo{
+				deploymentItem: g.ScalingInfo{
 					Name:               "foo",
 					Namespace:          "bar",
 					Annotations:        map[string]string{},
@@ -352,7 +352,7 @@ func TestReconcileDeploymentConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := ReconcileDeploymentOrDeploymentConfig(tt.args.ctx, tt.args._client, tt.args.deploymentItem, tt.args.state, false); (err != nil) != tt.wantErr {
+			if err := ReconcileScalingItem(tt.args.ctx, tt.args._client, tt.args.deploymentItem, tt.args.state, false); (err != nil) != tt.wantErr {
 				t.Errorf("ReconcileDeploymentConfig() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
