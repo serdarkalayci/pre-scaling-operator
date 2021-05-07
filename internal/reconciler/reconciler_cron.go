@@ -9,28 +9,42 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func RectifyDeploymentsInFailureState(client client.Client) {
+func RectifyDeploymentsInFailureState(client client.Client) error {
 
 	log := ctrl.Log
-	var failureList []g.ScalingInfo
-	for _, deployment := range failureList {
-		err := ReconcileScalingItem(context.TODO(), client, deployment, states.State{}, true)
+	for inList := range g.GetDenyList().IterOverItemsInFailureState() {
+		item := inList.Value
+
+		stateDefinitions, stateDefErr := states.GetClusterScalingStates(context.TODO(), client)
+		if stateDefErr != nil {
+			log.Error(stateDefErr, "Failed to get ClusterStateDefinitions")
+			return stateDefErr
+		}
+
+		// We need to calculate the desired state before we try to reconcile the deployment
+		finalState, stateErr := GetAppliedState(context.TODO(), client, item.Namespace, stateDefinitions, states.State{})
+		if stateErr != nil {
+			return stateErr
+		}
+
+		err := ReconcileScalingItem(context.TODO(), client, item, finalState, true)
 		if err != nil {
-			log.WithValues("Deployment", deployment.Name).
-				WithValues("Namespace", deployment.Namespace).
-				WithValues("IsDeploymentConfig", deployment.IsDeploymentConfig).
-				WithValues("Failure", deployment.Failure).
-				WithValues("Failuremessage", deployment.FailureMessage).
-				WithValues("DesiredReplicas", deployment.DesiredReplicas).
-				Error(err, "Failed to rectify the Failure state for the deployment!")
+			log.WithValues("Deployment", item.Name).
+				WithValues("Namespace", item.Namespace).
+				WithValues("IsDeploymentConfig", item.IsDeploymentConfig).
+				WithValues("Failure", item.Failure).
+				WithValues("Failuremessage", item.FailureMessage).
+				WithValues("DesiredReplicas", item.DesiredReplicas).
+				Error(err, "Failed to rectify the Failure state for the ScalingItem!")
 		} else {
-			log.WithValues("Deployment", deployment.Name).
-				WithValues("Namespace", deployment.Namespace).
-				WithValues("IsDeploymentConfig", deployment.IsDeploymentConfig).
-				WithValues("Failure", deployment.Failure).
-				WithValues("Failuremessage", deployment.FailureMessage).
-				WithValues("DesiredReplicas", deployment.DesiredReplicas).
-				Info("Successfully rectified the failing deployment!")
+			log.WithValues("Deployment", item.Name).
+				WithValues("Namespace", item.Namespace).
+				WithValues("IsDeploymentConfig", item.IsDeploymentConfig).
+				WithValues("Failure", item.Failure).
+				WithValues("Failuremessage", item.FailureMessage).
+				WithValues("DesiredReplicas", item.DesiredReplicas).
+				Info("Successfully rectified the failing ScalingItem!")
 		}
 	}
+	return nil
 }

@@ -114,6 +114,24 @@ func (cs *ConcurrentSlice) RemoveFromList(item ScalingInfo) {
 	}
 }
 
+func (cs *ConcurrentSlice) IterOverItemsInFailureState() <-chan ConcurrentSliceItem {
+	c := make(chan ConcurrentSliceItem)
+
+	f := func() {
+		cs.Lock()
+		defer cs.Unlock()
+		for index, value := range cs.items {
+			if value.Failure {
+				c <- ConcurrentSliceItem{index, value}
+			}
+		}
+		close(c)
+	}
+	go f()
+
+	return c
+}
+
 func (cs *ConcurrentSlice) PurgeList() {
 	for range cs.Iter() {
 		cs.items = RemoveIndex(cs.items, 0)
@@ -219,6 +237,19 @@ func ConvertDeploymentToItem(deployment v1.Deployment) ScalingInfo {
 }
 
 func ConvertDeploymentConfigToItem(deploymentConfig ocv1.DeploymentConfig) ScalingInfo {
+
+	// In some cases containers[] and conditions are empty[] that would lead to nullpointer exceptions.
+	var conditionReason = ""
+	if len(deploymentConfig.Status.Conditions) != 0 {
+		// get the latest condition reason in case there is one.
+		conditionReason = deploymentConfig.Status.Conditions[len(deploymentConfig.Status.Conditions)-1].Reason
+	}
+
+	var resourceList corev1.ResourceList = corev1.ResourceList{}
+	if len(deploymentConfig.Spec.Template.Spec.Containers) != 0 {
+		// get the latest condition reason in case there is one.
+		resourceList = deploymentConfig.Spec.Template.Spec.Containers[0].Resources.Limits
+	}
 	return ScalingInfo{
 		Name:               deploymentConfig.Name,
 		Namespace:          deploymentConfig.Namespace,
@@ -230,6 +261,7 @@ func ConvertDeploymentConfigToItem(deploymentConfig ocv1.DeploymentConfig) Scali
 		SpecReplica:        deploymentConfig.Spec.Replicas,
 		ReadyReplicas:      deploymentConfig.Status.AvailableReplicas,
 		DesiredReplicas:    -1,
-		ResourceList:       deploymentConfig.Spec.Template.Spec.Containers[0].Resources.Limits,
+		ResourceList:       resourceList,
+		ConditionReason:    conditionReason,
 	}
 }

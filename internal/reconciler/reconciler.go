@@ -130,9 +130,6 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 		deploymentItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(scalingItem)
 
 		if notFoundErr == nil && !forceReconcile {
-			if forceReconcile {
-
-			}
 			if deploymentItem.Failure {
 				log.WithValues("Deployment: ", deploymentItem.Name).
 					WithValues("Namespace: ", deploymentItem.Namespace).
@@ -142,17 +139,21 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 					Info("Deployment is in failure state! Not going to scale")
 				return nil
 			}
-			if deploymentItem.DesiredReplicas != stateReplica.Replicas {
-				g.GetDenyList().SetScalingItemOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, stateReplica.Replicas)
-
-				log.WithValues("Deployment: ", deploymentItem.Name).
-					WithValues("Namespace: ", deploymentItem.Namespace).
-					WithValues("DesiredReplicaount: ", deploymentItem.DesiredReplicas).
-					WithValues("Failure: ", deploymentItem.Failure).
-					WithValues("Failure message: ", deploymentItem.FailureMessage).
-					Info("Deployment is already being scaled at the moment. Updated desired replica count")
-			}
 		} else {
+			if g.GetDenyList().IsBeingScaled(deploymentItem) {
+				if deploymentItem.DesiredReplicas != stateReplica.Replicas {
+					g.GetDenyList().SetScalingItemOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, stateReplica.Replicas)
+
+					log.WithValues("Deployment: ", deploymentItem.Name).
+						WithValues("Namespace: ", deploymentItem.Namespace).
+						WithValues("DesiredReplicaount: ", deploymentItem.DesiredReplicas).
+						WithValues("Failure: ", deploymentItem.Failure).
+						WithValues("Failure message: ", deploymentItem.FailureMessage).
+						Info("Deployment is already being scaled at the moment. Updated desired replica count")
+				}
+				return nil
+			}
+
 			err = resources.ScaleOrStepScale(ctx, _client, deploymentItem, stateReplica, "deployScaler")
 			if err != nil {
 				log.Error(err, "Error scaling the deployment")

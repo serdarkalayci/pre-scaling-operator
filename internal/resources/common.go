@@ -211,7 +211,7 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 			if retryErr != nil {
 				log.Error(retryErr, "Unable to scale the deploymentItem, err: %v")
 				deploymentItem.IsBeingScaled = false
-				g.GetDenyList().SetScalingItemOnList(deploymentItem, true, "To many update atempts failed! Going into failure state.", stateReplica.Replicas)
+				g.GetDenyList().SetScalingItemOnList(deploymentItem, true, "To many update attempts failed! Going into failure state.", stateReplica.Replicas)
 				return retryErr
 			}
 

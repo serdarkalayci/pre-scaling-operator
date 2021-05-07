@@ -22,11 +22,13 @@ import (
 
 	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/validations"
+	"github.com/jasonlvhit/gocron"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	r "github.com/containersol/prescale-operator/internal/reconciler"
 	dc "github.com/openshift/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -37,8 +39,6 @@ import (
 
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
 	"github.com/containersol/prescale-operator/controllers"
-	r "github.com/containersol/prescale-operator/internal/reconciler"
-	"github.com/jasonlvhit/gocron"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -147,12 +147,12 @@ func main() {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
 	}
-
+	gocron.Every(1).Minute().Do(r.RectifyDeploymentsInFailureState, mgr.GetClient())
+	//gocron.Start()
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
 
-	gocron.Every(1).Minute().Do(r.RectifyDeploymentsInFailureState, mgr.GetClient())
 }
