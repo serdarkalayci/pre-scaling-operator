@@ -5,18 +5,28 @@ import (
 
 	ocv1 "github.com/openshift/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 type DeploymentInfo struct {
-	Namespace       string
-	Name            string
-	Failure         bool
-	FailureMessage  string
-	DesiredReplicas int
+	Namespace          string
+	Name               string
+	Annotations        map[string]string
+	Labels             map[string]string
+	IsDeploymentConfig bool
+	Failure            bool
+	FailureMessage     string
+	SpecReplica        int32
+	ReadyReplicas      int32
+	DesiredReplicas    int32
+	ResourceList       corev1.ResourceList
 }
 
 // Global DenyList to check if the deployment is currently reconciles/step scaled
 var denylist *ConcurrentSlice
+
+// Global ReconcileList hold deployment/deploymenconfig information to make reconcile decisions
+var reconcileList *ConcurrentSlice
 
 // ConcurrentSlice type that can be safely shared between goroutines
 type ConcurrentSlice struct {
@@ -29,6 +39,14 @@ type ConcurrentSlice struct {
 type ConcurrentSliceItem struct {
 	Index int
 	Value DeploymentInfo
+}
+
+func GetReconcileList() *ConcurrentSlice {
+	if reconcileList == nil {
+		reconcileList = NewConcurrentSlice()
+		return reconcileList
+	}
+	return reconcileList
 }
 
 func GetDenyList() *ConcurrentSlice {
@@ -50,8 +68,8 @@ func NewConcurrentSlice() *ConcurrentSlice {
 }
 
 func (cs *ConcurrentSlice) UpdateOrAppend(item DeploymentInfo) {
-	if cs.IsInConcurrentDenyList(item) {
-		cs.RemoveFromDenyList(item)
+	if cs.IsInConcurrentList(item) {
+		cs.RemoveFromList(item)
 
 		cs.Lock()
 		defer cs.Unlock()
@@ -84,7 +102,7 @@ func (cs *ConcurrentSlice) Iter() <-chan ConcurrentSliceItem {
 	return c
 }
 
-func (cs *ConcurrentSlice) RemoveFromDenyList(item DeploymentInfo) {
+func (cs *ConcurrentSlice) RemoveFromList(item DeploymentInfo) {
 	i := 0
 	for inList := range cs.Iter() {
 		if item.Name == inList.Value.Name && item.Namespace == inList.Value.Namespace {
@@ -94,7 +112,7 @@ func (cs *ConcurrentSlice) RemoveFromDenyList(item DeploymentInfo) {
 	}
 }
 
-func (cs *ConcurrentSlice) PurgeDenyList() {
+func (cs *ConcurrentSlice) PurgeList() {
 	for range cs.Iter() {
 		cs.items = RemoveIndex(cs.items, 0)
 	}
@@ -113,7 +131,7 @@ func RemoveIndex(s []DeploymentInfo, index int) []DeploymentInfo {
 	return append(s[:index], s[index+1:]...)
 }
 
-func (cs *ConcurrentSlice) IsInConcurrentDenyList(item DeploymentInfo) bool {
+func (cs *ConcurrentSlice) IsInConcurrentList(item DeploymentInfo) bool {
 	result := false
 	for inList := range cs.Iter() {
 		if item.Name == inList.Value.Name && item.Namespace == inList.Value.Namespace {
@@ -123,14 +141,14 @@ func (cs *ConcurrentSlice) IsInConcurrentDenyList(item DeploymentInfo) bool {
 	return result
 }
 
-func (cs *ConcurrentSlice) SetDeploymentInfoOnDenyList(item DeploymentInfo, failure bool, failureMessage string, desiredReplicas int) {
+func (cs *ConcurrentSlice) SetDeploymentInfoOnList(item DeploymentInfo, failure bool, failureMessage string, desiredReplicas int32) {
 	item.Failure = failure
 	item.FailureMessage = failureMessage
 	item.DesiredReplicas = desiredReplicas
 	cs.UpdateOrAppend(item)
 }
 
-func (cs *ConcurrentSlice) GetDeploymentInfoFromDenyList(item DeploymentInfo) (DeploymentInfo, error) {
+func (cs *ConcurrentSlice) GetDeploymentInfoFromList(item DeploymentInfo) (DeploymentInfo, error) {
 	result := DeploymentInfo{}
 	for inList := range cs.Iter() {
 		if item.Name == inList.Value.Name && item.Namespace == inList.Value.Namespace {
@@ -146,31 +164,57 @@ func (cs *ConcurrentSlice) GetDeploymentInfoFromDenyList(item DeploymentInfo) (D
 }
 
 func (cs *ConcurrentSlice) IsDeploymentInFailureState(item DeploymentInfo) bool {
-	itemToReturn, _ := cs.GetDeploymentInfoFromDenyList(item)
+	itemToReturn, _ := cs.GetDeploymentInfoFromList(item)
 	return itemToReturn.Failure
 }
 
-func (cs *ConcurrentSlice) GetDesiredReplicasFromDenyList(item DeploymentInfo) int {
-	itemToReturn, _ := cs.GetDeploymentInfoFromDenyList(item)
+func (cs *ConcurrentSlice) GetDesiredReplicasFromList(item DeploymentInfo) int32 {
+	itemToReturn, _ := cs.GetDeploymentInfoFromList(item)
 	return itemToReturn.DesiredReplicas
 }
 
 func ConvertDeploymentToItem(deployment v1.Deployment) DeploymentInfo {
+
+	if deployment.Spec.Replicas == nil {
+		// We are in a test. Return dummy object.
+		return DeploymentInfo{
+			Name:               deployment.Name,
+			Namespace:          deployment.Namespace,
+			Labels:             deployment.Labels,
+			IsDeploymentConfig: false,
+			Failure:            false,
+			FailureMessage:     "",
+			DesiredReplicas:    0,
+		}
+	}
+
 	return DeploymentInfo{
-		Name:            deployment.Name,
-		Namespace:       deployment.Namespace,
-		Failure:         false,
-		FailureMessage:  "",
-		DesiredReplicas: -1,
+		Name:               deployment.Name,
+		Namespace:          deployment.Namespace,
+		Annotations:        deployment.Annotations,
+		Labels:             deployment.Labels,
+		IsDeploymentConfig: false,
+		Failure:            false,
+		FailureMessage:     "",
+		SpecReplica:        *deployment.Spec.Replicas,
+		ReadyReplicas:      deployment.Status.AvailableReplicas,
+		DesiredReplicas:    -1,
+		ResourceList:       deployment.Spec.Template.Spec.Containers[0].Resources.Limits,
 	}
 }
 
-func ConvertDeploymentConfigToItem(deploymentconfig ocv1.DeploymentConfig) DeploymentInfo {
+func ConvertDeploymentConfigToItem(deploymentConfig ocv1.DeploymentConfig) DeploymentInfo {
 	return DeploymentInfo{
-		Name:            deploymentconfig.Name,
-		Namespace:       deploymentconfig.Namespace,
-		Failure:         false,
-		FailureMessage:  "",
-		DesiredReplicas: -1,
+		Name:               deploymentConfig.Name,
+		Namespace:          deploymentConfig.Namespace,
+		Annotations:        deploymentConfig.Annotations,
+		Labels:             deploymentConfig.Labels,
+		IsDeploymentConfig: true,
+		Failure:            false,
+		FailureMessage:     "",
+		SpecReplica:        deploymentConfig.Spec.Replicas,
+		ReadyReplicas:      deploymentConfig.Status.AvailableReplicas,
+		DesiredReplicas:    -1,
+		ResourceList:       deploymentConfig.Spec.Template.Spec.Containers[0].Resources.Limits,
 	}
 }

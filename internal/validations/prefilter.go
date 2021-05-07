@@ -35,10 +35,15 @@ func PreFilter(r record.EventRecorder) predicate.Predicate {
 			}
 
 			// Deployment opted out. Don't do anything
-			if !newoptin  {
-				if g.GetDenyList().IsInConcurrentDenyList(item) {
+			if !newoptin {
+				if g.GetDenyList().IsInConcurrentList(item) {
 					// The deployment is being scaled at the moment! Notify scaler to abort.
-					g.GetDenyList().SetDeploymentInfoOnDenyList(item, true, "Opt-In is false!", -1)
+					log := ctrl.Log.
+						WithValues("Name", item.Name).
+						WithValues("Namespace", item.Namespace).
+						WithValues("NewOptIn", newoptin)
+					log.Info("The deployment has been opted out and is being scaled at the moment. Trying to intercept the step scaler to stop scaling!")
+					g.GetDenyList().SetDeploymentInfoOnList(item, true, "Opt-In is false!", -1)
 				}
 				return false
 			}
@@ -50,7 +55,7 @@ func PreFilter(r record.EventRecorder) predicate.Predicate {
 			//stepScaleActive := AssessStepScaleAnnotation(e)
 
 			// Don't reconcile on any change except when Annotation may have changed while the deployment was on the deny list.
-			if g.GetDenyList().IsInConcurrentDenyList(item) && !annotationchange {
+			if g.GetDenyList().IsInConcurrentList(item) && !annotationchange {
 				return false
 			}
 

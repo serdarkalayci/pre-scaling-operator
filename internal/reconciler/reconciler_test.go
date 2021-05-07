@@ -7,8 +7,7 @@ import (
 
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
 	"github.com/containersol/prescale-operator/internal/states"
-	ocv1 "github.com/openshift/api/apps/v1"
-	v1 "k8s.io/api/apps/v1"
+	g "github.com/containersol/prescale-operator/pkg/utils/global"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -93,11 +92,11 @@ func TestReconcileNamespace(t *testing.T) {
 
 func TestReconcileDeployment(t *testing.T) {
 	type args struct {
-		ctx        context.Context
-		_client    client.Client
-		deployment v1.Deployment
-		state      states.State
-		optIn      bool
+		ctx            context.Context
+		_client        client.Client
+		deploymentItem g.DeploymentInfo
+		state          states.State
+		optIn          bool
 	}
 
 	_ = scalingv1alpha1.AddToScheme(scheme.Scheme)
@@ -115,17 +114,17 @@ func TestReconcileDeployment(t *testing.T) {
 					NewClientBuilder().
 					WithScheme(scheme.Scheme).
 					Build(),
-				deployment: v1.Deployment{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "Deployment",
-						APIVersion: "apps/v1",
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Labels:      map[string]string{"scaler/opt-in": "false"},
-						Annotations: map[string]string{},
-					},
-					Spec:   v1.DeploymentSpec{},
-					Status: v1.DeploymentStatus{},
+				deploymentItem: g.DeploymentInfo{
+					Name:               "foo",
+					Namespace:          "bar",
+					Annotations:        map[string]string{},
+					Labels:             map[string]string{"scaler/opt-in": "false"},
+					SpecReplica:        2,
+					IsDeploymentConfig: false,
+					Failure:            false,
+					FailureMessage:     "",
+					ReadyReplicas:      2,
+					DesiredReplicas:    4,
 				},
 				state: states.State{
 					Name: "peak",
@@ -137,7 +136,7 @@ func TestReconcileDeployment(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := ReconcileDeployment(tt.args.ctx, tt.args._client, tt.args.deployment, tt.args.state); (err != nil) != tt.wantErr {
+			if err := ReconcileDeploymentOrDeploymentConfig(tt.args.ctx, tt.args._client, tt.args.deploymentItem, tt.args.state); (err != nil) != tt.wantErr {
 				t.Errorf("ReconcileDeployment() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -309,11 +308,11 @@ func Test_fetchClusterState(t *testing.T) {
 
 func TestReconcileDeploymentConfig(t *testing.T) {
 	type args struct {
-		ctx              context.Context
-		_client          client.Client
-		deploymentConfig ocv1.DeploymentConfig
-		state            states.State
-		optIn            bool
+		ctx            context.Context
+		_client        client.Client
+		deploymentItem g.DeploymentInfo
+		state          states.State
+		optIn          bool
 	}
 
 	_ = scalingv1alpha1.AddToScheme(scheme.Scheme)
@@ -331,17 +330,17 @@ func TestReconcileDeploymentConfig(t *testing.T) {
 					NewClientBuilder().
 					WithScheme(scheme.Scheme).
 					Build(),
-				deploymentConfig: ocv1.DeploymentConfig{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "DeploymentConfig",
-						APIVersion: "apps.openshift.io/v1",
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Labels:      map[string]string{"scaler/opt-in": "false"},
-						Annotations: map[string]string{},
-					},
-					Spec:   ocv1.DeploymentConfigSpec{},
-					Status: ocv1.DeploymentConfigStatus{},
+				deploymentItem: g.DeploymentInfo{
+					Name:               "foo",
+					Namespace:          "bar",
+					Annotations:        map[string]string{},
+					Labels:             map[string]string{"scaler/opt-in": "false"},
+					SpecReplica:        2,
+					IsDeploymentConfig: true,
+					Failure:            false,
+					FailureMessage:     "",
+					ReadyReplicas:      2,
+					DesiredReplicas:    4,
 				},
 				state: states.State{
 					Name: "peak",
@@ -353,7 +352,7 @@ func TestReconcileDeploymentConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := ReconcileDeploymentConfig(tt.args.ctx, tt.args._client, tt.args.deploymentConfig, tt.args.state); (err != nil) != tt.wantErr {
+			if err := ReconcileDeploymentOrDeploymentConfig(tt.args.ctx, tt.args._client, tt.args.deploymentItem, tt.args.state); (err != nil) != tt.wantErr {
 				t.Errorf("ReconcileDeploymentConfig() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
