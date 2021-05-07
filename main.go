@@ -37,6 +37,8 @@ import (
 
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
 	"github.com/containersol/prescale-operator/controllers"
+	r "github.com/containersol/prescale-operator/internal/reconciler"
+	"github.com/jasonlvhit/gocron"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -151,4 +153,6 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+
+	gocron.Every(1).Minute().Do(r.RectifyDeploymentsInFailureState, mgr.GetClient())
 }

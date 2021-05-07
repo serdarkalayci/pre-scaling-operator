@@ -14,6 +14,7 @@ type DeploymentInfo struct {
 	Annotations        map[string]string
 	Labels             map[string]string
 	IsDeploymentConfig bool
+	IsBeingScaled      bool
 	Failure            bool
 	FailureMessage     string
 	SpecReplica        int32
@@ -136,6 +137,16 @@ func (cs *ConcurrentSlice) IsInConcurrentList(item DeploymentInfo) bool {
 	result := false
 	for inList := range cs.Iter() {
 		if item.Name == inList.Value.Name && item.Namespace == inList.Value.Namespace {
+			result = true
+		}
+	}
+	return result
+}
+
+func (cs *ConcurrentSlice) IsBeingScaled(item DeploymentInfo) bool {
+	result := false
+	for inList := range cs.Iter() {
+		if item.Name == inList.Value.Name && item.Namespace == inList.Value.Namespace && inList.Value.IsBeingScaled {
 			result = true
 		}
 	}

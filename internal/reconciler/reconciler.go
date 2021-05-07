@@ -105,7 +105,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	return nsEvents, finalState.Name, err
 }
 
-func ReconcileDeploymentOrDeploymentConfig(ctx context.Context, _client client.Client, deploymentItem g.DeploymentInfo, state states.State) error {
+func ReconcileDeploymentOrDeploymentConfig(ctx context.Context, _client client.Client, deploymentItem g.DeploymentInfo, state states.State, forceReconcile bool) error {
 	log := ctrl.Log.
 		WithValues("deploymentItem", deploymentItem.Name).
 		WithValues("namespace", deploymentItem.Namespace)
@@ -128,7 +128,11 @@ func ReconcileDeploymentOrDeploymentConfig(ctx context.Context, _client client.C
 
 	if allowed {
 		deploymentItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(deploymentItem)
-		if notFoundErr == nil {
+
+		if notFoundErr == nil && !forceReconcile{
+			if forceReconcile{
+				
+			}
 			if deploymentItem.Failure {
 				log.WithValues("Deployment: ", deploymentItem.Name).
 					WithValues("Namespace: ", deploymentItem.Namespace).

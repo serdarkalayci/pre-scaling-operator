@@ -175,6 +175,7 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 	var retryErr error = nil
 	rateLimitingEnabled := states.GetStepScaleSetting(ctx, _client)
 	log.Info("Putting deploymentItem on denylist")
+	deploymentItem.IsBeingScaled = true
 	g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, false, "", desiredReplicaCount)
 	if rateLimitingEnabled {
 		log.WithValues("Deployment: ", deploymentItem.Name).
@@ -209,6 +210,7 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 
 			if retryErr != nil {
 				log.Error(retryErr, "Unable to scale the deploymentItem, err: %v")
+				deploymentItem.IsBeingScaled = false
 				g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, true, "To many update atempts failed! Going into failure state.", stateReplica.Replicas)
 				return retryErr
 			}
@@ -229,6 +231,7 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 					stay = false
 				}
 				if deploymentItem.ConditionReason == "ProgressDeadlineExceeded" {
+					deploymentItem.IsBeingScaled = false
 					g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, true, "ProgressDeadlineExceeded", desiredReplicaCount)
 					return ScaleError{
 						msg: "The deployment is in a failing state on the cluster! ProgressDeadlineExceeded!",
@@ -247,6 +250,7 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 
 		if retryErr != nil {
 			log.Error(retryErr, "Unable to scale the deploymentItem, err: %v")
+			deploymentItem.IsBeingScaled = false
 			g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, true, "To many update atempts failed! Going into failure state.", stateReplica.Replicas)
 			return retryErr
 		}

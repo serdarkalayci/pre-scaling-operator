@@ -5,6 +5,7 @@ go 1.15
 require (
 	github.com/go-delve/delve v1.6.0 // indirect
 	github.com/go-logr/logr v0.3.0
+	github.com/jasonlvhit/gocron v0.0.1
 	github.com/onsi/ginkgo v1.15.2
 	github.com/onsi/gomega v1.10.2
 	github.com/openshift/api v3.9.0+incompatible
