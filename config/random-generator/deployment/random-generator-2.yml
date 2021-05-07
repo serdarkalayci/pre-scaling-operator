@@ -10,6 +10,7 @@ metadata:
     app: random-generator-2
     scaler/opt-in: "false"
 spec:
+  progressDeadlineSeconds: 20
   selector:
     matchLabels:
       app: random-generator-2

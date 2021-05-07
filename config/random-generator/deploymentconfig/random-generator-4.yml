@@ -10,6 +10,7 @@ metadata:
     deployment-config.name: random-generator-4
     scaler/opt-in: "true"
 spec:
+  progressDeadlineSeconds: 20
   replicas: 1
   selector:
     deployment-config.name: random-generator-4

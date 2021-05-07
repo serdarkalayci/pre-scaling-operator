@@ -81,7 +81,9 @@ func TestGetter(t *testing.T) {
 							Name:      "test",
 							Namespace: "bar",
 						},
-						Spec:   v1.DeploymentSpec{},
+						Spec: v1.DeploymentSpec{
+							Replicas: new(int32),
+						},
 						Status: v1.DeploymentStatus{},
 					}).
 					Build(),
@@ -91,6 +93,8 @@ func TestGetter(t *testing.T) {
 					IsDeploymentConfig: false,
 					SpecReplica:        0,
 					ReadyReplicas:      0,
+					DesiredReplicas:    -1,
+					ResourceList:       corev1.ResourceList{},
 				},
 			},
 			wantErr: false,
@@ -108,7 +112,9 @@ func TestGetter(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "test",
 						},
-						Spec:   v1.DeploymentSpec{},
+						Spec: v1.DeploymentSpec{
+							Replicas: new(int32),
+						},
 						Status: v1.DeploymentStatus{},
 					}).
 					Build(),
@@ -159,7 +165,9 @@ func TestScaler(t *testing.T) {
 							Namespace: "bar",
 							Labels:    map[string]string{"scaler/opt-in": "true"},
 						},
-						Spec:   v1.DeploymentSpec{},
+						Spec: v1.DeploymentSpec{
+							Replicas: new(int32),
+						},
 						Status: v1.DeploymentStatus{},
 					}).
 					Build(),
@@ -178,7 +186,9 @@ func TestScaler(t *testing.T) {
 						Name:      "foo",
 						Namespace: "bar",
 					},
-					Spec:   v1.DeploymentSpec{},
+					Spec: v1.DeploymentSpec{
+						Replicas: new(int32),
+					},
 					Status: v1.DeploymentStatus{},
 				},
 				replicas: 4,
@@ -200,7 +210,9 @@ func TestScaler(t *testing.T) {
 							Namespace: "bar",
 							Labels:    map[string]string{"scaler/opt-in": "true"},
 						},
-						Spec:   v1.DeploymentSpec{},
+						Spec: v1.DeploymentSpec{
+							Replicas: new(int32),
+						},
 						Status: v1.DeploymentStatus{},
 					}).
 					Build(),
@@ -220,7 +232,9 @@ func TestScaler(t *testing.T) {
 						Namespace: "foo",
 						Labels:    map[string]string{"scaler/opt-in": "true"},
 					},
-					Spec:   v1.DeploymentSpec{},
+					Spec: v1.DeploymentSpec{
+						Replicas: new(int32),
+					},
 					Status: v1.DeploymentStatus{},
 				},
 				replicas: 4,
@@ -242,7 +256,9 @@ func TestScaler(t *testing.T) {
 							Namespace: "bar",
 							Labels:    map[string]string{"scaler/opt-in": "true"},
 						},
-						Spec:   v1.DeploymentSpec{},
+						Spec: v1.DeploymentSpec{
+							Replicas: new(int32),
+						},
 						Status: v1.DeploymentStatus{},
 					}).
 					Build(),
@@ -303,7 +319,9 @@ func TestOptinLabel(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{},
 					},
-					Spec:   v1.DeploymentSpec{},
+					Spec: v1.DeploymentSpec{
+						Replicas: new(int32),
+					},
 					Status: v1.DeploymentStatus{},
 				},
 			},
@@ -327,8 +345,8 @@ func TestOptinLabel(t *testing.T) {
 
 func TestStateReplicas(t *testing.T) {
 	type args struct {
-		state      states.State
-		deployment v1.Deployment
+		state          states.State
+		deploymentItem g.DeploymentInfo
 	}
 	tests := []struct {
 		name    string
@@ -342,11 +360,10 @@ func TestStateReplicas(t *testing.T) {
 				state: states.State{
 					Name: "foo",
 				},
-				deployment: v1.Deployment{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "Deployment",
-						APIVersion: "apps/v1",
-					},
+				deploymentItem: g.DeploymentInfo{
+					Name:        "foo",
+					Namespace:   "bar",
+					Annotations: map[string]string{},
 				},
 			},
 			want:    sr.StateReplica{},
@@ -355,7 +372,7 @@ func TestStateReplicas(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := StateReplicas(tt.args.state, g.ConvertDeploymentToItem(tt.args.deployment))
+			got, err := StateReplicas(tt.args.state, tt.args.deploymentItem)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DeploymentStateReplicas() error = %v, wantErr %v", err, tt.wantErr)
 				return

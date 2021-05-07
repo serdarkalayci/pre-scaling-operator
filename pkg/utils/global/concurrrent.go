@@ -20,6 +20,7 @@ type DeploymentInfo struct {
 	ReadyReplicas      int32
 	DesiredReplicas    int32
 	ResourceList       corev1.ResourceList
+	ConditionReason    string
 }
 
 // Global DenyList to check if the deployment is currently reconciles/step scaled
@@ -175,17 +176,17 @@ func (cs *ConcurrentSlice) GetDesiredReplicasFromList(item DeploymentInfo) int32
 
 func ConvertDeploymentToItem(deployment v1.Deployment) DeploymentInfo {
 
-	if deployment.Spec.Replicas == nil {
-		// We are in a test. Return dummy object.
-		return DeploymentInfo{
-			Name:               deployment.Name,
-			Namespace:          deployment.Namespace,
-			Labels:             deployment.Labels,
-			IsDeploymentConfig: false,
-			Failure:            false,
-			FailureMessage:     "",
-			DesiredReplicas:    0,
-		}
+	// In some cases containers[] and conditions are empty[] that would lead to nullpointer exceptions.
+	var conditionReason = ""
+	if len(deployment.Status.Conditions) != 0 {
+		// get the latest condition reason in case there is one.
+		conditionReason = deployment.Status.Conditions[len(deployment.Status.Conditions)-1].Reason
+	}
+
+	var resourceList corev1.ResourceList = corev1.ResourceList{}
+	if len(deployment.Spec.Template.Spec.Containers) != 0 {
+		// get the latest condition reason in case there is one.
+		resourceList = deployment.Spec.Template.Spec.Containers[0].Resources.Limits
 	}
 
 	return DeploymentInfo{
@@ -199,7 +200,8 @@ func ConvertDeploymentToItem(deployment v1.Deployment) DeploymentInfo {
 		SpecReplica:        *deployment.Spec.Replicas,
 		ReadyReplicas:      deployment.Status.AvailableReplicas,
 		DesiredReplicas:    -1,
-		ResourceList:       deployment.Spec.Template.Spec.Containers[0].Resources.Limits,
+		ResourceList:       resourceList,
+		ConditionReason:    conditionReason,
 	}
 }
 

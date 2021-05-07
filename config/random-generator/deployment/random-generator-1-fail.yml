@@ -19,11 +19,11 @@ spec:
       labels:
         app: random-generator-1
     spec:
-      progressDeadlineSeconds: 20
+      progressDeadlineSeconds: 5
       containers:
         - name: random-generator
           imagePullPolicy: Always
-          image: chriscmsoft/random-generator:latest
+          image: chriscmsoft/random-generator:xxx
           resources:
             requests:
               cpu: "60m"

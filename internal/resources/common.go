@@ -161,34 +161,10 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 		WithValues("namespace", deploymentItem.Namespace)
 	var err error
 
-	if g.GetDenyList().IsInConcurrentList(deploymentItem) {
-		log.Info("Waiting for the deploymentItem to be off the denylist.")
-		for stay, timeout := true, time.After(time.Second*120); stay; {
-			select {
-			case <-timeout:
-				log.Info("Timeout reached! The deploymentItem stayed on the denylist for too long. Couldn't reconcile this deploymentItem!")
-				return nil
-			default:
-				time.Sleep(time.Second * 10)
-				if !g.GetDenyList().IsInConcurrentList(deploymentItem) {
-					// Refresh deploymentItem to get a new object to reconcile
-
-					deploymentItem, err = GetDeploymentItem(ctx, _client, deploymentItem)
-					if err != nil {
-						log.Error(err, "Deployment waited to be out of denylist but couldn't get a refreshed object to Reconcile.")
-						return nil
-					}
-					stay = false
-				}
-			}
-		}
-	}
-
 	var oldReplicaCount int32
 	oldReplicaCount = deploymentItem.SpecReplica
 	desiredReplicaCount := stateReplica.Replicas
 
-	// This might not be necessary anymore
 	if oldReplicaCount == stateReplica.Replicas {
 		log.Info("No Update on deploymentItem. Desired replica count already matches current.")
 		return nil
@@ -233,25 +209,29 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 
 			if retryErr != nil {
 				log.Error(retryErr, "Unable to scale the deploymentItem, err: %v")
-				g.GetDenyList().RemoveFromList(deploymentItem)
+				g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, true, "To many update atempts failed! Going into failure state.", stateReplica.Replicas)
 				return retryErr
 			}
 
 			// Wait until deploymentItem is ready for the next step
-			for stay, timeout := true, time.After(time.Second*60); stay; {
-				select {
-				case <-timeout:
+			for stay := true; stay; {
+
+				time.Sleep(time.Second * 5)
+				deploymentItem, err = GetDeploymentItem(ctx, _client, deploymentItem)
+				if err != nil {
+					log.Error(err, "Error getting refreshed deploymentItem in wait for Readiness loop")
+					// The deployment does not exist anymore. Not putting it in failure state.
+					g.GetDenyList().RemoveFromList(deploymentItem)
+					return err
+				}
+
+				if deploymentItem.ReadyReplicas == stepReplicaCount {
 					stay = false
-				default:
-					time.Sleep(time.Second * 5)
-					deploymentItem, err = GetDeploymentItem(ctx, _client, deploymentItem)
-					if err != nil {
-						log.Error(err, "Error getting refreshed deploymentItem in wait for Readiness loop")
-						g.GetDenyList().RemoveFromList(deploymentItem)
-						return err
-					}
-					if deploymentItem.ReadyReplicas == stepReplicaCount {
-						stay = false
+				}
+				if deploymentItem.ConditionReason == "ProgressDeadlineExceeded" {
+					g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, true, "ProgressDeadlineExceeded", desiredReplicaCount)
+					return ScaleError{
+						msg: "The deployment is in a failing state on the cluster! ProgressDeadlineExceeded!",
 					}
 				}
 			}
@@ -267,7 +247,7 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 
 		if retryErr != nil {
 			log.Error(retryErr, "Unable to scale the deploymentItem, err: %v")
-			g.GetDenyList().RemoveFromList(deploymentItem)
+			g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, true, "To many update atempts failed! Going into failure state.", stateReplica.Replicas)
 			return retryErr
 		}
 	}
