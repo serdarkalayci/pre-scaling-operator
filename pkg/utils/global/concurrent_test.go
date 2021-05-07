@@ -401,10 +401,8 @@ func TestUpdateItemInList(t *testing.T) {
 		t.Errorf("! Got  %v, Want %v", desiredReplicas, 2)
 	}
 
-	item, err := GetDenyList().GetDeploymentInfoFromList(notInList)
-	if item.Name != "" || item.Namespace != "" {
-		t.Errorf("! Got  %v, Want %v", "", item.Name)
-	}
+	_, err := GetDenyList().GetDeploymentInfoFromList(notInList)
+
 	if err == nil {
 		t.Errorf("! Got  %v, Want %v", err, nil)
 	}

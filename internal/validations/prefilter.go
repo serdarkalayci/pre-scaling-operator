@@ -91,6 +91,16 @@ func PreFilter(r record.EventRecorder) predicate.Predicate {
 			return newoptin
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
+			// The deployment got deleted. Regardless of the failure state, we need to delete the item from the list.
+			item := g.DeploymentInfo{
+				Name:      e.Object.GetName(),
+				Namespace: e.Object.GetNamespace(),
+			}
+
+			if g.GetDenyList().IsInConcurrentList(item) {
+				g.GetDenyList().RemoveFromList(item)
+			}
+
 			return false
 		},
 	}

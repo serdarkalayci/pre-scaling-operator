@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: random-generator-1
+  name: random-generator-1-fail
   annotations:
     scaler/allow-autoscaling: "false" # Change to 'true' to allow scaling up
     scaler/state-peak-replicas: "5"
@@ -11,6 +11,7 @@ metadata:
     app: random-generator-1
     scaler/opt-in: "true"
 spec:
+  progressDeadlineSeconds: 20
   selector:
     matchLabels:
       app: random-generator-1
@@ -19,7 +20,6 @@ spec:
       labels:
         app: random-generator-1
     spec:
-      progressDeadlineSeconds: 5
       containers:
         - name: random-generator
           imagePullPolicy: Always

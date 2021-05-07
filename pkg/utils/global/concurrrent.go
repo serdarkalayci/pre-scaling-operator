@@ -158,9 +158,11 @@ func (cs *ConcurrentSlice) GetDeploymentInfoFromList(item DeploymentInfo) (Deplo
 	}
 	if result.Name != "" && result.Namespace != "" {
 		return result, nil
-	}
-	return DeploymentInfo{}, NotFound{
-		msg: "No deploymentInfo found!",
+	} else {
+		// Returning the item we passed in because there was none on the list
+		return item, NotFound{
+			msg: "No deploymentInfo found!",
+		}
 	}
 }
 

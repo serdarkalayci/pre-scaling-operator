@@ -64,6 +64,15 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 		for i, deployment := range deployments {
 			deploymentItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(deployment)
 			if notFoundErr == nil {
+				if deploymentItem.Failure {
+					log.WithValues("Deployment: ", deploymentItem.Name).
+						WithValues("Namespace: ", deploymentItem.Namespace).
+						WithValues("DesiredReplicaount: ", deploymentItem.DesiredReplicas).
+						WithValues("Failure: ", deploymentItem.Failure).
+						WithValues("Failure message: ", deploymentItem.FailureMessage).
+						Info("Deployment is in failure state! Not going to scale")
+					continue
+				}
 				if deploymentItem.DesiredReplicas != scaleReplicalist[i].Replicas {
 					g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, scaleReplicalist[i].Replicas)
 
@@ -118,7 +127,17 @@ func ReconcileDeploymentOrDeploymentConfig(ctx context.Context, _client client.C
 	log.Info("Quota Check")
 
 	if allowed {
-		if g.GetDenyList().IsInConcurrentList(deploymentItem) {
+		deploymentItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(deploymentItem)
+		if notFoundErr == nil {
+			if deploymentItem.Failure {
+				log.WithValues("Deployment: ", deploymentItem.Name).
+					WithValues("Namespace: ", deploymentItem.Namespace).
+					WithValues("DesiredReplicaount: ", deploymentItem.DesiredReplicas).
+					WithValues("Failure: ", deploymentItem.Failure).
+					WithValues("Failure message: ", deploymentItem.FailureMessage).
+					Info("Deployment is in failure state! Not going to scale")
+				return nil
+			}
 			if deploymentItem.DesiredReplicas != stateReplica.Replicas {
 				g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, stateReplica.Replicas)
 
