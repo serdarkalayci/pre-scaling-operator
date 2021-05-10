@@ -22,13 +22,11 @@ import (
 
 	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/validations"
-	"github.com/jasonlvhit/gocron"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	r "github.com/containersol/prescale-operator/internal/reconciler"
 	dc "github.com/openshift/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -147,7 +145,11 @@ func main() {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
 	}
-	gocron.Every(1).Minute().Do(r.RectifyDeploymentsInFailureState, mgr.GetClient())
+	z := cron.New()
+	z.AddFunc("0 30 * * * *", func() { fmt.Println("Every hour on the half hour") })
+	z.Start()
+	// s := gocron.NewScheduler(time.UTC)
+	// s.Every(1).Minute().Do(r.RectifyDeploymentsInFailureState, mgr.GetClient())
 	//gocron.Start()
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

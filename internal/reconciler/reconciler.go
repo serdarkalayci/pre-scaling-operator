@@ -62,26 +62,17 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 	if allowed {
 		for i, deployment := range deployments {
-			deploymentItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(deployment)
+			scalingItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(deployment)
 			if notFoundErr == nil {
-				if deploymentItem.Failure {
-					log.WithValues("Deployment: ", deploymentItem.Name).
-						WithValues("Namespace: ", deploymentItem.Namespace).
-						WithValues("DesiredReplicaount: ", deploymentItem.DesiredReplicas).
-						WithValues("Failure: ", deploymentItem.Failure).
-						WithValues("Failure message: ", deploymentItem.FailureMessage).
-						Info("Deployment is in failure state! Not going to scale")
-					continue
-				}
-				if deploymentItem.DesiredReplicas != scaleReplicalist[i].Replicas {
-					g.GetDenyList().SetScalingItemOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, scaleReplicalist[i].Replicas)
+				if scalingItem.DesiredReplicas != scaleReplicalist[i].Replicas {
+					g.GetDenyList().SetScalingItemOnList(scalingItem, scalingItem.Failure, scalingItem.FailureMessage, scaleReplicalist[i].Replicas)
 
-					log.WithValues("Name: ", deploymentItem.Name).
-						WithValues("Namespace: ", deploymentItem.Namespace).
-						WithValues("DeploymentConfig: ", deploymentItem.IsDeploymentConfig).
-						WithValues("DesiredReplicaount: ", deploymentItem.DesiredReplicas).
-						WithValues("Failure: ", deploymentItem.Failure).
-						WithValues("Failure message: ", deploymentItem.FailureMessage).
+					log.WithValues("Name: ", scalingItem.Name).
+						WithValues("Namespace: ", scalingItem.Namespace).
+						WithValues("DeploymentConfig: ", scalingItem.IsDeploymentConfig).
+						WithValues("DesiredReplicaount: ", scalingItem.DesiredReplicas).
+						WithValues("Failure: ", scalingItem.Failure).
+						WithValues("Failure message: ", scalingItem.FailureMessage).
 						Info("Deployment is already being scaled at the moment. Updated desired replica count")
 				}
 				continue
@@ -127,34 +118,19 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 	log.Info("Quota Check")
 
 	if allowed {
-		deploymentItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(scalingItem)
+		if g.GetDenyList().IsInConcurrentList(scalingItem) {
+			if scalingItem.DesiredReplicas != stateReplica.Replicas {
+				g.GetDenyList().SetScalingItemOnList(scalingItem, scalingItem.Failure, scalingItem.FailureMessage, stateReplica.Replicas)
 
-		if notFoundErr == nil && !forceReconcile {
-			if deploymentItem.Failure {
-				log.WithValues("Deployment: ", deploymentItem.Name).
-					WithValues("Namespace: ", deploymentItem.Namespace).
-					WithValues("DesiredReplicaount: ", deploymentItem.DesiredReplicas).
-					WithValues("Failure: ", deploymentItem.Failure).
-					WithValues("Failure message: ", deploymentItem.FailureMessage).
-					Info("Deployment is in failure state! Not going to scale")
-				return nil
+				log.WithValues("Deployment: ", scalingItem.Name).
+					WithValues("Namespace: ", scalingItem.Namespace).
+					WithValues("DesiredReplicaount: ", scalingItem.DesiredReplicas).
+					WithValues("Failure: ", scalingItem.Failure).
+					WithValues("Failure message: ", scalingItem.FailureMessage).
+					Info("Deployment is already being scaled at the moment. Updated desired replica count")
 			}
 		} else {
-			if g.GetDenyList().IsBeingScaled(deploymentItem) {
-				if deploymentItem.DesiredReplicas != stateReplica.Replicas {
-					g.GetDenyList().SetScalingItemOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, stateReplica.Replicas)
-
-					log.WithValues("Deployment: ", deploymentItem.Name).
-						WithValues("Namespace: ", deploymentItem.Namespace).
-						WithValues("DesiredReplicaount: ", deploymentItem.DesiredReplicas).
-						WithValues("Failure: ", deploymentItem.Failure).
-						WithValues("Failure message: ", deploymentItem.FailureMessage).
-						Info("Deployment is already being scaled at the moment. Updated desired replica count")
-				}
-				return nil
-			}
-
-			err = resources.ScaleOrStepScale(ctx, _client, deploymentItem, stateReplica, "deployScaler")
+			err = resources.ScaleOrStepScale(ctx, _client, scalingItem, stateReplica, "deployScaler")
 			if err != nil {
 				log.Error(err, "Error scaling the deployment")
 				return err
