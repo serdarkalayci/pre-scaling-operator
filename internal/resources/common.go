@@ -11,7 +11,6 @@ import (
 	"github.com/containersol/prescale-operator/internal/validations"
 	g "github.com/containersol/prescale-operator/pkg/utils/global"
 	"github.com/containersol/prescale-operator/pkg/utils/math"
-	m "github.com/containersol/prescale-operator/pkg/utils/math"
 	ocv1 "github.com/openshift/api/apps/v1"
 	"github.com/prometheus/common/log"
 	v1 "k8s.io/api/apps/v1"
@@ -195,13 +194,13 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 				desiredReplicaCount = stateReplica.Replicas
 			}
 
-			if oldReplicaCount != deploymentItem.ReadyReplicas {
-				deploymentItem.IsBeingScaled = false
-				g.GetDenyList().SetScalingItemOnList(deploymentItem, true, "Oldreplicacount is not equal to readyreplicas!", stateReplica.Replicas)
-				return ScaleError{
-					msg: "The deployment is in a failing state on the cluster! Oldreplicacount is not equal to readyreplicas!",
-				}
-			}
+			// if oldReplicaCount != deploymentItem.ReadyReplicas {
+			// 	deploymentItem.IsBeingScaled = false
+			// 	g.GetDenyList().SetScalingItemOnList(deploymentItem, true, "Oldreplicacount is not equal to readyreplicas!", stateReplica.Replicas)
+			// 	return ScaleError{
+			// 		msg: "The deployment is in a failing state on the cluster! Oldreplicacount is not equal to readyreplicas!",
+			// 	}
+			// }
 			// decide if we need to step up or down
 
 			if oldReplicaCount < desiredReplicaCount {
@@ -265,13 +264,13 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 					}
 
 					// We have some problem with validating the readiness of the pods. Probably because k8s doesn't scale
-					if m.Abs(deploymentItem.ReadyReplicas-stepReplicaCount) > 1 {
-						deploymentItem.IsBeingScaled = false
-						g.GetDenyList().SetScalingItemOnList(deploymentItem, true, "Replica diff too high!", stateReplica.Replicas)
-						return ScaleError{
-							msg: "The deployment is in a failing state on the cluster! Replica diff too high!!",
-						}
-					}
+					// if m.Abs(deploymentItem.ReadyReplicas-stepReplicaCount) > 1 {
+					// 	deploymentItem.IsBeingScaled = false
+					// 	g.GetDenyList().SetScalingItemOnList(deploymentItem, true, "Replica diff too high!", stateReplica.Replicas)
+					// 	return ScaleError{
+					// 		msg: "The deployment is in a failing state on the cluster! Replica diff too high!!",
+					// 	}
+					// }
 
 				}
 

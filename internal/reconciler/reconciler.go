@@ -227,23 +227,31 @@ func fetchNameSpaceState(ctx context.Context, _client client.Client, stateDefini
 }
 
 func RegisterEvents(ctx context.Context, _client client.Client, recorder record.EventRecorder, scalerErr error, scalingItem g.ScalingInfo) {
-
+	// refresh the item to get newest replica count
+	scalingItem, _ = g.GetDenyList().GetDeploymentInfoFromList(scalingItem)
 	if scalingItem.IsDeploymentConfig {
 		deplConf := ocv1.DeploymentConfig{}
-		deplConf, _ = resources.DeploymentConfigGetterByScaleItem(ctx, _client, scalingItem)
-		if scalerErr != nil {
-			recorder.Event(deplConf.DeepCopyObject(), "Warning", "Deploymentconfig scale error", scalerErr.Error()+" | "+fmt.Sprintf("Failed to scale the Deploymentconfig to %d replicas", scalingItem.DesiredReplicas))
+		deplConf, getErr := resources.DeploymentConfigGetterByScaleItem(ctx, _client, scalingItem)
+		if getErr != nil {
+			if scalerErr != nil {
+				recorder.Event(deplConf.DeepCopyObject(), "Warning", "Deploymentconfig scale error", scalerErr.Error()+" | "+fmt.Sprintf("Failed to scale the Deploymentconfig to %d replicas. Stuck on: %d replicas", scalingItem.DesiredReplicas, deplConf.Spec.Replicas))
+			} else {
+				recorder.Event(deplConf.DeepCopyObject(), "Normal", "Deploymentconfig scaled", fmt.Sprintf("Successfully scaled the Deploymentconfig to %d replicas", deplConf.Spec.Replicas))
+			}
 		} else {
-			recorder.Event(deplConf.DeepCopyObject(), "Normal", "Deploymentconfig scaled", fmt.Sprintf("Successfully scaled the Deploymentconfig to %d replicas", scalingItem.DesiredReplicas))
+			recorder.Event(deplConf.DeepCopyObject(), "Warning", "Deploymentconfig scale error", scalerErr.Error()+" | "+fmt.Sprintf("Failed to scale the Deploymentconfig to %d replicas. Most likely cause is that the Deploymentconfig doesn't exist anymore.", scalingItem.DesiredReplicas))
 		}
-
 	} else {
 		depl := v1.Deployment{}
-		depl, _ = resources.DeploymentGetterByScaleItem(ctx, _client, scalingItem)
-		if scalerErr != nil {
-			recorder.Event(depl.DeepCopyObject(), "Warning", "Deployment scale error", scalerErr.Error()+" | "+fmt.Sprintf("Failed to scale the Deployment to %d replicas", scalingItem.DesiredReplicas))
+		depl, getErr := resources.DeploymentGetterByScaleItem(ctx, _client, scalingItem)
+		if getErr != nil {
+			if scalerErr != nil {
+				recorder.Event(depl.DeepCopyObject(), "Warning", "Deployment scale error", scalerErr.Error()+" | "+fmt.Sprintf("Failed to scale the Deployment to %d replicas. Stuck on: %d replicas", scalingItem.DesiredReplicas, *depl.Spec.Replicas))
+			} else {
+				recorder.Event(depl.DeepCopyObject(), "Normal", "Deployment scaled", fmt.Sprintf("Successfully scaled the Deployment to %d replicas", *depl.Spec.Replicas))
+			}
 		} else {
-			recorder.Event(depl.DeepCopyObject(), "Normal", "Deployment scaled", fmt.Sprintf("Successfully scaled the Deployment to %d replicas", scalingItem.DesiredReplicas))
+			recorder.Event(depl.DeepCopyObject(), "Warning", "Deployment scale error", scalerErr.Error()+" | "+fmt.Sprintf("Failed to scale the Deployment to %d replicas. Most likely cause is that the Deployment doesn't exist anymore.", scalingItem.DesiredReplicas))
 		}
 
 	}
