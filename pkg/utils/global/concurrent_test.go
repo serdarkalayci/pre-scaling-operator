@@ -31,7 +31,8 @@ func TestPutOnDenyListAndIsFound(t *testing.T) {
 							Namespace: "bar",
 						},
 						Spec: v1.DeploymentSpec{
-							Replicas: new(int32),
+							Replicas:                new(int32),
+							ProgressDeadlineSeconds: new(int32),
 						},
 						Status: v1.DeploymentStatus{
 							Replicas: 5,
@@ -81,7 +82,8 @@ func TestDenyList(t *testing.T) {
 							Namespace: "bar",
 						},
 						Spec: v1.DeploymentSpec{
-							Replicas: new(int32),
+							Replicas:                new(int32),
+							ProgressDeadlineSeconds: new(int32),
 						},
 						Status: v1.DeploymentStatus{
 							Replicas: 5,
@@ -105,7 +107,8 @@ func TestDenyList(t *testing.T) {
 							Namespace: "bar",
 						},
 						Spec: v1.DeploymentSpec{
-							Replicas: new(int32),
+							Replicas:                new(int32),
+							ProgressDeadlineSeconds: new(int32),
 						},
 						Status: v1.DeploymentStatus{
 							Replicas: 5,
@@ -121,7 +124,8 @@ func TestDenyList(t *testing.T) {
 							Namespace: "one",
 						},
 						Spec: v1.DeploymentSpec{
-							Replicas: new(int32),
+							Replicas:                new(int32),
+							ProgressDeadlineSeconds: new(int32),
 						},
 						Status: v1.DeploymentStatus{
 							Replicas: 5,
@@ -145,7 +149,8 @@ func TestDenyList(t *testing.T) {
 							Namespace: "bar",
 						},
 						Spec: v1.DeploymentSpec{
-							Replicas: new(int32),
+							Replicas:                new(int32),
+							ProgressDeadlineSeconds: new(int32),
 						},
 						Status: v1.DeploymentStatus{
 							Replicas: 5,
@@ -161,7 +166,8 @@ func TestDenyList(t *testing.T) {
 							Namespace: "bar",
 						},
 						Spec: v1.DeploymentSpec{
-							Replicas: new(int32),
+							Replicas:                new(int32),
+							ProgressDeadlineSeconds: new(int32),
 						},
 						Status: v1.DeploymentStatus{
 							Replicas: 5,

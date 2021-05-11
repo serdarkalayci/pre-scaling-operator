@@ -58,7 +58,8 @@ func TestAnnotationIsDeletedCorrectly(t *testing.T) {
 			Annotations: deploymentAnnotations,
 		},
 		Spec: v1.DeploymentSpec{
-			Replicas: new(int32),
+			Replicas:                new(int32),
+			ProgressDeadlineSeconds: new(int32),
 		},
 		Status: v1.DeploymentStatus{
 			Replicas: 5,
@@ -92,7 +93,8 @@ func TestPutOnDeployment(t *testing.T) {
 			Annotations: deploymentAnnotations,
 		},
 		Spec: v1.DeploymentSpec{
-			Replicas: new(int32),
+			Replicas:                new(int32),
+			ProgressDeadlineSeconds: new(int32),
 		},
 		Status: v1.DeploymentStatus{
 			Replicas: 5,

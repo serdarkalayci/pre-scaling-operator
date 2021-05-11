@@ -82,7 +82,8 @@ func TestGetter(t *testing.T) {
 							Namespace: "bar",
 						},
 						Spec: v1.DeploymentSpec{
-							Replicas: new(int32),
+							Replicas:                new(int32),
+							ProgressDeadlineSeconds: new(int32),
 						},
 						Status: v1.DeploymentStatus{},
 					}).
@@ -113,7 +114,8 @@ func TestGetter(t *testing.T) {
 							Name: "test",
 						},
 						Spec: v1.DeploymentSpec{
-							Replicas: new(int32),
+							Replicas:                new(int32),
+							ProgressDeadlineSeconds: new(int32),
 						},
 						Status: v1.DeploymentStatus{},
 					}).
@@ -166,7 +168,8 @@ func TestScaler(t *testing.T) {
 							Labels:    map[string]string{"scaler/opt-in": "true"},
 						},
 						Spec: v1.DeploymentSpec{
-							Replicas: new(int32),
+							Replicas:                new(int32),
+							ProgressDeadlineSeconds: new(int32),
 						},
 						Status: v1.DeploymentStatus{},
 					}).
@@ -187,7 +190,8 @@ func TestScaler(t *testing.T) {
 						Namespace: "bar",
 					},
 					Spec: v1.DeploymentSpec{
-						Replicas: new(int32),
+						Replicas:                new(int32),
+						ProgressDeadlineSeconds: new(int32),
 					},
 					Status: v1.DeploymentStatus{},
 				},
@@ -211,7 +215,8 @@ func TestScaler(t *testing.T) {
 							Labels:    map[string]string{"scaler/opt-in": "true"},
 						},
 						Spec: v1.DeploymentSpec{
-							Replicas: new(int32),
+							Replicas:                new(int32),
+							ProgressDeadlineSeconds: new(int32),
 						},
 						Status: v1.DeploymentStatus{},
 					}).
@@ -233,7 +238,8 @@ func TestScaler(t *testing.T) {
 						Labels:    map[string]string{"scaler/opt-in": "true"},
 					},
 					Spec: v1.DeploymentSpec{
-						Replicas: new(int32),
+						Replicas:                new(int32),
+						ProgressDeadlineSeconds: new(int32),
 					},
 					Status: v1.DeploymentStatus{},
 				},
@@ -257,7 +263,8 @@ func TestScaler(t *testing.T) {
 							Labels:    map[string]string{"scaler/opt-in": "true"},
 						},
 						Spec: v1.DeploymentSpec{
-							Replicas: new(int32),
+							Replicas:                new(int32),
+							ProgressDeadlineSeconds: new(int32),
 						},
 						Status: v1.DeploymentStatus{},
 					}).
@@ -281,7 +288,8 @@ func TestScaler(t *testing.T) {
 						Annotations: map[string]string{"scaler/allow-autoscaling": "true"},
 					},
 					Spec: v1.DeploymentSpec{
-						Replicas: new(int32),
+						Replicas:                new(int32),
+						ProgressDeadlineSeconds: new(int32),
 					},
 					Status: v1.DeploymentStatus{
 						Replicas: 5,
@@ -320,7 +328,8 @@ func TestOptinLabel(t *testing.T) {
 						Labels: map[string]string{},
 					},
 					Spec: v1.DeploymentSpec{
-						Replicas: new(int32),
+						Replicas:                new(int32),
+						ProgressDeadlineSeconds: new(int32),
 					},
 					Status: v1.DeploymentStatus{},
 				},
@@ -509,7 +518,8 @@ func TestLimitsNeeded(t *testing.T) {
 			args: args{
 				deployment: v1.Deployment{
 					Spec: v1.DeploymentSpec{
-						Replicas: new(int32),
+						Replicas:                new(int32),
+						ProgressDeadlineSeconds: new(int32),
 						Template: corev1.PodTemplateSpec{
 							ObjectMeta: metav1.ObjectMeta{},
 							Spec: corev1.PodSpec{Containers: []corev1.Container{

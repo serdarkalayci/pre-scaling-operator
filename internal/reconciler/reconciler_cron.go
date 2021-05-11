@@ -9,12 +9,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func RectifyDeploymentsInFailureState(client client.Client) error {
+func RectifyScaleItemsInFailureState(client client.Client) error {
 
 	log := ctrl.Log
-	log.Info("TRYING TO RECTIFY")
 	for inList := range g.GetDenyList().IterOverItemsInFailureState() {
 		item := inList.Value
+		log.WithValues("Name", item.Name).
+			WithValues("Namespace", item.Namespace).
+			WithValues("IsDeploymentconfig", item.IsDeploymentConfig).
+			WithValues("Failure", item.Failure).
+			WithValues("Failure Message", item.FailureMessage).
+			Info("Trying to rectify ScaleItem in failure state")
 
 		stateDefinitions, stateDefErr := states.GetClusterScalingStates(context.TODO(), client)
 		if stateDefErr != nil {

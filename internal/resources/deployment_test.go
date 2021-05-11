@@ -40,7 +40,8 @@ func TestDeploymentGetter(t *testing.T) {
 							Name: "test",
 						},
 						Spec: v1.DeploymentSpec{
-							Replicas: new(int32),
+							Replicas:                new(int32),
+							ProgressDeadlineSeconds: new(int32),
 						},
 						Status: v1.DeploymentStatus{},
 					}).
@@ -60,7 +61,8 @@ func TestDeploymentGetter(t *testing.T) {
 					Name: "test",
 				},
 				Spec: v1.DeploymentSpec{
-					Replicas: new(int32),
+					Replicas:                new(int32),
+					ProgressDeadlineSeconds: new(int32),
 				},
 				Status: v1.DeploymentStatus{},
 			},
@@ -80,7 +82,8 @@ func TestDeploymentGetter(t *testing.T) {
 							Name: "test",
 						},
 						Spec: v1.DeploymentSpec{
-							Replicas: new(int32),
+							Replicas:                new(int32),
+							ProgressDeadlineSeconds: new(int32),
 						},
 						Status: v1.DeploymentStatus{},
 					}).

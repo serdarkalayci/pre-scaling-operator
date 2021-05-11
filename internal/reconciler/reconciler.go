@@ -120,6 +120,7 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 	if allowed {
 		if g.GetDenyList().IsBeingScaled(scalingItem) {
 			if scalingItem.DesiredReplicas != stateReplica.Replicas {
+				// Update the desired replica count with a "jump ahead". Because the scaler is active with this ScaleItem we need to tell them via the concurrent list that the desiredreplicacount has changed
 				g.GetDenyList().SetScalingItemOnList(scalingItem, scalingItem.Failure, scalingItem.FailureMessage, stateReplica.Replicas)
 
 				log.WithValues("Deployment: ", scalingItem.Name).
