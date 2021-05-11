@@ -5,11 +5,12 @@ import (
 
 	"github.com/containersol/prescale-operator/internal/states"
 	g "github.com/containersol/prescale-operator/pkg/utils/global"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func RectifyScaleItemsInFailureState(client client.Client) error {
+func RectifyScaleItemsInFailureState(client client.Client, recorder record.EventRecorder) error {
 
 	log := ctrl.Log
 	for inList := range g.GetDenyList().IterOverItemsInFailureState() {
@@ -32,7 +33,7 @@ func RectifyScaleItemsInFailureState(client client.Client) error {
 		if stateErr != nil {
 			return stateErr
 		}
-		err := ReconcileScalingItem(context.TODO(), client, item, finalState, true)
+		err := ReconcileScalingItem(context.TODO(), client, item, finalState, true, recorder)
 		if err != nil {
 			log.WithValues("Deployment", item.Name).
 				WithValues("Namespace", item.Namespace).

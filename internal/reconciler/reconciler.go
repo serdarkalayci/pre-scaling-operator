@@ -3,22 +3,29 @@ package reconciler
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/quotas"
 	"github.com/containersol/prescale-operator/internal/resources"
 	"github.com/containersol/prescale-operator/internal/states"
 	g "github.com/containersol/prescale-operator/pkg/utils/global"
+	ocv1 "github.com/openshift/api/apps/v1"
+
+	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type NamespaceEvents struct {
-	QuotaExceeded string
+	QuotaExceeded    string
+	ReconcileSuccess []string
+	ReconcileFailure []string
 }
 
-func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State) (NamespaceEvents, string, error) {
+func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State, recorder record.EventRecorder) (NamespaceEvents, string, error) {
 
 	var objectsToReconcile int
 	var nsEvents NamespaceEvents
@@ -80,6 +87,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 			err := resources.ScaleOrStepScale(ctx, _client, deployment, scaleReplicalist[i], "NSSCALER")
 
+			RegisterEvents(ctx, _client, recorder, err, scalingItem)
 			if err != nil {
 				log.Error(err, "Error scaling the deployment")
 				continue
@@ -96,7 +104,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	return nsEvents, finalState.Name, err
 }
 
-func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingItem g.ScalingInfo, state states.State, forceReconcile bool) error {
+func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingItem g.ScalingInfo, state states.State, forceReconcile bool, recorder record.EventRecorder) error {
 	log := ctrl.Log.
 		WithValues("deploymentItem", scalingItem.Name).
 		WithValues("namespace", scalingItem.Namespace)
@@ -132,6 +140,7 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 			}
 		} else {
 			err = resources.ScaleOrStepScale(ctx, _client, scalingItem, stateReplica, "deployScaler")
+			RegisterEvents(ctx, _client, recorder, err, scalingItem)
 			if err != nil {
 				log.Error(err, "Error scaling the deployment")
 				return err
@@ -215,4 +224,28 @@ func fetchNameSpaceState(ctx context.Context, _client client.Client, stateDefini
 		}
 	}
 	return namespaceState, nil
+}
+
+func RegisterEvents(ctx context.Context, _client client.Client, recorder record.EventRecorder, scalerErr error, scalingItem g.ScalingInfo) {
+
+	if scalingItem.IsDeploymentConfig {
+		deplConf := ocv1.DeploymentConfig{}
+		deplConf, _ = resources.DeploymentConfigGetterByScaleItem(ctx, _client, scalingItem)
+		if scalerErr != nil {
+			recorder.Event(deplConf.DeepCopyObject(), "Warning", "Deploymentconfig scale error", scalerErr.Error()+" | "+fmt.Sprintf("Failed to scale the Deploymentconfig %s in namespace %s", scalingItem.Name, scalingItem.Namespace))
+		} else {
+			recorder.Event(deplConf.DeepCopyObject(), "Normal", "Deploymentconfig scaled", fmt.Sprintf("Successfully scaled the Deploymentconfig %s in namespace %s", scalingItem.Name, scalingItem.Namespace))
+		}
+
+	} else {
+		depl := v1.Deployment{}
+		depl, _ = resources.DeploymentGetterByScaleItem(ctx, _client, scalingItem)
+		if scalerErr != nil {
+			recorder.Event(depl.DeepCopyObject(), "Warning", "Deployment scale error", scalerErr.Error()+" | "+fmt.Sprintf("Failed to scale the Deployment %s in namespace %s", scalingItem.Name, scalingItem.Namespace))
+		} else {
+			recorder.Event(depl.DeepCopyObject(), "Normal", "Deployment scaled", fmt.Sprintf("Successfully scaled the Deployment %s in namespace %s", scalingItem.Name, scalingItem.Namespace))
+		}
+
+	}
+
 }

@@ -148,7 +148,9 @@ func main() {
 		os.Exit(1)
 	}
 	z := cron.New()
-	z.AddFunc("@every 0h1m", func() { r.RectifyScaleItemsInFailureState(mgr.GetClient()) })
+	z.AddFunc("@every 0h1m", func() {
+		r.RectifyScaleItemsInFailureState(mgr.GetClient(), mgr.GetEventRecorderFor("clusterscalingstatedefinition-controller"))
+	})
 	z.Start()
 	// s := gocron.NewScheduler(time.UTC)
 	// s.Every(1).Minute().Do(r.RectifyDeploymentsInFailureState, mgr.GetClient())
