@@ -232,18 +232,18 @@ func RegisterEvents(ctx context.Context, _client client.Client, recorder record.
 		deplConf := ocv1.DeploymentConfig{}
 		deplConf, _ = resources.DeploymentConfigGetterByScaleItem(ctx, _client, scalingItem)
 		if scalerErr != nil {
-			recorder.Event(deplConf.DeepCopyObject(), "Warning", "Deploymentconfig scale error", scalerErr.Error()+" | "+fmt.Sprintf("Failed to scale the Deploymentconfig %s in namespace %s", scalingItem.Name, scalingItem.Namespace))
+			recorder.Event(deplConf.DeepCopyObject(), "Warning", "Deploymentconfig scale error", scalerErr.Error()+" | "+fmt.Sprintf("Failed to scale the Deploymentconfig to %d replicas", scalingItem.DesiredReplicas))
 		} else {
-			recorder.Event(deplConf.DeepCopyObject(), "Normal", "Deploymentconfig scaled", fmt.Sprintf("Successfully scaled the Deploymentconfig %s in namespace %s", scalingItem.Name, scalingItem.Namespace))
+			recorder.Event(deplConf.DeepCopyObject(), "Normal", "Deploymentconfig scaled", fmt.Sprintf("Successfully scaled the Deploymentconfig to %d replicas", scalingItem.DesiredReplicas))
 		}
 
 	} else {
 		depl := v1.Deployment{}
 		depl, _ = resources.DeploymentGetterByScaleItem(ctx, _client, scalingItem)
 		if scalerErr != nil {
-			recorder.Event(depl.DeepCopyObject(), "Warning", "Deployment scale error", scalerErr.Error()+" | "+fmt.Sprintf("Failed to scale the Deployment %s in namespace %s", scalingItem.Name, scalingItem.Namespace))
+			recorder.Event(depl.DeepCopyObject(), "Warning", "Deployment scale error", scalerErr.Error()+" | "+fmt.Sprintf("Failed to scale the Deployment to %d replicas", scalingItem.DesiredReplicas))
 		} else {
-			recorder.Event(depl.DeepCopyObject(), "Normal", "Deployment scaled", fmt.Sprintf("Successfully scaled the Deployment %s in namespace %s", scalingItem.Name, scalingItem.Namespace))
+			recorder.Event(depl.DeepCopyObject(), "Normal", "Deployment scaled", fmt.Sprintf("Successfully scaled the Deployment to %d replicas", scalingItem.DesiredReplicas))
 		}
 
 	}
