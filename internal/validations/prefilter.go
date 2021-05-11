@@ -7,6 +7,7 @@ import (
 	"github.com/containersol/prescale-operator/pkg/utils/annotations"
 	g "github.com/containersol/prescale-operator/pkg/utils/global"
 	"github.com/containersol/prescale-operator/pkg/utils/labels"
+	m "github.com/containersol/prescale-operator/pkg/utils/math"
 	ocv1 "github.com/openshift/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
 	"k8s.io/client-go/tools/record"
@@ -36,7 +37,7 @@ func PreFilter(r record.EventRecorder) predicate.Predicate {
 
 			// Deployment opted out. Don't do anything
 			if !newoptin {
-				if g.GetDenyList().IsInConcurrentList(item) {
+				if g.GetDenyList().IsBeingScaled(item) {
 					// The deployment is being scaled at the moment! Notify scaler to abort.
 					log := ctrl.Log.
 						WithValues("Name", item.Name).
@@ -54,8 +55,13 @@ func PreFilter(r record.EventRecorder) predicate.Predicate {
 			// don't reconcile if the stepscale annotation is present.
 			//stepScaleActive := AssessStepScaleAnnotation(e)
 
+			// Let reconciler_cron handle those deployments
+			if g.GetDenyList().IsDeploymentInFailureState(item) {
+				return false
+			}
+
 			// Don't reconcile on any change except when Annotation may have changed while the deployment was on the deny list.
-			if g.GetDenyList().IsInConcurrentList(item) && !annotationchange {
+			if g.GetDenyList().IsBeingScaled(item) && !annotationchange {
 				return false
 			}
 
@@ -131,6 +137,23 @@ func AssesReplicaChange(e event.UpdateEvent) bool {
 
 	// Check if replicas count has changed
 	if *replicasOld != *replicasNew {
+		return true
+	}
+	return false
+}
+
+func AssesReplicaDifferenceTooHigh(e event.UpdateEvent) bool {
+	var replicasActual, replicasNew *int32
+	if reflect.TypeOf(e.ObjectNew) == reflect.TypeOf(&ocv1.DeploymentConfig{}) {
+
+		replicasNew = &e.ObjectNew.(*ocv1.DeploymentConfig).Spec.Replicas
+		replicasActual = &e.ObjectNew.(*ocv1.DeploymentConfig).Status.AvailableReplicas
+
+	} else {
+		replicasNew = e.ObjectNew.(*v1.Deployment).Spec.Replicas
+		replicasActual = &e.ObjectNew.(*v1.Deployment).Status.AvailableReplicas
+	}
+	if m.Abs(*replicasNew-*replicasActual) > 1 {
 		return true
 	}
 	return false

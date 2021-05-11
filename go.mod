@@ -9,6 +9,7 @@ require (
 	github.com/onsi/gomega v1.10.2
 	github.com/openshift/api v3.9.0+incompatible
 	github.com/prometheus/common v0.10.0
+	github.com/robfig/cron v1.2.0
 	golang.org/x/sys v0.0.0-20210320140829-1e4c9ba3b0c4 // indirect
 	golang.org/x/tools v0.1.1-0.20210222172741-77e031214674 // indirect
 	honnef.co/go/tools v0.1.1 // indirect

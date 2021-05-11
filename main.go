@@ -22,6 +22,7 @@ import (
 
 	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/validations"
+	"github.com/robfig/cron"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -37,6 +38,7 @@ import (
 
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
 	"github.com/containersol/prescale-operator/controllers"
+	r "github.com/containersol/prescale-operator/internal/reconciler"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -146,7 +148,7 @@ func main() {
 		os.Exit(1)
 	}
 	z := cron.New()
-	z.AddFunc("0 30 * * * *", func() { fmt.Println("Every hour on the half hour") })
+	z.AddFunc("@every 0h1m", func() { r.RectifyDeploymentsInFailureState(mgr.GetClient()) })
 	z.Start()
 	// s := gocron.NewScheduler(time.UTC)
 	// s.Every(1).Minute().Do(r.RectifyDeploymentsInFailureState, mgr.GetClient())

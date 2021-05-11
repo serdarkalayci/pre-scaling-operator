@@ -12,6 +12,7 @@ import (
 func RectifyDeploymentsInFailureState(client client.Client) error {
 
 	log := ctrl.Log
+	log.Info("TRYING TO RECTIFY")
 	for inList := range g.GetDenyList().IterOverItemsInFailureState() {
 		item := inList.Value
 
@@ -26,7 +27,6 @@ func RectifyDeploymentsInFailureState(client client.Client) error {
 		if stateErr != nil {
 			return stateErr
 		}
-
 		err := ReconcileScalingItem(context.TODO(), client, item, finalState, true)
 		if err != nil {
 			log.WithValues("Deployment", item.Name).
@@ -34,14 +34,11 @@ func RectifyDeploymentsInFailureState(client client.Client) error {
 				WithValues("IsDeploymentConfig", item.IsDeploymentConfig).
 				WithValues("Failure", item.Failure).
 				WithValues("Failuremessage", item.FailureMessage).
-				WithValues("DesiredReplicas", item.DesiredReplicas).
 				Error(err, "Failed to rectify the Failure state for the ScalingItem!")
 		} else {
 			log.WithValues("Deployment", item.Name).
 				WithValues("Namespace", item.Namespace).
 				WithValues("IsDeploymentConfig", item.IsDeploymentConfig).
-				WithValues("Failure", item.Failure).
-				WithValues("Failuremessage", item.FailureMessage).
 				WithValues("DesiredReplicas", item.DesiredReplicas).
 				Info("Successfully rectified the failing ScalingItem!")
 		}

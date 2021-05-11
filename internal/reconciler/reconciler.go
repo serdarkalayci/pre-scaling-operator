@@ -118,7 +118,7 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 	log.Info("Quota Check")
 
 	if allowed {
-		if g.GetDenyList().IsInConcurrentList(scalingItem) {
+		if g.GetDenyList().IsBeingScaled(scalingItem) {
 			if scalingItem.DesiredReplicas != stateReplica.Replicas {
 				g.GetDenyList().SetScalingItemOnList(scalingItem, scalingItem.Failure, scalingItem.FailureMessage, stateReplica.Replicas)
 

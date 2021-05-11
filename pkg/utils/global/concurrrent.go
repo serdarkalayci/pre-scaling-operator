@@ -20,6 +20,7 @@ type ScalingInfo struct {
 	SpecReplica        int32
 	ReadyReplicas      int32
 	DesiredReplicas    int32
+	ProgressDeadline   int32
 	ResourceList       corev1.ResourceList
 	ConditionReason    string
 }
@@ -178,6 +179,11 @@ func (cs *ConcurrentSlice) SetScalingItemOnList(item ScalingInfo, failure bool, 
 	cs.UpdateOrAppend(item)
 }
 
+func (cs *ConcurrentSlice) SetProgressDeadline(item ScalingInfo, progressDeadline int32) {
+	item.ProgressDeadline = progressDeadline
+	cs.UpdateOrAppend(item)
+}
+
 func (cs *ConcurrentSlice) GetDeploymentInfoFromList(item ScalingInfo) (ScalingInfo, error) {
 	result := ScalingInfo{}
 	for inList := range cs.Iter() {
@@ -220,18 +226,26 @@ func ConvertDeploymentToItem(deployment v1.Deployment) ScalingInfo {
 		resourceList = deployment.Spec.Template.Spec.Containers[0].Resources.Limits
 	}
 
+	failure := false
+	failureMessage := ""
+	if conditionReason == "ProgressDeadlineExceeded" {
+		failure = true
+		failureMessage = "Can't scale. ProgressDeadlineExceeded on the cluster!"
+	}
+
 	return ScalingInfo{
 		Name:               deployment.Name,
 		Namespace:          deployment.Namespace,
 		Annotations:        deployment.Annotations,
 		Labels:             deployment.Labels,
 		IsDeploymentConfig: false,
-		Failure:            false,
-		FailureMessage:     "",
+		Failure:            failure,
+		FailureMessage:     failureMessage,
 		SpecReplica:        *deployment.Spec.Replicas,
 		ReadyReplicas:      deployment.Status.AvailableReplicas,
 		DesiredReplicas:    -1,
 		ResourceList:       resourceList,
+		ProgressDeadline:   *deployment.Spec.ProgressDeadlineSeconds,
 		ConditionReason:    conditionReason,
 	}
 }
@@ -263,5 +277,6 @@ func ConvertDeploymentConfigToItem(deploymentConfig ocv1.DeploymentConfig) Scali
 		DesiredReplicas:    -1,
 		ResourceList:       resourceList,
 		ConditionReason:    conditionReason,
+		ProgressDeadline:   int32(*deploymentConfig.Spec.Strategy.RollingParams.TimeoutSeconds),
 	}
 }
