@@ -29,8 +29,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // DeploymentWatcher reconciles a ScalingState object
@@ -45,11 +43,6 @@ type DeploymentWatcher struct {
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;patch;update;
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
-// WatchForDeployments creates watcher for the deployment objects
-func (r *DeploymentWatcher) WatchForDeployments(client client.Client, c controller.Controller) error {
-
-	return c.Watch(&source.Kind{Type: &v1.Deployment{}}, &handler.EnqueueRequestForObject{})
-}
 
 // Reconcile tries to reconcile the replicas of the opted-in deployments
 func (r *DeploymentWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -80,10 +73,11 @@ func (r *DeploymentWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// After we have the deployment and state data, we are ready to reconcile the deployment
-
-	err = reconciler.ReconcileScalingItem(ctx, r.Client, deploymentItem, finalState, false, r.Recorder)
-	if err != nil {
-		return ctrl.Result{}, err
+	if !g.GetDenyList().IsDeploymentInFailureState(deploymentItem) {
+		err = reconciler.ReconcileScalingItem(ctx, r.Client, deploymentItem, finalState, false, r.Recorder, "DEPLOYMENTWATCHCONTROLLER")
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	log.Info("Reconciliation loop completed successfully")

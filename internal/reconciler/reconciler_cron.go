@@ -33,7 +33,7 @@ func RectifyScaleItemsInFailureState(client client.Client, recorder record.Event
 		if stateErr != nil {
 			return stateErr
 		}
-		err := ReconcileScalingItem(context.TODO(), client, item, finalState, true, recorder)
+		err := ReconcileScalingItem(context.TODO(), client, item, finalState, true, recorder, "CRONJOB")
 		if err != nil {
 			log.WithValues("Deployment", item.Name).
 				WithValues("Namespace", item.Namespace).

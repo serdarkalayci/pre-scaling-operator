@@ -69,6 +69,11 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 	if allowed {
 		for i, deployment := range deployments {
+			// Don't scale if we don't need to
+			if deployment.SpecReplica == scaleReplicalist[i].Replicas {
+				return nsEvents, finalState.Name, nil
+			}
+
 			scalingItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(deployment)
 			if notFoundErr == nil {
 				if scalingItem.DesiredReplicas != scaleReplicalist[i].Replicas {
@@ -88,6 +93,10 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 			err := resources.ScaleOrStepScale(ctx, _client, deployment, scaleReplicalist[i], "NSSCALER")
 
 			RegisterEvents(ctx, _client, recorder, err, scalingItem)
+			if !g.GetDenyList().IsDeploymentInFailureState(scalingItem) {
+				g.GetDenyList().RemoveFromList(scalingItem)
+			}
+
 			if err != nil {
 				log.Error(err, "Error scaling the deployment")
 				continue
@@ -104,7 +113,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	return nsEvents, finalState.Name, err
 }
 
-func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingItem g.ScalingInfo, state states.State, forceReconcile bool, recorder record.EventRecorder) error {
+func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingItem g.ScalingInfo, state states.State, forceReconcile bool, recorder record.EventRecorder, whereFromScalingItem string) error {
 	log := ctrl.Log.
 		WithValues("deploymentItem", scalingItem.Name).
 		WithValues("namespace", scalingItem.Namespace)
@@ -113,6 +122,11 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 	if err != nil {
 		log.Error(err, "Error getting the state replicas")
 		return err
+	}
+
+	// Don't scale if we don't need to
+	if scalingItem.SpecReplica == stateReplica.Replicas {
+		return nil
 	}
 
 	allowed, err := quotas.ResourceQuotaCheck(ctx, scalingItem.Namespace, resources.LimitsNeeded(scalingItem, stateReplica.Replicas))
@@ -126,7 +140,7 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 	log.Info("Quota Check")
 
 	if allowed {
-		if g.GetDenyList().IsBeingScaled(scalingItem) {
+		if g.GetDenyList().IsBeingScaled(scalingItem) && !g.GetDenyList().IsDeploymentInFailureState(scalingItem) {
 			if scalingItem.DesiredReplicas != stateReplica.Replicas {
 				// Update the desired replica count with a "jump ahead". Because the scaler is active with this ScaleItem we need to tell them via the concurrent list that the desiredreplicacount has changed
 				g.GetDenyList().SetScalingItemOnList(scalingItem, scalingItem.Failure, scalingItem.FailureMessage, stateReplica.Replicas)
@@ -139,8 +153,12 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 					Info("Deployment is already being scaled at the moment. Updated desired replica count")
 			}
 		} else {
+			_ = whereFromScalingItem
 			err = resources.ScaleOrStepScale(ctx, _client, scalingItem, stateReplica, "deployScaler")
 			RegisterEvents(ctx, _client, recorder, err, scalingItem)
+			if !g.GetDenyList().IsDeploymentInFailureState(scalingItem) {
+				g.GetDenyList().RemoveFromList(scalingItem)
+			}
 			if err != nil {
 				log.Error(err, "Error scaling the deployment")
 				return err
@@ -232,7 +250,7 @@ func RegisterEvents(ctx context.Context, _client client.Client, recorder record.
 	if scalingItem.IsDeploymentConfig {
 		deplConf := ocv1.DeploymentConfig{}
 		deplConf, getErr := resources.DeploymentConfigGetterByScaleItem(ctx, _client, scalingItem)
-		if getErr != nil {
+		if getErr == nil {
 			if scalerErr != nil {
 				recorder.Event(deplConf.DeepCopyObject(), "Warning", "Deploymentconfig scale error", scalerErr.Error()+" | "+fmt.Sprintf("Failed to scale the Deploymentconfig to %d replicas. Stuck on: %d replicas", scalingItem.DesiredReplicas, deplConf.Spec.Replicas))
 			} else {
@@ -244,7 +262,7 @@ func RegisterEvents(ctx context.Context, _client client.Client, recorder record.
 	} else {
 		depl := v1.Deployment{}
 		depl, getErr := resources.DeploymentGetterByScaleItem(ctx, _client, scalingItem)
-		if getErr != nil {
+		if getErr == nil {
 			if scalerErr != nil {
 				recorder.Event(depl.DeepCopyObject(), "Warning", "Deployment scale error", scalerErr.Error()+" | "+fmt.Sprintf("Failed to scale the Deployment to %d replicas. Stuck on: %d replicas", scalingItem.DesiredReplicas, *depl.Spec.Replicas))
 			} else {

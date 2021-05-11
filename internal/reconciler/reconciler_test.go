@@ -137,7 +137,7 @@ func TestReconcileDeployment(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := ReconcileScalingItem(tt.args.ctx, tt.args._client, tt.args.deploymentItem, tt.args.state, false, record.NewFakeRecorder(10)); (err != nil) != tt.wantErr {
+			if err := ReconcileScalingItem(tt.args.ctx, tt.args._client, tt.args.deploymentItem, tt.args.state, false, record.NewFakeRecorder(10), "UNIT TEST"); (err != nil) != tt.wantErr {
 				t.Errorf("ReconcileDeployment() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -353,7 +353,7 @@ func TestReconcileDeploymentConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := ReconcileScalingItem(tt.args.ctx, tt.args._client, tt.args.deploymentItem, tt.args.state, false, record.NewFakeRecorder(10)); (err != nil) != tt.wantErr {
+			if err := ReconcileScalingItem(tt.args.ctx, tt.args._client, tt.args.deploymentItem, tt.args.state, false, record.NewFakeRecorder(10), "UNIT TEST"); (err != nil) != tt.wantErr {
 				t.Errorf("ReconcileDeploymentConfig() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
