@@ -154,6 +154,7 @@ func StateReplicasList(state states.State, deployments []g.ScalingInfo) ([]sr.St
 	return stateReplicaList, err
 }
 
+// Main function to make scaling decisions. The step scaler scales 1 by 1 towards the desired replica count.
 func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem g.ScalingInfo, stateReplica sr.StateReplica, whereFrom string) error {
 
 	log := ctrl.Log.
@@ -321,6 +322,7 @@ func LimitsNeededList(deployments []g.ScalingInfo, scaleReplicalist []sr.StateRe
 	return limitsneeded
 }
 
+// Returns a new scaling item from the cluster
 func GetRefreshedScalingItem(ctx context.Context, _client client.Client, deploymentInfo g.ScalingInfo) (g.ScalingInfo, error) {
 	var req reconcile.Request
 	req.NamespacedName.Namespace = deploymentInfo.Namespace

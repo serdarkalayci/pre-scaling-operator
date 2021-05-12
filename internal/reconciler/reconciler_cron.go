@@ -42,6 +42,8 @@ func RectifyScaleItemsInFailureState(client client.Client, recorder record.Event
 				WithValues("Failuremessage", item.FailureMessage).
 				Error(err, "Failed to rectify the Failure state for the ScalingItem!")
 		} else {
+			// Succesfully rectified. Remove from failure state
+			g.GetDenyList().RemoveFromList(item)
 			log.WithValues("Deployment", item.Name).
 				WithValues("Namespace", item.Namespace).
 				WithValues("IsDeploymentConfig", item.IsDeploymentConfig).

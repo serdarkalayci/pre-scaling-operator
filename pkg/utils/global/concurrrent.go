@@ -245,8 +245,8 @@ func ConvertDeploymentToItem(deployment v1.Deployment) ScalingInfo {
 		ReadyReplicas:      deployment.Status.AvailableReplicas,
 		DesiredReplicas:    -1,
 		ResourceList:       resourceList,
-		ProgressDeadline:   *deployment.Spec.ProgressDeadlineSeconds,
 		ConditionReason:    conditionReason,
+		ProgressDeadline:   *deployment.Spec.ProgressDeadlineSeconds,
 	}
 }
 
@@ -264,14 +264,21 @@ func ConvertDeploymentConfigToItem(deploymentConfig ocv1.DeploymentConfig) Scali
 		// get the latest condition reason in case there is one.
 		resourceList = deploymentConfig.Spec.Template.Spec.Containers[0].Resources.Limits
 	}
+
+	failure := false
+	failureMessage := ""
+	if conditionReason == "ProgressDeadlineExceeded" {
+		failure = true
+		failureMessage = "Can't scale. ProgressDeadlineExceeded on the cluster!"
+	}
 	return ScalingInfo{
 		Name:               deploymentConfig.Name,
 		Namespace:          deploymentConfig.Namespace,
 		Annotations:        deploymentConfig.Annotations,
 		Labels:             deploymentConfig.Labels,
 		IsDeploymentConfig: true,
-		Failure:            false,
-		FailureMessage:     "",
+		Failure:            failure,
+		FailureMessage:     failureMessage,
 		SpecReplica:        deploymentConfig.Spec.Replicas,
 		ReadyReplicas:      deploymentConfig.Status.AvailableReplicas,
 		DesiredReplicas:    -1,

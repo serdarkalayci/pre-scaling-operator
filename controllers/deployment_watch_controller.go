@@ -43,7 +43,6 @@ type DeploymentWatcher struct {
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;patch;update;
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
-
 // Reconcile tries to reconcile the replicas of the opted-in deployments
 func (r *DeploymentWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 
