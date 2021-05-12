@@ -3,6 +3,7 @@ package reconciler
 import (
 	"context"
 
+	com "github.com/containersol/prescale-operator/internal/resources"
 	"github.com/containersol/prescale-operator/internal/states"
 	g "github.com/containersol/prescale-operator/pkg/utils/global"
 	"k8s.io/client-go/tools/record"
@@ -33,6 +34,14 @@ func RectifyScaleItemsInFailureState(client client.Client, recorder record.Event
 		if stateErr != nil {
 			return stateErr
 		}
+		// Get a new item and put it in failure mode.
+		item, getErr := com.GetRefreshedScalingItemSetError(context.TODO(), client, item, true)
+		if getErr != nil {
+			g.GetDenyList().RemoveFromList(item)
+			log.Info("Not rectifying, the item doesn't exist anymore on the cluster!")
+			continue
+		}
+
 		err := ReconcileScalingItem(context.TODO(), client, item, finalState, true, recorder, "CRONJOB")
 		if err != nil {
 			log.WithValues("Deployment", item.Name).

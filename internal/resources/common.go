@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -184,7 +185,6 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 	if rateLimitingEnabled {
 		log.WithValues("Deployment: ", deploymentItem.Name).
 			WithValues("Namespace: ", deploymentItem.Namespace).
-			WithValues("DesiredReplicaount: ", deploymentItem.DesiredReplicas).
 			WithValues("Wherefrom: ", whereFrom).
 			Info("Going into step scaler..")
 		// Loop step by step until deploymentItem has reached desiredreplica count.
@@ -197,24 +197,15 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 				desiredReplicaCount = stateReplica.Replicas
 			}
 
-			// if oldReplicaCount != deploymentItem.ReadyReplicas {
-			// 	deploymentItem.IsBeingScaled = false
-			// 	g.GetDenyList().SetScalingItemOnList(deploymentItem, true, "Oldreplicacount is not equal to readyreplicas!", stateReplica.Replicas)
-			// 	return ScaleError{
-			// 		msg: "The deployment is in a failing state on the cluster! Oldreplicacount is not equal to readyreplicas!",
-			// 	}
-			// }
-
-			// Wait until deploymentItem is ready for the next step
-			//deploymentItem, _ := g.GetDenyList().GetDeploymentInfoFromList(deploymentItem)
+			// Wait until deploymentItem is ready for the next step and check if it's failing for some reason
 			waitTime := time.Duration(time.Duration(deploymentItem.ProgressDeadline))*time.Second + time.Second
 			for stay, timeout := true, time.After(waitTime); stay; {
 				select {
 				case <-timeout:
 					deploymentItem.IsBeingScaled = false
-					g.GetDenyList().SetScalingItemOnList(deploymentItem, true, "ProgressDeadlineExceeded - Operator decision!", desiredReplicaCount)
+					g.GetDenyList().SetScalingItemOnList(deploymentItem, true, fmt.Sprintf("%s | The operator decided that it can't scale that deployment or deploymentconfig!", deploymentItem.ConditionReason), desiredReplicaCount)
 					return ScaleError{
-						msg: "The deployment is in a failing state according to the operator! The OPERATOR decided that progressDeadline exceeded!",
+						msg: fmt.Sprintf("%s | The operator decided that it can't scale that deployment or deploymentconfig!", deploymentItem.ConditionReason),
 					}
 				default:
 					time.Sleep(time.Second * 2)
@@ -238,16 +229,6 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 							msg: "The deployment is in a failing state on the cluster! ProgressDeadlineExceeded!",
 						}
 					}
-
-					// We have some problem with validating the readiness of the pods. Probably because k8s doesn't scale
-					// if m.Abs(deploymentItem.ReadyReplicas-stepReplicaCount) > 1 {
-					// 	deploymentItem.IsBeingScaled = false
-					// 	g.GetDenyList().SetScalingItemOnList(deploymentItem, true, "Replica diff too high!", stateReplica.Replicas)
-					// 	return ScaleError{
-					// 		msg: "The deployment is in a failing state on the cluster! Replica diff too high!!",
-					// 	}
-					// }
-
 				}
 
 			}
@@ -267,8 +248,6 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 
 			log.WithValues("ScalingItem: ", deploymentItem.Name).
 				WithValues("Namespace: ", deploymentItem.Namespace).
-				WithValues("DesiredReplicaount on item:  ", deploymentItem.DesiredReplicas).
-				WithValues("Desiredreplicacount", desiredReplicaCount).
 				WithValues("Stepreplicacount", stepReplicaCount).
 				WithValues("Wherefrom: ", whereFrom).
 				Info("Step Scaling!")
@@ -320,6 +299,11 @@ func LimitsNeededList(deployments []g.ScalingInfo, scaleReplicalist []sr.StateRe
 		limitsneeded = math.Add(limitsneeded, math.Mul(math.ReplicaCalc(scaleReplicalist[i].Replicas, deploymentItem.SpecReplica), deploymentItem.ResourceList))
 	}
 	return limitsneeded
+}
+
+func GetRefreshedScalingItemSetError(ctx context.Context, _client client.Client, deploymentInfo g.ScalingInfo, failure bool) (g.ScalingInfo, error) {
+	item, err := GetRefreshedScalingItem(ctx, _client, deploymentInfo)
+	return g.GetDenyList().SetScalingItemOnList(item, failure, "", -1), err
 }
 
 // Returns a new scaling item from the cluster

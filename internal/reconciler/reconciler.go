@@ -25,6 +25,14 @@ type NamespaceEvents struct {
 	ReconcileFailure []string
 }
 
+type ReconcilerError struct {
+	msg string
+}
+
+func (err ReconcilerError) Error() string {
+	return err.msg
+}
+
 func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State, recorder record.EventRecorder) (NamespaceEvents, string, error) {
 
 	var objectsToReconcile int
@@ -89,18 +97,19 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 				}
 				continue
 			}
+			if !g.GetDenyList().IsDeploymentInFailureState(deployment) {
+				err := resources.ScaleOrStepScale(ctx, _client, deployment, scaleReplicalist[i], "NSSCALER")
+				RegisterEvents(ctx, _client, recorder, err, scalingItem)
+				if !g.GetDenyList().IsDeploymentInFailureState(scalingItem) {
+					g.GetDenyList().RemoveFromList(scalingItem)
+				}
 
-			err := resources.ScaleOrStepScale(ctx, _client, deployment, scaleReplicalist[i], "NSSCALER")
-
-			RegisterEvents(ctx, _client, recorder, err, scalingItem)
-			if !g.GetDenyList().IsDeploymentInFailureState(scalingItem) {
-				g.GetDenyList().RemoveFromList(scalingItem)
+				if err != nil {
+					log.Error(err, "Error scaling the deployment")
+					continue
+				}
 			}
 
-			if err != nil {
-				log.Error(err, "Error scaling the deployment")
-				continue
-			}
 		}
 	} else {
 		nsEvents.QuotaExceeded = namespace
@@ -125,7 +134,7 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 	}
 
 	// Don't scale if we don't need to
-	if scalingItem.SpecReplica == stateReplica.Replicas {
+	if scalingItem.ReadyReplicas == stateReplica.Replicas {
 		return nil
 	}
 
@@ -152,8 +161,10 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 					WithValues("Failure message: ", scalingItem.FailureMessage).
 					Info("Deployment is already being scaled at the moment. Updated desired replica count")
 			}
+			return ReconcilerError{
+				msg: "Already being scaled",
+			}
 		} else {
-			_ = whereFromScalingItem
 			err = resources.ScaleOrStepScale(ctx, _client, scalingItem, stateReplica, "deployScaler")
 			RegisterEvents(ctx, _client, recorder, err, scalingItem)
 			if !g.GetDenyList().IsDeploymentInFailureState(scalingItem) {
@@ -165,6 +176,10 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 			}
 		}
 
+	} else {
+		return ReconcilerError{
+			msg: "Can't scale due to ResourceQuota violation!",
+		}
 	}
 
 	return nil

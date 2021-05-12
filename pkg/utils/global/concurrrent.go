@@ -172,11 +172,12 @@ func (cs *ConcurrentSlice) IsBeingScaled(item ScalingInfo) bool {
 	return result
 }
 
-func (cs *ConcurrentSlice) SetScalingItemOnList(item ScalingInfo, failure bool, failureMessage string, desiredReplicas int32) {
+func (cs *ConcurrentSlice) SetScalingItemOnList(item ScalingInfo, failure bool, failureMessage string, desiredReplicas int32) ScalingInfo {
 	item.Failure = failure
 	item.FailureMessage = failureMessage
 	item.DesiredReplicas = desiredReplicas
 	cs.UpdateOrAppend(item)
+	return item
 }
 
 func (cs *ConcurrentSlice) SetProgressDeadline(item ScalingInfo, progressDeadline int32) {
