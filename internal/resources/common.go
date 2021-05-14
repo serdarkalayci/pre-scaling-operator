@@ -203,9 +203,9 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 				select {
 				case <-timeout:
 					deploymentItem.IsBeingScaled = false
-					g.GetDenyList().SetScalingItemOnList(deploymentItem, true, fmt.Sprintf("%s | The operator decided that it can't scale that deployment or deploymentconfig!", deploymentItem.ConditionReason), desiredReplicaCount)
+					g.GetDenyList().SetScalingItemOnList(deploymentItem, true, fmt.Sprintf("Message on the cluster: %s | The operator decided that it can't scale that deployment or deploymentconfig!", deploymentItem.ConditionReason), desiredReplicaCount)
 					return ScaleError{
-						msg: fmt.Sprintf("%s | The operator decided that it can't scale that deployment or deploymentconfig!", deploymentItem.ConditionReason),
+						msg: fmt.Sprintf("Message on the cluster: %s | The operator decided that it can't scale that deployment or deploymentconfig!", deploymentItem.ConditionReason),
 					}
 				default:
 					time.Sleep(time.Second * 2)
