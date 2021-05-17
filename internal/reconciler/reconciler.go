@@ -89,8 +89,8 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 					log.WithValues("Name: ", scalingItem.Name).
 						WithValues("Namespace: ", scalingItem.Namespace).
-						WithValues("DeploymentConfig: ", scalingItem.ScalingItemType).
-						WithValues("DesiredReplicaount: ", scalingItem.DesiredReplicas).
+						WithValues("Object: ", scalingItem.ScalingItemType.ItemTypeName).
+						WithValues("DesiredReplicacount: ", scalingItem.DesiredReplicas).
 						WithValues("Failure: ", scalingItem.Failure).
 						WithValues("Failure message: ", scalingItem.FailureMessage).
 						Info("Deployment is already being scaled at the moment. Updated desired replica count")
