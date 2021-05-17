@@ -312,7 +312,7 @@ func GetRefreshedScalingItem(ctx context.Context, _client client.Client, deploym
 	req.NamespacedName.Namespace = deploymentInfo.Namespace
 	req.NamespacedName.Name = deploymentInfo.Name
 	itemToReturn := g.ScalingInfo{}
-	if deploymentInfo.ScalingItem.ItemType == "DeploymentConfig" {
+	if deploymentInfo.ScalingItemType.ItemTypeName == "DeploymentConfig" {
 		deploymentconfig := ocv1.DeploymentConfig{}
 		err := _client.Get(ctx, req.NamespacedName, &deploymentconfig)
 		if err != nil {
@@ -375,7 +375,7 @@ func UpdateScalingItem(ctx context.Context, _client client.Client, deploymentIte
 	deployment := v1.Deployment{}
 	deploymentConfig := ocv1.DeploymentConfig{}
 
-	if deploymentItem.ScalingItem.ItemType == "DeploymentConfig" {
+	if deploymentItem.ScalingItemType.ItemTypeName == "DeploymentConfig" {
 		deploymentConfig, getErr = DeploymentConfigGetter(ctx, _client, req)
 		if getErr != nil {
 			return getErr

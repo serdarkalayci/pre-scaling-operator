@@ -18,7 +18,7 @@ func RectifyScaleItemsInFailureState(client client.Client, recorder record.Event
 		item := inList.Value
 		log.WithValues("Name", item.Name).
 			WithValues("Namespace", item.Namespace).
-			WithValues("IsDeploymentconfig", item.ScalingItem).
+			WithValues("IsDeploymentconfig", item.ScalingItemType).
 			WithValues("Failure", item.Failure).
 			WithValues("Failure Message", item.FailureMessage).
 			Info("Trying to rectify ScaleItem in failure state")
@@ -46,7 +46,7 @@ func RectifyScaleItemsInFailureState(client client.Client, recorder record.Event
 		if err != nil {
 			log.WithValues("Deployment", item.Name).
 				WithValues("Namespace", item.Namespace).
-				WithValues("IsDeploymentConfig", item.ScalingItem).
+				WithValues("IsDeploymentConfig", item.ScalingItemType).
 				WithValues("Failure", item.Failure).
 				WithValues("Failuremessage", item.FailureMessage).
 				Error(err, "Failed to rectify the Failure state for the ScalingItem!")
@@ -55,7 +55,7 @@ func RectifyScaleItemsInFailureState(client client.Client, recorder record.Event
 			g.GetDenyList().RemoveFromList(item)
 			log.WithValues("Deployment", item.Name).
 				WithValues("Namespace", item.Namespace).
-				WithValues("IsDeploymentConfig", item.ScalingItem).
+				WithValues("IsDeploymentConfig", item.ScalingItemType).
 				WithValues("DesiredReplicas", item.DesiredReplicas).
 				Info("Successfully rectified the failing ScalingItem!")
 		}

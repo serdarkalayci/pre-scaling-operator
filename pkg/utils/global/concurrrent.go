@@ -8,8 +8,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-type ScalingItem struct {
-	ItemType string
+// Deployment or deploymentconfig supported for now
+type ScalingItemType struct {
+	ItemTypeName string
 }
 
 type ScalingInfo struct {
@@ -17,7 +18,7 @@ type ScalingInfo struct {
 	Name        string
 	Annotations map[string]string
 	Labels      map[string]string
-	ScalingItem
+	ScalingItemType
 	IsBeingScaled    bool
 	Failure          bool
 	FailureMessage   string
@@ -243,7 +244,7 @@ func ConvertDeploymentToItem(deployment v1.Deployment) ScalingInfo {
 		Namespace:        deployment.Namespace,
 		Annotations:      deployment.Annotations,
 		Labels:           deployment.Labels,
-		ScalingItem:      ScalingItem{ItemType: "Deployment"},
+		ScalingItemType:  ScalingItemType{ItemTypeName: "Deployment"},
 		Failure:          failure,
 		FailureMessage:   failureMessage,
 		SpecReplica:      *deployment.Spec.Replicas,
@@ -281,7 +282,7 @@ func ConvertDeploymentConfigToItem(deploymentConfig ocv1.DeploymentConfig) Scali
 		Namespace:        deploymentConfig.Namespace,
 		Annotations:      deploymentConfig.Annotations,
 		Labels:           deploymentConfig.Labels,
-		ScalingItem:      ScalingItem{ItemType: "DeploymentConfig"},
+		ScalingItemType:  ScalingItemType{ItemTypeName: "DeploymentConfig"},
 		Failure:          failure,
 		FailureMessage:   failureMessage,
 		SpecReplica:      deploymentConfig.Spec.Replicas,

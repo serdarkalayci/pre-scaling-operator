@@ -89,7 +89,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 					log.WithValues("Name: ", scalingItem.Name).
 						WithValues("Namespace: ", scalingItem.Namespace).
-						WithValues("DeploymentConfig: ", scalingItem.ScalingItem).
+						WithValues("DeploymentConfig: ", scalingItem.ScalingItemType).
 						WithValues("DesiredReplicaount: ", scalingItem.DesiredReplicas).
 						WithValues("Failure: ", scalingItem.Failure).
 						WithValues("Failure message: ", scalingItem.FailureMessage).
@@ -262,7 +262,7 @@ func fetchNameSpaceState(ctx context.Context, _client client.Client, stateDefini
 func RegisterEvents(ctx context.Context, _client client.Client, recorder record.EventRecorder, scalerErr error, scalingItem g.ScalingInfo) {
 	// refresh the item to get newest replica count
 	scalingItem, _ = g.GetDenyList().GetDeploymentInfoFromList(scalingItem)
-	if scalingItem.ScalingItem.ItemType == "DeploymentConfig" {
+	if scalingItem.ScalingItemType.ItemTypeName == "DeploymentConfig" {
 		deplConf := ocv1.DeploymentConfig{}
 		deplConf, getErr := resources.DeploymentConfigGetterByScaleItem(ctx, _client, scalingItem)
 		if getErr == nil {
