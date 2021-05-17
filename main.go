@@ -152,9 +152,7 @@ func main() {
 		r.RectifyScaleItemsInFailureState(mgr.GetClient(), mgr.GetEventRecorderFor("clusterscalingstatedefinition-controller"))
 	})
 	z.Start()
-	// s := gocron.NewScheduler(time.UTC)
-	// s.Every(1).Minute().Do(r.RectifyDeploymentsInFailureState, mgr.GetClient())
-	//gocron.Start()
+
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
