@@ -8,21 +8,25 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+type ScalingItem struct {
+	ItemType string
+}
+
 type ScalingInfo struct {
-	Namespace          string
-	Name               string
-	Annotations        map[string]string
-	Labels             map[string]string
-	IsDeploymentConfig bool
-	IsBeingScaled      bool
-	Failure            bool
-	FailureMessage     string
-	SpecReplica        int32
-	ReadyReplicas      int32
-	DesiredReplicas    int32
-	ProgressDeadline   int32
-	ResourceList       corev1.ResourceList
-	ConditionReason    string
+	Namespace   string
+	Name        string
+	Annotations map[string]string
+	Labels      map[string]string
+	ScalingItem
+	IsBeingScaled    bool
+	Failure          bool
+	FailureMessage   string
+	SpecReplica      int32
+	ReadyReplicas    int32
+	DesiredReplicas  int32
+	ProgressDeadline int32
+	ResourceList     corev1.ResourceList
+	ConditionReason  string
 }
 
 // Global DenyList to check if the deployment is currently reconciles/step scaled
@@ -235,19 +239,19 @@ func ConvertDeploymentToItem(deployment v1.Deployment) ScalingInfo {
 	}
 
 	return ScalingInfo{
-		Name:               deployment.Name,
-		Namespace:          deployment.Namespace,
-		Annotations:        deployment.Annotations,
-		Labels:             deployment.Labels,
-		IsDeploymentConfig: false,
-		Failure:            failure,
-		FailureMessage:     failureMessage,
-		SpecReplica:        *deployment.Spec.Replicas,
-		ReadyReplicas:      deployment.Status.AvailableReplicas,
-		DesiredReplicas:    -1,
-		ResourceList:       resourceList,
-		ConditionReason:    conditionReason,
-		ProgressDeadline:   *deployment.Spec.ProgressDeadlineSeconds,
+		Name:             deployment.Name,
+		Namespace:        deployment.Namespace,
+		Annotations:      deployment.Annotations,
+		Labels:           deployment.Labels,
+		ScalingItem:      ScalingItem{ItemType: "Deployment"},
+		Failure:          failure,
+		FailureMessage:   failureMessage,
+		SpecReplica:      *deployment.Spec.Replicas,
+		ReadyReplicas:    deployment.Status.AvailableReplicas,
+		DesiredReplicas:  -1,
+		ResourceList:     resourceList,
+		ConditionReason:  conditionReason,
+		ProgressDeadline: *deployment.Spec.ProgressDeadlineSeconds,
 	}
 }
 
@@ -273,18 +277,18 @@ func ConvertDeploymentConfigToItem(deploymentConfig ocv1.DeploymentConfig) Scali
 		failureMessage = "Can't scale. ProgressDeadlineExceeded on the cluster!"
 	}
 	return ScalingInfo{
-		Name:               deploymentConfig.Name,
-		Namespace:          deploymentConfig.Namespace,
-		Annotations:        deploymentConfig.Annotations,
-		Labels:             deploymentConfig.Labels,
-		IsDeploymentConfig: true,
-		Failure:            failure,
-		FailureMessage:     failureMessage,
-		SpecReplica:        deploymentConfig.Spec.Replicas,
-		ReadyReplicas:      deploymentConfig.Status.AvailableReplicas,
-		DesiredReplicas:    -1,
-		ResourceList:       resourceList,
-		ConditionReason:    conditionReason,
-		ProgressDeadline:   int32(*deploymentConfig.Spec.Strategy.RollingParams.TimeoutSeconds),
+		Name:             deploymentConfig.Name,
+		Namespace:        deploymentConfig.Namespace,
+		Annotations:      deploymentConfig.Annotations,
+		Labels:           deploymentConfig.Labels,
+		ScalingItem:      ScalingItem{ItemType: "DeploymentConfig"},
+		Failure:          failure,
+		FailureMessage:   failureMessage,
+		SpecReplica:      deploymentConfig.Spec.Replicas,
+		ReadyReplicas:    deploymentConfig.Status.AvailableReplicas,
+		DesiredReplicas:  -1,
+		ResourceList:     resourceList,
+		ConditionReason:  conditionReason,
+		ProgressDeadline: int32(*deploymentConfig.Spec.Strategy.RollingParams.TimeoutSeconds),
 	}
 }
