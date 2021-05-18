@@ -146,10 +146,10 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 					time.Sleep(time.Second * 5)
 
 					var replicas32 int32 = int32(expectedReplicas)
-					Eventually(func() bool {
+					Eventually(func() int32 {
 						k8sClient.Get(context.Background(), key, &fetchedDeployment)
-						return *fetchedDeployment.Spec.Replicas == replicas32 && fetchedDeployment.Status.ReadyReplicas == replicas32
-					}, timeout, interval).Should(Equal(true))
+						return *fetchedDeployment.Spec.Replicas
+					}, timeout, interval).Should(Equal(replicas32))
 
 				}
 

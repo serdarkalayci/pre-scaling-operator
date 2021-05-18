@@ -75,13 +75,10 @@ func (r *DeploymentConfigWatcher) Reconcile(ctx context.Context, req ctrl.Reques
 	// After we have the deploymentconfig and state data, we are ready to reconcile the deploymentconfig
 	// Only reconcile if the item is not in a failure state. Failure states are only handled by RectifyScaleItemsInFailureState() in reconciler_cron.go
 	if !g.GetDenyList().IsDeploymentInFailureState(deploymentItem) {
-		err = reconciler.ReconcileScalingItem(ctx, r.Client, deploymentItem, finalState, false, r.Recorder, "DEPLOYMENTCONFIGCONTROLLLER")
-		if err != nil {
-			return ctrl.Result{}, err
-		}
+		go reconciler.ReconcileScalingItem(ctx, r.Client, deploymentItem, finalState, false, r.Recorder, "DEPLOYMENTCONFIGCONTROLLLER")
 	}
 
-	log.Info("Reconciliation loop completed successfully for deploymentconfig")
+	log.Info("Reconciliation loop completed for deploymentconfig")
 
 	return ctrl.Result{}, nil
 }
