@@ -26,7 +26,7 @@ func TestLister(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    []g.DeploymentInfo
+		want    []g.ScalingInfo
 		wantErr bool
 	}{
 		{
@@ -37,13 +37,13 @@ func TestLister(t *testing.T) {
 				namespace:  "default",
 				OptInLabel: map[string]string{},
 			},
-			want:    []g.DeploymentInfo{},
+			want:    []g.ScalingInfo{},
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := DeploymentItemLister(tt.args.ctx, tt.args._client, tt.args.namespace, tt.args.OptInLabel)
+			got, err := ScalingItemLister(tt.args.ctx, tt.args._client, tt.args.namespace, tt.args.OptInLabel)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DeploymentLister() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -59,12 +59,12 @@ func TestGetter(t *testing.T) {
 	type args struct {
 		ctx     context.Context
 		_client client.Client
-		want    g.DeploymentInfo
+		want    g.ScalingInfo
 	}
 	tests := []struct {
 		name    string
 		args    args
-		want    g.DeploymentInfo
+		want    g.ScalingInfo
 		wantErr bool
 	}{
 		{
@@ -81,16 +81,21 @@ func TestGetter(t *testing.T) {
 							Name:      "test",
 							Namespace: "bar",
 						},
-						Spec:   v1.DeploymentSpec{},
+						Spec: v1.DeploymentSpec{
+							Replicas:                new(int32),
+							ProgressDeadlineSeconds: new(int32),
+						},
 						Status: v1.DeploymentStatus{},
 					}).
 					Build(),
-				want: g.DeploymentInfo{
-					Name:               "test",
-					Namespace:          "bar",
-					IsDeploymentConfig: false,
-					SpecReplica:        0,
-					ReadyReplicas:      0,
+				want: g.ScalingInfo{
+					Name:            "test",
+					Namespace:       "bar",
+					ScalingItemType: g.ScalingItemType{ItemTypeName: "Deployment"},
+					SpecReplica:     0,
+					ReadyReplicas:   0,
+					DesiredReplicas: -1,
+					ResourceList:    corev1.ResourceList{},
 				},
 			},
 			wantErr: false,
@@ -108,24 +113,27 @@ func TestGetter(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "test",
 						},
-						Spec:   v1.DeploymentSpec{},
+						Spec: v1.DeploymentSpec{
+							Replicas:                new(int32),
+							ProgressDeadlineSeconds: new(int32),
+						},
 						Status: v1.DeploymentStatus{},
 					}).
 					Build(),
-				want: g.DeploymentInfo{},
+				want: g.ScalingInfo{},
 			},
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetDeploymentItem(tt.args.ctx, tt.args._client, tt.args.want)
+			got, err := GetRefreshedScalingItem(tt.args.ctx, tt.args._client, tt.args.want)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("DeploymentGetter() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ScalingItemGetter() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.args.want) {
-				t.Errorf("DeploymentGetter() = %v, want %v", got, tt.args.want)
+				t.Errorf("ScalingItemGetter() = %v, want %v", got, tt.args.want)
 			}
 		})
 	}
@@ -133,11 +141,11 @@ func TestGetter(t *testing.T) {
 
 func TestScaler(t *testing.T) {
 	type args struct {
-		ctx            context.Context
-		_client        client.Client
-		deploymentItem g.DeploymentInfo
-		deployment     v1.Deployment
-		replicas       int32
+		ctx         context.Context
+		_client     client.Client
+		scalingItem g.ScalingInfo
+		deployment  v1.Deployment
+		replicas    int32
 	}
 	tests := []struct {
 		name    string
@@ -159,11 +167,14 @@ func TestScaler(t *testing.T) {
 							Namespace: "bar",
 							Labels:    map[string]string{"scaler/opt-in": "true"},
 						},
-						Spec:   v1.DeploymentSpec{},
+						Spec: v1.DeploymentSpec{
+							Replicas:                new(int32),
+							ProgressDeadlineSeconds: new(int32),
+						},
 						Status: v1.DeploymentStatus{},
 					}).
 					Build(),
-				deploymentItem: g.DeploymentInfo{
+				scalingItem: g.ScalingInfo{
 					Name:        "foo",
 					Namespace:   "bar",
 					SpecReplica: 4,
@@ -178,7 +189,10 @@ func TestScaler(t *testing.T) {
 						Name:      "foo",
 						Namespace: "bar",
 					},
-					Spec:   v1.DeploymentSpec{},
+					Spec: v1.DeploymentSpec{
+						Replicas:                new(int32),
+						ProgressDeadlineSeconds: new(int32),
+					},
 					Status: v1.DeploymentStatus{},
 				},
 				replicas: 4,
@@ -200,11 +214,14 @@ func TestScaler(t *testing.T) {
 							Namespace: "bar",
 							Labels:    map[string]string{"scaler/opt-in": "true"},
 						},
-						Spec:   v1.DeploymentSpec{},
+						Spec: v1.DeploymentSpec{
+							Replicas:                new(int32),
+							ProgressDeadlineSeconds: new(int32),
+						},
 						Status: v1.DeploymentStatus{},
 					}).
 					Build(),
-				deploymentItem: g.DeploymentInfo{
+				scalingItem: g.ScalingInfo{
 					Name:        "bar",
 					Namespace:   "foo",
 					SpecReplica: 4,
@@ -220,7 +237,10 @@ func TestScaler(t *testing.T) {
 						Namespace: "foo",
 						Labels:    map[string]string{"scaler/opt-in": "true"},
 					},
-					Spec:   v1.DeploymentSpec{},
+					Spec: v1.DeploymentSpec{
+						Replicas:                new(int32),
+						ProgressDeadlineSeconds: new(int32),
+					},
 					Status: v1.DeploymentStatus{},
 				},
 				replicas: 4,
@@ -242,11 +262,14 @@ func TestScaler(t *testing.T) {
 							Namespace: "bar",
 							Labels:    map[string]string{"scaler/opt-in": "true"},
 						},
-						Spec:   v1.DeploymentSpec{},
+						Spec: v1.DeploymentSpec{
+							Replicas:                new(int32),
+							ProgressDeadlineSeconds: new(int32),
+						},
 						Status: v1.DeploymentStatus{},
 					}).
 					Build(),
-				deploymentItem: g.DeploymentInfo{
+				scalingItem: g.ScalingInfo{
 					Name:          "foo",
 					Namespace:     "bar",
 					Annotations:   map[string]string{"scaler/allow-autoscaling": "true"},
@@ -265,7 +288,8 @@ func TestScaler(t *testing.T) {
 						Annotations: map[string]string{"scaler/allow-autoscaling": "true"},
 					},
 					Spec: v1.DeploymentSpec{
-						Replicas: new(int32),
+						Replicas:                new(int32),
+						ProgressDeadlineSeconds: new(int32),
 					},
 					Status: v1.DeploymentStatus{
 						Replicas: 5,
@@ -278,8 +302,8 @@ func TestScaler(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := DoScaling(tt.args.ctx, tt.args._client, tt.args.deploymentItem, tt.args.replicas); (err != nil) != tt.wantErr {
-				t.Errorf("DeploymentScaler() error = %v, wantErr %v", err, tt.wantErr)
+			if err := DoScaling(tt.args.ctx, tt.args._client, tt.args.scalingItem, tt.args.replicas); (err != nil) != tt.wantErr {
+				t.Errorf("Scaler() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -303,7 +327,10 @@ func TestOptinLabel(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{},
 					},
-					Spec:   v1.DeploymentSpec{},
+					Spec: v1.DeploymentSpec{
+						Replicas:                new(int32),
+						ProgressDeadlineSeconds: new(int32),
+					},
 					Status: v1.DeploymentStatus{},
 				},
 			},
@@ -327,8 +354,8 @@ func TestOptinLabel(t *testing.T) {
 
 func TestStateReplicas(t *testing.T) {
 	type args struct {
-		state      states.State
-		deployment v1.Deployment
+		state          states.State
+		deploymentItem g.ScalingInfo
 	}
 	tests := []struct {
 		name    string
@@ -342,11 +369,10 @@ func TestStateReplicas(t *testing.T) {
 				state: states.State{
 					Name: "foo",
 				},
-				deployment: v1.Deployment{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "Deployment",
-						APIVersion: "apps/v1",
-					},
+				deploymentItem: g.ScalingInfo{
+					Name:        "foo",
+					Namespace:   "bar",
+					Annotations: map[string]string{},
 				},
 			},
 			want:    sr.StateReplica{},
@@ -355,7 +381,7 @@ func TestStateReplicas(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := StateReplicas(tt.args.state, g.ConvertDeploymentToItem(tt.args.deployment))
+			got, err := StateReplicas(tt.args.state, tt.args.deploymentItem)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DeploymentStateReplicas() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -370,7 +396,7 @@ func TestStateReplicas(t *testing.T) {
 func TestStateReplicasList(t *testing.T) {
 	type args struct {
 		state           states.State
-		deploymentItems []g.DeploymentInfo
+		deploymentItems []g.ScalingInfo
 	}
 	tests := []struct {
 		name    string
@@ -384,20 +410,20 @@ func TestStateReplicasList(t *testing.T) {
 				state: states.State{
 					Name: "foo",
 				},
-				deploymentItems: []g.DeploymentInfo{
+				deploymentItems: []g.ScalingInfo{
 					{
 						Name:      "foo",
 						Namespace: "bar",
 						Annotations: map[string]string{
 							"scaler/state-foo-replicas":     "2",
 							"scaler/state-default-replicas": "1"},
-						Labels:             map[string]string{"scaler/opt-in": "false"},
-						SpecReplica:        1,
-						IsDeploymentConfig: false,
-						Failure:            false,
-						FailureMessage:     "",
-						ReadyReplicas:      1,
-						DesiredReplicas:    2,
+						Labels:          map[string]string{"scaler/opt-in": "false"},
+						SpecReplica:     1,
+						ScalingItemType: g.ScalingItemType{ItemTypeName: "Deployment"},
+						Failure:         false,
+						FailureMessage:  "",
+						ReadyReplicas:   1,
+						DesiredReplicas: 2,
 					},
 					{
 						Name:      "foo2",
@@ -405,13 +431,13 @@ func TestStateReplicasList(t *testing.T) {
 						Annotations: map[string]string{
 							"scaler/state-foo-replicas":     "5",
 							"scaler/state-default-replicas": "3"},
-						Labels:             map[string]string{"scaler/opt-in": "false"},
-						SpecReplica:        1,
-						IsDeploymentConfig: false,
-						Failure:            false,
-						FailureMessage:     "",
-						ReadyReplicas:      1,
-						DesiredReplicas:    2,
+						Labels:          map[string]string{"scaler/opt-in": "false"},
+						SpecReplica:     1,
+						ScalingItemType: g.ScalingItemType{ItemTypeName: "Deployment"},
+						Failure:         false,
+						FailureMessage:  "",
+						ReadyReplicas:   1,
+						DesiredReplicas: 2,
 					},
 				},
 			},
@@ -433,28 +459,28 @@ func TestStateReplicasList(t *testing.T) {
 				state: states.State{
 					Name: "foo",
 				},
-				deploymentItems: []g.DeploymentInfo{
+				deploymentItems: []g.ScalingInfo{
 					{
-						Name:               "foo",
-						Namespace:          "bar",
-						Labels:             map[string]string{"scaler/opt-in": "false"},
-						SpecReplica:        1,
-						IsDeploymentConfig: false,
-						Failure:            false,
-						FailureMessage:     "",
-						ReadyReplicas:      1,
-						DesiredReplicas:    2,
+						Name:            "foo",
+						Namespace:       "bar",
+						Labels:          map[string]string{"scaler/opt-in": "false"},
+						SpecReplica:     1,
+						ScalingItemType: g.ScalingItemType{ItemTypeName: "Deployment"},
+						Failure:         false,
+						FailureMessage:  "",
+						ReadyReplicas:   1,
+						DesiredReplicas: 2,
 					},
 					{
-						Name:               "foo2",
-						Namespace:          "bar2",
-						Labels:             map[string]string{"scaler/opt-in": "false"},
-						SpecReplica:        1,
-						IsDeploymentConfig: false,
-						Failure:            false,
-						FailureMessage:     "",
-						ReadyReplicas:      1,
-						DesiredReplicas:    2,
+						Name:            "foo2",
+						Namespace:       "bar2",
+						Labels:          map[string]string{"scaler/opt-in": "false"},
+						SpecReplica:     1,
+						ScalingItemType: g.ScalingItemType{ItemTypeName: "Deployment"},
+						Failure:         false,
+						FailureMessage:  "",
+						ReadyReplicas:   1,
+						DesiredReplicas: 2,
 					},
 				},
 			},
@@ -492,7 +518,8 @@ func TestLimitsNeeded(t *testing.T) {
 			args: args{
 				deployment: v1.Deployment{
 					Spec: v1.DeploymentSpec{
-						Replicas: new(int32),
+						Replicas:                new(int32),
+						ProgressDeadlineSeconds: new(int32),
 						Template: corev1.PodTemplateSpec{
 							ObjectMeta: metav1.ObjectMeta{},
 							Spec: corev1.PodSpec{Containers: []corev1.Container{
@@ -525,7 +552,7 @@ func TestLimitsNeeded(t *testing.T) {
 
 func TestLimitsNeededList(t *testing.T) {
 	type args struct {
-		deploymentItems  []g.DeploymentInfo
+		deploymentItems  []g.ScalingInfo
 		scaleReplicalist []sr.StateReplica
 	}
 	tests := []struct {
@@ -536,7 +563,7 @@ func TestLimitsNeededList(t *testing.T) {
 		{
 			name: "TestLimitsNeededList",
 			args: args{
-				deploymentItems: []g.DeploymentInfo{
+				deploymentItems: []g.ScalingInfo{
 					{
 						Name:         "foo",
 						ResourceList: map[corev1.ResourceName]resource.Quantity{},

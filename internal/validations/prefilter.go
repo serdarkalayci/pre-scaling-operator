@@ -29,21 +29,21 @@ func PreFilter(r record.EventRecorder) predicate.Predicate {
 
 			generateOptInLabelUpdateEvent(e, r, newoptin, oldoptin)
 
-			item := g.DeploymentInfo{
+			item := g.ScalingInfo{
 				Name:      deploymentName,
 				Namespace: nameSpace,
 			}
 
 			// Deployment opted out. Don't do anything
 			if !newoptin {
-				if g.GetDenyList().IsInConcurrentList(item) {
+				if g.GetDenyList().IsBeingScaled(item) {
 					// The deployment is being scaled at the moment! Notify scaler to abort.
 					log := ctrl.Log.
 						WithValues("Name", item.Name).
 						WithValues("Namespace", item.Namespace).
 						WithValues("NewOptIn", newoptin)
 					log.Info("The deployment has been opted out and is being scaled at the moment. Trying to intercept the step scaler to stop scaling!")
-					g.GetDenyList().SetDeploymentInfoOnList(item, true, "Opt-In is false!", -1)
+					g.GetDenyList().SetScalingItemOnList(item, true, "Opt-In is false!", -1)
 				}
 				return false
 			}
@@ -54,8 +54,13 @@ func PreFilter(r record.EventRecorder) predicate.Predicate {
 			// don't reconcile if the stepscale annotation is present.
 			//stepScaleActive := AssessStepScaleAnnotation(e)
 
+			// Let reconciler_cron handle those deployments
+			if g.GetDenyList().IsDeploymentInFailureState(item) {
+				return false
+			}
+
 			// Don't reconcile on any change except when Annotation may have changed while the deployment was on the deny list.
-			if g.GetDenyList().IsInConcurrentList(item) && !annotationchange {
+			if g.GetDenyList().IsBeingScaled(item) && !annotationchange {
 				return false
 			}
 
@@ -91,6 +96,16 @@ func PreFilter(r record.EventRecorder) predicate.Predicate {
 			return newoptin
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
+			// The deployment got deleted. Regardless of the failure state, we need to delete the item from the list.
+			item := g.ScalingInfo{
+				Name:      e.Object.GetName(),
+				Namespace: e.Object.GetNamespace(),
+			}
+
+			if g.GetDenyList().IsInConcurrentList(item) {
+				g.GetDenyList().RemoveFromList(item)
+			}
+
 			return false
 		},
 	}

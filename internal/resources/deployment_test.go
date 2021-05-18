@@ -39,7 +39,10 @@ func TestDeploymentGetter(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "test",
 						},
-						Spec:   v1.DeploymentSpec{},
+						Spec: v1.DeploymentSpec{
+							Replicas:                new(int32),
+							ProgressDeadlineSeconds: new(int32),
+						},
 						Status: v1.DeploymentStatus{},
 					}).
 					Build(),
@@ -57,7 +60,10 @@ func TestDeploymentGetter(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 				},
-				Spec:   v1.DeploymentSpec{},
+				Spec: v1.DeploymentSpec{
+					Replicas:                new(int32),
+					ProgressDeadlineSeconds: new(int32),
+				},
 				Status: v1.DeploymentStatus{},
 			},
 			wantErr: false,
@@ -75,7 +81,10 @@ func TestDeploymentGetter(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "test",
 						},
-						Spec:   v1.DeploymentSpec{},
+						Spec: v1.DeploymentSpec{
+							Replicas:                new(int32),
+							ProgressDeadlineSeconds: new(int32),
+						},
 						Status: v1.DeploymentStatus{},
 					}).
 					Build(),

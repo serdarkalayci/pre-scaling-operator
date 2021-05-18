@@ -3,22 +3,37 @@ package reconciler
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/quotas"
 	"github.com/containersol/prescale-operator/internal/resources"
 	"github.com/containersol/prescale-operator/internal/states"
 	g "github.com/containersol/prescale-operator/pkg/utils/global"
+	ocv1 "github.com/openshift/api/apps/v1"
+
+	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type NamespaceEvents struct {
-	QuotaExceeded string
+	QuotaExceeded    string
+	ReconcileSuccess []string
+	ReconcileFailure []string
 }
 
-func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State) (NamespaceEvents, string, error) {
+type ReconcilerError struct {
+	msg string
+}
+
+func (err ReconcilerError) Error() string {
+	return err.msg
+}
+
+func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State, recorder record.EventRecorder) (NamespaceEvents, string, error) {
 
 	var objectsToReconcile int
 	var nsEvents NamespaceEvents
@@ -37,7 +52,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 	// We now need to look for objects (currently supported deployments and deploymentConfigs) which are opted in,
 	// then use their annotations to determine the correct scale
-	deployments, err := resources.DeploymentItemLister(ctx, _client, namespace, c.OptInLabel)
+	deployments, err := resources.ScalingItemLister(ctx, _client, namespace, c.OptInLabel)
 	if err != nil {
 		log.Error(err, "Cannot list deployments in namespace")
 		return nsEvents, finalState.Name, err
@@ -62,28 +77,39 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 	if allowed {
 		for i, deployment := range deployments {
-			deploymentItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(deployment)
-			if notFoundErr == nil {
-				if deploymentItem.DesiredReplicas != scaleReplicalist[i].Replicas {
-					g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, scaleReplicalist[i].Replicas)
+			// Don't scale if we don't need to
+			if deployment.SpecReplica == scaleReplicalist[i].Replicas {
+				return nsEvents, finalState.Name, nil
+			}
 
-					log.WithValues("Name: ", deploymentItem.Name).
-						WithValues("Namespace: ", deploymentItem.Namespace).
-						WithValues("DeploymentConfig: ", deploymentItem.IsDeploymentConfig).
-						WithValues("DesiredReplicaount: ", deploymentItem.DesiredReplicas).
-						WithValues("Failure: ", deploymentItem.Failure).
-						WithValues("Failure message: ", deploymentItem.FailureMessage).
+			scalingItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(deployment)
+			if notFoundErr == nil {
+				if scalingItem.DesiredReplicas != scaleReplicalist[i].Replicas {
+					g.GetDenyList().SetScalingItemOnList(scalingItem, scalingItem.Failure, scalingItem.FailureMessage, scaleReplicalist[i].Replicas)
+
+					log.WithValues("Name: ", scalingItem.Name).
+						WithValues("Namespace: ", scalingItem.Namespace).
+						WithValues("Object: ", scalingItem.ScalingItemType.ItemTypeName).
+						WithValues("DesiredReplicacount: ", scalingItem.DesiredReplicas).
+						WithValues("Failure: ", scalingItem.Failure).
+						WithValues("Failure message: ", scalingItem.FailureMessage).
 						Info("Deployment is already being scaled at the moment. Updated desired replica count")
 				}
 				continue
 			}
+			if !g.GetDenyList().IsDeploymentInFailureState(deployment) {
+				err := resources.ScaleOrStepScale(ctx, _client, deployment, scaleReplicalist[i], "NSSCALER")
+				RegisterEvents(ctx, _client, recorder, err, scalingItem)
+				if !g.GetDenyList().IsDeploymentInFailureState(scalingItem) {
+					g.GetDenyList().RemoveFromList(scalingItem)
+				}
 
-			err := resources.ScaleOrStepScale(ctx, _client, deployment, scaleReplicalist[i], "NSSCALER")
-
-			if err != nil {
-				log.Error(err, "Error scaling the deployment")
-				continue
+				if err != nil {
+					log.Error(err, "Error scaling the deployment")
+					continue
+				}
 			}
+
 		}
 	} else {
 		nsEvents.QuotaExceeded = namespace
@@ -96,18 +122,23 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	return nsEvents, finalState.Name, err
 }
 
-func ReconcileDeploymentOrDeploymentConfig(ctx context.Context, _client client.Client, deploymentItem g.DeploymentInfo, state states.State) error {
+func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingItem g.ScalingInfo, state states.State, forceReconcile bool, recorder record.EventRecorder, whereFromScalingItem string) error {
 	log := ctrl.Log.
-		WithValues("deploymentItem", deploymentItem.Name).
-		WithValues("namespace", deploymentItem.Namespace)
+		WithValues("deploymentItem", scalingItem.Name).
+		WithValues("namespace", scalingItem.Namespace)
 
-	stateReplica, err := resources.StateReplicas(state, deploymentItem)
+	stateReplica, err := resources.StateReplicas(state, scalingItem)
 	if err != nil {
 		log.Error(err, "Error getting the state replicas")
 		return err
 	}
 
-	allowed, err := quotas.ResourceQuotaCheck(ctx, deploymentItem.Namespace, resources.LimitsNeeded(deploymentItem, stateReplica.Replicas))
+	// Don't scale if we don't need to
+	if scalingItem.ReadyReplicas == stateReplica.Replicas {
+		return nil
+	}
+
+	allowed, err := quotas.ResourceQuotaCheck(ctx, scalingItem.Namespace, resources.LimitsNeeded(scalingItem, stateReplica.Replicas))
 	if err != nil {
 		log.Error(err, "Cannot calculate the resource quotas")
 		return err
@@ -118,25 +149,37 @@ func ReconcileDeploymentOrDeploymentConfig(ctx context.Context, _client client.C
 	log.Info("Quota Check")
 
 	if allowed {
-		if g.GetDenyList().IsInConcurrentList(deploymentItem) {
-			if deploymentItem.DesiredReplicas != stateReplica.Replicas {
-				g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, stateReplica.Replicas)
+		if g.GetDenyList().IsBeingScaled(scalingItem) && !g.GetDenyList().IsDeploymentInFailureState(scalingItem) {
+			if scalingItem.DesiredReplicas != stateReplica.Replicas {
+				// Update the desired replica count with a "jump ahead". Because the scaler is active with this ScaleItem we need to tell them via the concurrent list that the desiredreplicacount has changed
+				g.GetDenyList().SetScalingItemOnList(scalingItem, scalingItem.Failure, scalingItem.FailureMessage, stateReplica.Replicas)
 
-				log.WithValues("Deployment: ", deploymentItem.Name).
-					WithValues("Namespace: ", deploymentItem.Namespace).
-					WithValues("DesiredReplicaount: ", deploymentItem.DesiredReplicas).
-					WithValues("Failure: ", deploymentItem.Failure).
-					WithValues("Failure message: ", deploymentItem.FailureMessage).
+				log.WithValues("Deployment: ", scalingItem.Name).
+					WithValues("Namespace: ", scalingItem.Namespace).
+					WithValues("DesiredReplicaount: ", scalingItem.DesiredReplicas).
+					WithValues("Failure: ", scalingItem.Failure).
+					WithValues("Failure message: ", scalingItem.FailureMessage).
 					Info("Deployment is already being scaled at the moment. Updated desired replica count")
 			}
+			return ReconcilerError{
+				msg: "Already being scaled",
+			}
 		} else {
-			err = resources.ScaleOrStepScale(ctx, _client, deploymentItem, stateReplica, "deployScaler")
+			err = resources.ScaleOrStepScale(ctx, _client, scalingItem, stateReplica, "deployScaler")
+			RegisterEvents(ctx, _client, recorder, err, scalingItem)
+			if !g.GetDenyList().IsDeploymentInFailureState(scalingItem) {
+				g.GetDenyList().RemoveFromList(scalingItem)
+			}
 			if err != nil {
 				log.Error(err, "Error scaling the deployment")
 				return err
 			}
 		}
 
+	} else {
+		return ReconcilerError{
+			msg: "Can't scale due to ResourceQuota violation!",
+		}
 	}
 
 	return nil
@@ -214,4 +257,36 @@ func fetchNameSpaceState(ctx context.Context, _client client.Client, stateDefini
 		}
 	}
 	return namespaceState, nil
+}
+
+func RegisterEvents(ctx context.Context, _client client.Client, recorder record.EventRecorder, scalerErr error, scalingItem g.ScalingInfo) {
+	// refresh the item to get newest replica count
+	scalingItem, _ = g.GetDenyList().GetDeploymentInfoFromList(scalingItem)
+	if scalingItem.ScalingItemType.ItemTypeName == "DeploymentConfig" {
+		deplConf := ocv1.DeploymentConfig{}
+		deplConf, getErr := resources.DeploymentConfigGetterByScaleItem(ctx, _client, scalingItem)
+		if getErr == nil {
+			if scalerErr != nil {
+				recorder.Event(deplConf.DeepCopyObject(), "Warning", "Deploymentconfig scale error", scalerErr.Error()+" | "+fmt.Sprintf("Failed to scale the Deploymentconfig to %d replicas. Stuck on: %d replicas", scalingItem.DesiredReplicas, deplConf.Spec.Replicas))
+			} else {
+				recorder.Event(deplConf.DeepCopyObject(), "Normal", "Deploymentconfig scaled", fmt.Sprintf("Successfully scaled the Deploymentconfig to %d replicas", deplConf.Spec.Replicas))
+			}
+		} else {
+			recorder.Event(deplConf.DeepCopyObject(), "Warning", "Deploymentconfig scale error", scalerErr.Error()+" | "+fmt.Sprintf("Failed to scale the Deploymentconfig to %d replicas. Most likely cause is that the Deploymentconfig doesn't exist anymore.", scalingItem.DesiredReplicas))
+		}
+	} else {
+		depl := v1.Deployment{}
+		depl, getErr := resources.DeploymentGetterByScaleItem(ctx, _client, scalingItem)
+		if getErr == nil {
+			if scalerErr != nil {
+				recorder.Event(depl.DeepCopyObject(), "Warning", "Deployment scale error", scalerErr.Error()+" | "+fmt.Sprintf("Failed to scale the Deployment to %d replicas. Stuck on: %d replicas", scalingItem.DesiredReplicas, *depl.Spec.Replicas))
+			} else {
+				recorder.Event(depl.DeepCopyObject(), "Normal", "Deployment scaled", fmt.Sprintf("Successfully scaled the Deployment to %d replicas", *depl.Spec.Replicas))
+			}
+		} else {
+			recorder.Event(depl.DeepCopyObject(), "Warning", "Deployment scale error", scalerErr.Error()+" | "+fmt.Sprintf("Failed to scale the Deployment to %d replicas. Most likely cause is that the Deployment doesn't exist anymore.", scalingItem.DesiredReplicas))
+		}
+
+	}
+
 }

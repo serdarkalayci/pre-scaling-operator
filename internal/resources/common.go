@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -29,11 +30,11 @@ func (err ScaleError) Error() string {
 	return err.msg
 }
 
-func DoScaling(ctx context.Context, _client client.Client, deploymentItem g.DeploymentInfo, replicas int32) error {
+func DoScaling(ctx context.Context, _client client.Client, scalingItem g.ScalingInfo, replicas int32) error {
 
-	if v, found := deploymentItem.Annotations["scaler/allow-autoscaling"]; found {
+	if v, found := scalingItem.Annotations["scaler/allow-autoscaling"]; found {
 		if v == "true" {
-			if replicas <= int32(deploymentItem.SpecReplica) {
+			if replicas <= int32(scalingItem.SpecReplica) {
 				return nil
 			}
 		}
@@ -43,8 +44,8 @@ func DoScaling(ctx context.Context, _client client.Client, deploymentItem g.Depl
 		time.Sleep(time.Second * 1)
 
 		// We need to get a newer version of the object from the client
-		deploymentItem, err := GetDeploymentItem(ctx, _client, deploymentItem)
-		if err != nil {
+		deploymentItem, err := GetRefreshedScalingItem(ctx, _client, scalingItem)
+		if err != nil || (deploymentItem.Name == "" || deploymentItem.Namespace == "") {
 			log.Error(err, "Error getting refreshed deploymentItem in conflict resolution")
 		}
 
@@ -53,17 +54,17 @@ func DoScaling(ctx context.Context, _client client.Client, deploymentItem g.Depl
 			deploymentItem.SpecReplica = replicas
 
 			var updateErr error = nil
-			if !g.GetDenyList().IsDeploymentInFailureState(deploymentItem) {
+			if !deploymentItem.Failure {
 				exists, labelErr := OptinLabel(deploymentItem)
 				if !exists || labelErr != nil {
 					return DeploymentScaleError{
 						msg: "Error scaling the Deployment! The deployment is opted out!",
 					}
 				}
-				updateErr = UpdateDeploymentOrDeploymentConfig(ctx, _client, deploymentItem)
+				updateErr = UpdateScalingItem(ctx, _client, deploymentItem)
 			} else {
 				return DeploymentScaleError{
-					msg: "Error scaling the Deployment!. The Deployment is in failure state!",
+					msg: "Error scaling the Deployment!. The Deployment is in failure state! Message: " + deploymentItem.FailureMessage,
 				}
 			}
 			if updateErr != nil {
@@ -75,12 +76,12 @@ func DoScaling(ctx context.Context, _client client.Client, deploymentItem g.Depl
 }
 
 //DeploymentOptinLabel returns true if the optin-label is found and is true for the deploymentItem
-func OptinLabel(deploymentItem g.DeploymentInfo) (bool, error) {
+func OptinLabel(deploymentItem g.ScalingInfo) (bool, error) {
 
 	return validations.OptinLabelExists(deploymentItem.Labels)
 }
 
-func StateReplicas(state states.State, deploymentItem g.DeploymentInfo) (sr.StateReplica, error) {
+func StateReplicas(state states.State, deploymentItem g.ScalingInfo) (sr.StateReplica, error) {
 	log := ctrl.Log.
 		WithValues("deploymentItem", deploymentItem.Name).
 		WithValues("namespace", deploymentItem.Namespace)
@@ -104,7 +105,7 @@ func StateReplicas(state states.State, deploymentItem g.DeploymentInfo) (sr.Stat
 	return stateReplica, nil
 }
 
-func StateReplicasList(state states.State, deployments []g.DeploymentInfo) ([]sr.StateReplica, error) {
+func StateReplicasList(state states.State, deployments []g.ScalingInfo) ([]sr.StateReplica, error) {
 
 	var stateReplicaList []sr.StateReplica
 	var err error
@@ -154,42 +155,20 @@ func StateReplicasList(state states.State, deployments []g.DeploymentInfo) ([]sr
 	return stateReplicaList, err
 }
 
-func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem g.DeploymentInfo, stateReplica sr.StateReplica, whereFrom string) error {
+// Main function to make scaling decisions. The step scaler scales 1 by 1 towards the desired replica count.
+func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem g.ScalingInfo, stateReplica sr.StateReplica, whereFrom string) error {
 
 	log := ctrl.Log.
 		WithValues("deploymentItem", deploymentItem.Name).
 		WithValues("namespace", deploymentItem.Namespace)
 	var err error
 
-	if g.GetDenyList().IsInConcurrentList(deploymentItem) {
-		log.Info("Waiting for the deploymentItem to be off the denylist.")
-		for stay, timeout := true, time.After(time.Second*120); stay; {
-			select {
-			case <-timeout:
-				log.Info("Timeout reached! The deploymentItem stayed on the denylist for too long. Couldn't reconcile this deploymentItem!")
-				return nil
-			default:
-				time.Sleep(time.Second * 10)
-				if !g.GetDenyList().IsInConcurrentList(deploymentItem) {
-					// Refresh deploymentItem to get a new object to reconcile
-
-					deploymentItem, err = GetDeploymentItem(ctx, _client, deploymentItem)
-					if err != nil {
-						log.Error(err, "Deployment waited to be out of denylist but couldn't get a refreshed object to Reconcile.")
-						return nil
-					}
-					stay = false
-				}
-			}
-		}
-	}
-
 	var oldReplicaCount int32
 	oldReplicaCount = deploymentItem.SpecReplica
 	desiredReplicaCount := stateReplica.Replicas
 
-	// This might not be necessary anymore
-	if oldReplicaCount == stateReplica.Replicas {
+	// We need to skip this check in case of failure in order to get a new object from DoScaling() to check on the state on the cluster.
+	if oldReplicaCount == stateReplica.Replicas && !deploymentItem.Failure {
 		log.Info("No Update on deploymentItem. Desired replica count already matches current.")
 		return nil
 	}
@@ -197,34 +176,78 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 	var stepReplicaCount int32
 	var stepCondition bool = true
 	var retryErr error = nil
+
+	stepReplicaCount = deploymentItem.SpecReplica
 	rateLimitingEnabled := states.GetStepScaleSetting(ctx, _client)
 	log.Info("Putting deploymentItem on denylist")
-	g.GetDenyList().SetDeploymentInfoOnList(deploymentItem, false, "", desiredReplicaCount)
+	deploymentItem.IsBeingScaled = true
+	g.GetDenyList().SetScalingItemOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, desiredReplicaCount)
 	if rateLimitingEnabled {
 		log.WithValues("Deployment: ", deploymentItem.Name).
 			WithValues("Namespace: ", deploymentItem.Namespace).
-			WithValues("DesiredReplicaount: ", deploymentItem.DesiredReplicas).
 			WithValues("Wherefrom: ", whereFrom).
 			Info("Going into step scaler..")
-		// Loop step by step until deploymentItem has reached desiredreplica count. Fail when the deploymentItem update failed too many times
+		// Loop step by step until deploymentItem has reached desiredreplica count.
 		for stepCondition {
 
-			desiredReplicaCount = int32(g.GetDenyList().GetDesiredReplicasFromList(deploymentItem))
-			// decide if we need to step up or down
+			deploymentItem, _ = g.GetDenyList().GetDeploymentInfoFromList(deploymentItem)
+			desiredReplicaCount = deploymentItem.DesiredReplicas
 			oldReplicaCount = deploymentItem.SpecReplica
+			if desiredReplicaCount == -1 {
+				desiredReplicaCount = stateReplica.Replicas
+			}
+
+			// Wait until deploymentItem is ready for the next step and check if it's failing for some reason
+			waitTime := time.Duration(time.Duration(deploymentItem.ProgressDeadline))*time.Second + time.Second
+			for stay, timeout := true, time.After(waitTime); stay; {
+				select {
+				case <-timeout:
+					deploymentItem.IsBeingScaled = false
+					g.GetDenyList().SetScalingItemOnList(deploymentItem, true, fmt.Sprintf("Message on the cluster: %s | The operator decided that it can't scale that deployment or deploymentconfig!", deploymentItem.ConditionReason), desiredReplicaCount)
+					return ScaleError{
+						msg: fmt.Sprintf("Message on the cluster: %s | The operator decided that it can't scale that deployment or deploymentconfig!", deploymentItem.ConditionReason),
+					}
+				default:
+					time.Sleep(time.Second * 2)
+					deploymentItem, err = GetRefreshedScalingItem(ctx, _client, deploymentItem)
+					if err != nil {
+						log.Error(err, "Error getting refreshed deploymentItem in wait for Readiness loop")
+						// The deployment does not exist anymore. Not putting it in failure state.
+						deploymentItem.IsBeingScaled = false
+						g.GetDenyList().SetScalingItemOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, deploymentItem.DesiredReplicas)
+						return err
+					}
+
+					if deploymentItem.ReadyReplicas == stepReplicaCount {
+						stay = false
+					}
+					// k8s can't handle the deployment for some reason. We can't scale
+					if deploymentItem.ConditionReason == "ProgressDeadlineExceeded" {
+						deploymentItem.IsBeingScaled = false
+						g.GetDenyList().SetScalingItemOnList(deploymentItem, true, "ProgressDeadlineExceeded", desiredReplicaCount)
+						return ScaleError{
+							msg: "The deployment is in a failing state on the cluster! ProgressDeadlineExceeded!",
+						}
+					}
+				}
+
+			}
+
+			// decide if we need to step up or down
 			if oldReplicaCount < desiredReplicaCount {
 				stepReplicaCount = oldReplicaCount + 1
 			} else if oldReplicaCount > desiredReplicaCount {
 				stepReplicaCount = oldReplicaCount - 1
 			} else if oldReplicaCount == desiredReplicaCount {
 				log.Info("Finished scaling. Leaving early due to an update from another goroutine.")
-				g.GetDenyList().RemoveFromList(deploymentItem)
+				deploymentItem.IsBeingScaled = false
+				g.GetDenyList().SetScalingItemOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, deploymentItem.DesiredReplicas)
+
 				return nil
 			}
-			log.WithValues("Deployment: ", deploymentItem.Name).
+
+			log.WithValues("ScalingItem: ", deploymentItem.Name).
 				WithValues("Namespace: ", deploymentItem.Namespace).
-				WithValues("DesiredReplicaount on item:  ", deploymentItem.DesiredReplicas).
-				WithValues("Desiredreplicacount", desiredReplicaCount).
 				WithValues("Stepreplicacount", stepReplicaCount).
 				WithValues("Wherefrom: ", whereFrom).
 				Info("Step Scaling!")
@@ -232,28 +255,10 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 			retryErr = DoScaling(ctx, _client, deploymentItem, stepReplicaCount)
 
 			if retryErr != nil {
-				log.Error(retryErr, "Unable to scale the deploymentItem, err: %v")
-				g.GetDenyList().RemoveFromList(deploymentItem)
+				//log.Error(retryErr, "Unable to scale the deploymentItem, err: %v")
+				deploymentItem.IsBeingScaled = false
+				g.GetDenyList().SetScalingItemOnList(deploymentItem, true, retryErr.Error(), stateReplica.Replicas)
 				return retryErr
-			}
-
-			// Wait until deploymentItem is ready for the next step
-			for stay, timeout := true, time.After(time.Second*60); stay; {
-				select {
-				case <-timeout:
-					stay = false
-				default:
-					time.Sleep(time.Second * 5)
-					deploymentItem, err = GetDeploymentItem(ctx, _client, deploymentItem)
-					if err != nil {
-						log.Error(err, "Error getting refreshed deploymentItem in wait for Readiness loop")
-						g.GetDenyList().RemoveFromList(deploymentItem)
-						return err
-					}
-					if deploymentItem.ReadyReplicas == stepReplicaCount {
-						stay = false
-					}
-				}
 			}
 
 			// check if desired is reached
@@ -266,8 +271,9 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 		retryErr = DoScaling(ctx, _client, deploymentItem, desiredReplicaCount)
 
 		if retryErr != nil {
-			log.Error(retryErr, "Unable to scale the deploymentItem, err: %v")
-			g.GetDenyList().RemoveFromList(deploymentItem)
+			//log.Error(retryErr, "Unable to scale the deploymentItem, err: %v")
+			deploymentItem.IsBeingScaled = false
+			g.GetDenyList().SetScalingItemOnList(deploymentItem, true, retryErr.Error(), stateReplica.Replicas)
 			return retryErr
 		}
 	}
@@ -276,16 +282,17 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 		WithValues("Deployment Name", deploymentItem.Name).
 		WithValues("Namespace", deploymentItem.Namespace).
 		Info("Finished scaling deploymentItem to desired replica count")
-	g.GetDenyList().RemoveFromList(deploymentItem)
+	deploymentItem.IsBeingScaled = false
+	g.GetDenyList().SetScalingItemOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, deploymentItem.DesiredReplicas)
 	return nil
 }
 
-func LimitsNeeded(deploymentItem g.DeploymentInfo, replicas int32) corev1.ResourceList {
+func LimitsNeeded(deploymentItem g.ScalingInfo, replicas int32) corev1.ResourceList {
 
 	return math.Mul(math.ReplicaCalc(replicas, deploymentItem.SpecReplica), deploymentItem.ResourceList)
 }
 
-func LimitsNeededList(deployments []g.DeploymentInfo, scaleReplicalist []sr.StateReplica) corev1.ResourceList {
+func LimitsNeededList(deployments []g.ScalingInfo, scaleReplicalist []sr.StateReplica) corev1.ResourceList {
 
 	var limitsneeded corev1.ResourceList
 	for i, deploymentItem := range deployments {
@@ -294,16 +301,22 @@ func LimitsNeededList(deployments []g.DeploymentInfo, scaleReplicalist []sr.Stat
 	return limitsneeded
 }
 
-func GetDeploymentItem(ctx context.Context, _client client.Client, deploymentInfo g.DeploymentInfo) (g.DeploymentInfo, error) {
+func GetRefreshedScalingItemSetError(ctx context.Context, _client client.Client, deploymentInfo g.ScalingInfo, failure bool) (g.ScalingInfo, error) {
+	item, err := GetRefreshedScalingItem(ctx, _client, deploymentInfo)
+	return g.GetDenyList().SetScalingItemOnList(item, failure, "", -1), err
+}
+
+// Returns a new scaling item from the cluster
+func GetRefreshedScalingItem(ctx context.Context, _client client.Client, deploymentInfo g.ScalingInfo) (g.ScalingInfo, error) {
 	var req reconcile.Request
 	req.NamespacedName.Namespace = deploymentInfo.Namespace
 	req.NamespacedName.Name = deploymentInfo.Name
-	itemToReturn := g.DeploymentInfo{}
-	if deploymentInfo.IsDeploymentConfig {
+	itemToReturn := g.ScalingInfo{}
+	if deploymentInfo.ScalingItemType.ItemTypeName == "DeploymentConfig" {
 		deploymentconfig := ocv1.DeploymentConfig{}
 		err := _client.Get(ctx, req.NamespacedName, &deploymentconfig)
 		if err != nil {
-			return g.DeploymentInfo{}, err
+			return g.ScalingInfo{}, err
 		}
 		itemToReturn = g.ConvertDeploymentConfigToItem(deploymentconfig)
 	} else {
@@ -311,28 +324,32 @@ func GetDeploymentItem(ctx context.Context, _client client.Client, deploymentInf
 		deployment := v1.Deployment{}
 		err := _client.Get(ctx, req.NamespacedName, &deployment)
 		if err != nil {
-			return g.DeploymentInfo{}, err
+			return g.ScalingInfo{}, err
 		}
 		itemToReturn = g.ConvertDeploymentToItem(deployment)
 	}
-	return itemToReturn, nil
+	// Refresh the item on the list as well
+	itemToReturn.IsBeingScaled = deploymentInfo.IsBeingScaled
+	g.GetDenyList().SetScalingItemOnList(itemToReturn, itemToReturn.Failure, itemToReturn.FailureMessage, deploymentInfo.DesiredReplicas)
+	item, _ := g.GetDenyList().GetDeploymentInfoFromList(itemToReturn)
+	return item, nil
 }
 
 //DeploymentLister lists all deployments in a namespace
-func DeploymentItemLister(ctx context.Context, _client client.Client, namespace string, OptInLabel map[string]string) ([]g.DeploymentInfo, error) {
+func ScalingItemLister(ctx context.Context, _client client.Client, namespace string, OptInLabel map[string]string) ([]g.ScalingInfo, error) {
 
-	returnList := []g.DeploymentInfo{}
+	returnList := []g.ScalingInfo{}
 	deployments := v1.DeploymentList{}
 	deploymentconfigs := ocv1.DeploymentConfigList{}
 	err := _client.List(ctx, &deployments, client.MatchingLabels(OptInLabel), client.InNamespace(namespace))
 	if err != nil {
-		return []g.DeploymentInfo{}, err
+		return []g.ScalingInfo{}, err
 	}
 
 	if c.OpenshiftCluster {
 		err := _client.List(ctx, &deploymentconfigs, client.MatchingLabels(OptInLabel), client.InNamespace(namespace))
 		if err != nil {
-			return []g.DeploymentInfo{}, err
+			return []g.ScalingInfo{}, err
 		}
 	}
 
@@ -348,7 +365,7 @@ func DeploymentItemLister(ctx context.Context, _client client.Client, namespace 
 
 }
 
-func UpdateDeploymentOrDeploymentConfig(ctx context.Context, _client client.Client, deploymentItem g.DeploymentInfo) error {
+func UpdateScalingItem(ctx context.Context, _client client.Client, deploymentItem g.ScalingInfo) error {
 	var req reconcile.Request
 	req.NamespacedName.Namespace = deploymentItem.Namespace
 	req.NamespacedName.Name = deploymentItem.Name
@@ -358,7 +375,7 @@ func UpdateDeploymentOrDeploymentConfig(ctx context.Context, _client client.Clie
 	deployment := v1.Deployment{}
 	deploymentConfig := ocv1.DeploymentConfig{}
 
-	if deploymentItem.IsDeploymentConfig {
+	if deploymentItem.ScalingItemType.ItemTypeName == "DeploymentConfig" {
 		deploymentConfig, getErr = DeploymentConfigGetter(ctx, _client, req)
 		if getErr != nil {
 			return getErr

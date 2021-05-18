@@ -22,6 +22,7 @@ import (
 
 	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/validations"
+	"github.com/robfig/cron"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -37,6 +38,7 @@ import (
 
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
 	"github.com/containersol/prescale-operator/controllers"
+	r "github.com/containersol/prescale-operator/internal/reconciler"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -145,10 +147,16 @@ func main() {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
 	}
+	z := cron.New()
+	z.AddFunc("@every 0h1m", func() {
+		r.RectifyScaleItemsInFailureState(mgr.GetClient(), mgr.GetEventRecorderFor("clusterscalingstatedefinition-controller"))
+	})
+	z.Start()
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+
 }

@@ -3,9 +3,11 @@ package resources
 import (
 	"context"
 
+	g "github.com/containersol/prescale-operator/pkg/utils/global"
 	v1 "k8s.io/api/apps/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 type DeploymentScaleError struct {
@@ -25,5 +27,15 @@ func DeploymentGetter(ctx context.Context, _client client.Client, req ctrl.Reque
 		return v1.Deployment{}, err
 	}
 	return deployment, nil
+
+}
+
+//DeploymentGetter returns the specific deployment data given a scaleitem
+func DeploymentGetterByScaleItem(ctx context.Context, _client client.Client, deploymentItem g.ScalingInfo) (v1.Deployment, error) {
+	var req reconcile.Request
+	req.NamespacedName.Namespace = deploymentItem.Namespace
+	req.NamespacedName.Name = deploymentItem.Name
+
+	return DeploymentGetter(ctx, _client, req)
 
 }
