@@ -78,7 +78,7 @@ func (r *DeploymentConfigWatcher) Reconcile(ctx context.Context, req ctrl.Reques
 		go reconciler.ReconcileScalingItem(ctx, r.Client, deploymentItem, finalState, false, r.Recorder, "DEPLOYMENTCONFIGCONTROLLLER")
 	}
 
-	log.Info("Reconciliation loop completed for deploymentconfig")
+	log.Info("Deploymentconfig Reconciliation loop completed")
 
 	return ctrl.Result{}, nil
 }

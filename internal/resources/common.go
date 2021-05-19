@@ -187,6 +187,7 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 		log.WithValues("Deployment: ", deploymentItem.Name).
 			WithValues("Namespace: ", deploymentItem.Namespace).
 			WithValues("Wherefrom: ", whereFrom).
+			WithValues("DesiredReplicaCount", desiredReplicaCount).
 			Info("Going into step scaler..")
 		// Loop step by step until deploymentItem has reached desiredreplica count.
 		for stepCondition {
@@ -243,16 +244,19 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 				stepReplicaCount = oldReplicaCount + 1
 			} else if oldReplicaCount > desiredReplicaCount {
 				stepReplicaCount = oldReplicaCount - 1
-			} else if oldReplicaCount == desiredReplicaCount {
-				log.Info("Finished scaling. Leaving early due to an update from another goroutine.")
-				RegisterEvents(ctx, _client, recorder, nil, deploymentItem)
-				g.GetDenyList().RemoveFromList(deploymentItem)
-				return nil
 			}
+			// else if oldReplicaCount == desiredReplicaCount {
+			// 	log.Info("Finished scaling. Leaving early due to an update from another goroutine.")
+			// 	RegisterEvents(ctx, _client, recorder, nil, deploymentItem)
+			// 	g.GetDenyList().RemoveFromList(deploymentItem)
+			// 	return nil
+			// }
 
 			log.WithValues("ScalingItem: ", deploymentItem.Name).
 				WithValues("Namespace: ", deploymentItem.Namespace).
 				WithValues("Stepreplicacount", stepReplicaCount).
+				WithValues("Oldreplicacount", oldReplicaCount).
+				WithValues("Desiredreplicacount", desiredReplicaCount).
 				WithValues("Wherefrom: ", whereFrom).
 				Info("Step Scaling!")
 
@@ -266,8 +270,9 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 				return retryErr
 			}
 
-			// check if desired is reached
-			if deploymentItem.ReadyReplicas == desiredReplicaCount {
+			// check if desired is reached from a fresh item
+			deploymentItem, _ = GetRefreshedScalingItem(ctx, _client, deploymentItem)
+			if deploymentItem.ReadyReplicas == deploymentItem.DesiredReplicas {
 				stepCondition = false
 			}
 		}
@@ -283,8 +288,8 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 			return retryErr
 		}
 	}
-	log.WithValues("State", stateReplica.Name).
-		WithValues("Desired Replica Count", stateReplica.Replicas).
+
+	log.WithValues("Desired Replica Count", deploymentItem.DesiredReplicas).
 		WithValues("Deployment Name", deploymentItem.Name).
 		WithValues("Namespace", deploymentItem.Namespace).
 		Info("Finished scaling deploymentItem to desired replica count")
@@ -316,6 +321,11 @@ func GetRefreshedScalingItemSetError(ctx context.Context, _client client.Client,
 
 // Returns a new scaling item from the cluster
 func GetRefreshedScalingItem(ctx context.Context, _client client.Client, deploymentInfo g.ScalingInfo) (g.ScalingInfo, error) {
+	// First we need to get an updated version from the list
+	deploymentInfo, getErr := g.GetDenyList().GetDeploymentInfoFromList(deploymentInfo)
+	if getErr != nil {
+		return g.ScalingInfo{}, getErr
+	}
 	var req reconcile.Request
 	req.NamespacedName.Namespace = deploymentInfo.Namespace
 	req.NamespacedName.Name = deploymentInfo.Name
@@ -414,7 +424,7 @@ func RegisterEvents(ctx context.Context, _client client.Client, recorder record.
 			} else {
 				recorder.Event(deplConf.DeepCopyObject(), "Normal", "Deploymentconfig scaled", fmt.Sprintf("Successfully scaled the Deploymentconfig to %d replicas", deplConf.Spec.Replicas))
 			}
-		} 
+		}
 	} else {
 		depl := v1.Deployment{}
 		depl, getErr := DeploymentGetterByScaleItem(ctx, _client, scalingItem)

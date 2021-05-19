@@ -92,18 +92,17 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 			Expect(k8sClient.Delete(context.Background(), &ss)).Should(Succeed())
 		}
 
-		time.Sleep(time.Second * 5)
 		for _, ns := range namespaceList {
 			Expect(k8sClient.Delete(context.Background(), &ns)).Should(Succeed())
 		}
-
+		time.Sleep(time.Second * 10)
 		Expect(k8sClient.Delete(context.Background(), &cssd)).Should(Succeed())
 
 		casenumber = casenumber + 1
 
 		key.Namespace = "e2e-tests-crds" + strconv.Itoa(casenumber)
 
-		time.Sleep(time.Second * 1)
+		time.Sleep(time.Second * 5)
 	})
 
 	Context("Deployment in place and modification test", func() {
@@ -124,7 +123,6 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
 
 					time.Sleep(time.Second * 10)
-
 					ss = CreateScalingState("peak", namespaceList[0].Name)
 					Expect(k8sClient.Create(context.Background(), &ss)).Should(Succeed())
 				} else if casenumber == 4 {

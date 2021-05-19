@@ -83,14 +83,14 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 			if notFoundErr == nil {
 				if scalingItem.DesiredReplicas != scaleReplicalist[i].Replicas {
 					g.GetDenyList().SetScalingItemOnList(scalingItem, scalingItem.Failure, scalingItem.FailureMessage, scaleReplicalist[i].Replicas)
-
 					log.WithValues("Name: ", scalingItem.Name).
 						WithValues("Namespace: ", scalingItem.Namespace).
 						WithValues("Object: ", scalingItem.ScalingItemType.ItemTypeName).
-						WithValues("DesiredReplicacount: ", scalingItem.DesiredReplicas).
+						WithValues("DesiredReplicacount on item: ", scalingItem.DesiredReplicas).
+						WithValues("New replica count:", scaleReplicalist[i].Replicas).
 						WithValues("Failure: ", scalingItem.Failure).
 						WithValues("Failure message: ", scalingItem.FailureMessage).
-						Info("Deployment is already being scaled at the moment. Updated desired replica count")
+						Info("Deployment is already being scaled at the moment. Updated desired replica count with new replica count")
 				}
 				continue
 			}
@@ -137,25 +137,24 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 	log.Info("Quota Check")
 
 	if allowed {
-		if g.GetDenyList().IsBeingScaled(scalingItem) && !g.GetDenyList().IsDeploymentInFailureState(scalingItem) {
+		scalingItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(scalingItem)
+		if notFoundErr == nil {
 			if scalingItem.DesiredReplicas != stateReplica.Replicas {
-				// Update the desired replica count with a "jump ahead". Because the scaler is active with this ScaleItem we need to tell them via the concurrent list that the desiredreplicacount has changed
 				g.GetDenyList().SetScalingItemOnList(scalingItem, scalingItem.Failure, scalingItem.FailureMessage, stateReplica.Replicas)
 
-				log.WithValues("Deployment: ", scalingItem.Name).
+				log.WithValues("Name: ", scalingItem.Name).
 					WithValues("Namespace: ", scalingItem.Namespace).
-					WithValues("DesiredReplicaount: ", scalingItem.DesiredReplicas).
+					WithValues("Object: ", scalingItem.ScalingItemType.ItemTypeName).
+					WithValues("DesiredReplicacount on item: ", scalingItem.DesiredReplicas).
+					WithValues("New replica count:", stateReplica.Replicas).
 					WithValues("Failure: ", scalingItem.Failure).
 					WithValues("Failure message: ", scalingItem.FailureMessage).
-					Info("Deployment is already being scaled at the moment. Updated desired replica count")
-			}
-			return ReconcilerError{
-				msg: "Already being scaled",
+					Info("Deployment is already being scaled at the moment. Updated desired replica count with new replica count")
 			}
 		} else {
 			err = resources.ScaleOrStepScale(ctx, _client, scalingItem, stateReplica, "deployScaler", recorder)
 			if err != nil {
-				log.Error(err, "Errer scaling object!")
+				log.Error(err, "Error scaling object!")
 			}
 		}
 

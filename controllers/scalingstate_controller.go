@@ -69,7 +69,8 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		log.Error(err, "Failed to get ClusterStateDefinitions")
 		return ctrl.Result{}, err
 	}
-
+	log.WithValues("Namespace", req.Namespace).
+		Info("Scalingstate Controller: Reconciling namespace")
 	events, state, err := reconciler.ReconcileNamespace(ctx, r.Client, req.Namespace, clusterStateDefinitions, states.State{}, r.Recorder)
 
 	if err != nil {
@@ -85,7 +86,7 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	r.Recorder.Event(ss, "Normal", "AppliedState", fmt.Sprintf("The applied state for this namespace is %s", state))
 
-	log.Info("Reconciliation loop completed successfully")
+	log.Info("Scalingstate Reconciliation loop completed successfully")
 
 	return ctrl.Result{}, nil
 }
