@@ -322,10 +322,8 @@ func GetRefreshedScalingItemSetError(ctx context.Context, _client client.Client,
 // Returns a new scaling item from the cluster
 func GetRefreshedScalingItem(ctx context.Context, _client client.Client, deploymentInfo g.ScalingInfo) (g.ScalingInfo, error) {
 	// First we need to get an updated version from the list
-	deploymentInfo, getErr := g.GetDenyList().GetDeploymentInfoFromList(deploymentInfo)
-	if getErr != nil {
-		return g.ScalingInfo{}, getErr
-	}
+	deploymentInfo, _ = g.GetDenyList().GetDeploymentInfoFromList(deploymentInfo)
+
 	var req reconcile.Request
 	req.NamespacedName.Namespace = deploymentInfo.Namespace
 	req.NamespacedName.Name = deploymentInfo.Name

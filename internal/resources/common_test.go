@@ -126,6 +126,7 @@ func TestGetter(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		// Only step scaler can put the item on the list which we don't test here. So we do it manually
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := GetRefreshedScalingItem(tt.args.ctx, tt.args._client, tt.args.want)
 			if (err != nil) != tt.wantErr {
@@ -302,6 +303,9 @@ func TestScaler(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Only step scaler can put the item on the list which we don't test here. So we do it manually
+			g.GetDenyList().SetScalingItemOnList(tt.args.scalingItem, false, "", 0)
+
 			if err := DoScaling(tt.args.ctx, tt.args._client, tt.args.scalingItem, tt.args.replicas); (err != nil) != tt.wantErr {
 				t.Errorf("Scaler() error = %v, wantErr %v", err, tt.wantErr)
 			}
