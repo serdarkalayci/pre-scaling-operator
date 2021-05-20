@@ -47,7 +47,7 @@ func DoScaling(ctx context.Context, _client client.Client, scalingItem g.Scaling
 		// We need to get a newer version of the object from the client
 		deploymentItem, err := GetRefreshedScalingItem(ctx, _client, scalingItem)
 		if err != nil || (deploymentItem.Name == "" || deploymentItem.Namespace == "") {
-			log.Error(err, "Error getting refreshed deploymentItem in conflict resolution")
+			log.Error(err, fmt.Sprintf("Error getting refreshed deploymentItem in conflict resolution. Name: %s , Namespace: %s", scalingItem.Name, scalingItem.Namespace))
 		}
 
 		// Skip if we couldn't get the deploymentItem

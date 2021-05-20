@@ -87,6 +87,11 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 					deploymentconfig = *createDeploymentConfig(key, optinOld, casenumber)
 					Expect(k8sClient.Create(context.Background(), &deploymentconfig)).Should(Succeed())
 
+					Eventually(func() int32 {
+						k8sClient.Get(context.Background(), key, &fetchedDeploymentConfig)
+						return fetchedDeploymentConfig.Status.AvailableReplicas
+					}, timeout, interval).Should(Equal(OptInSpecificReplicaCount(optinOld)))
+
 					time.Sleep(time.Second * 2)
 
 					Eventually(func() ocv1.DeploymentConfig {
@@ -114,7 +119,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 					Eventually(func() int32 {
 						k8sClient.Get(context.Background(), key, &fetchedDeploymentConfig)
-						return fetchedDeploymentConfig.Status.AvailableReplicas
+						return fetchedDeploymentConfig.Spec.Replicas
 					}, timeout, interval).Should(Equal(replicas32))
 
 				} else {
@@ -290,13 +295,16 @@ func createDeployment(deploymentInfo types.NamespacedName, optInOld bool, casenu
 	return *dep
 }
 
-func createDeploymentConfig(deploymentInfo types.NamespacedName, optInOld bool, casenumber int) *ocv1.DeploymentConfig {
-	var replicaCount int32
-	if optInOld {
-		replicaCount = 3 // Deployment should start with "bau" in the test. Therefore 3
+func OptInSpecificReplicaCount(optin bool) int32 {
+	if optin {
+		return 3 // Deployment should start with "bau" in the test. Therefore 3
 	} else {
-		replicaCount = 1
+		return 1
 	}
+}
+
+func createDeploymentConfig(deploymentInfo types.NamespacedName, optInOld bool, casenumber int) *ocv1.DeploymentConfig {
+	var replicaCount = OptInSpecificReplicaCount(optInOld)
 
 	deploymentConfig := &ocv1.DeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
