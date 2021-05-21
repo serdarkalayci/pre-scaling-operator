@@ -79,7 +79,7 @@ func (r *ClusterScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.
 		log.Error(err, "Cannot list namespaces")
 		return ctrl.Result{}, err
 	}
-
+	log.Info("Clusterscalingstate Controller: Reconciling namespaces")
 	for _, namespace := range namespaces.Items {
 
 		events, state, err := reconciler.ReconcileNamespace(ctx, r.Client, namespace.Name, clusterStateDefinitions, states.State{}, r.Recorder)
@@ -105,7 +105,7 @@ func (r *ClusterScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.
 
 	r.Recorder.Event(css, "Normal", "AppliedStates", fmt.Sprintf("The applied state for each of the %s namespaces is %s", appliedStateNamespaceList, appliedStates))
 
-	log.Info("Reconciliation loop completed successfully")
+	log.Info("Clusterscalingstate Reconciliation loop completed successfully")
 
 	return ctrl.Result{}, nil
 

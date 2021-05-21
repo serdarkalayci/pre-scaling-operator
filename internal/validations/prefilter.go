@@ -75,7 +75,7 @@ func PreFilter(r record.EventRecorder) predicate.Predicate {
 				WithValues("Replicachange", replicaChange).
 				WithValues("OldOptIn", oldoptin).
 				WithValues("NewOptIn", newoptin)
-			log.Info("Reconciling for deployment " + deploymentName)
+			log.Info("Reconciling for object " + deploymentName)
 
 			return true
 

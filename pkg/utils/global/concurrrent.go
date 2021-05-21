@@ -208,7 +208,10 @@ func (cs *ConcurrentSlice) GetDeploymentInfoFromList(item ScalingInfo) (ScalingI
 }
 
 func (cs *ConcurrentSlice) IsDeploymentInFailureState(item ScalingInfo) bool {
-	itemToReturn, _ := cs.GetDeploymentInfoFromList(item)
+	itemToReturn, err := cs.GetDeploymentInfoFromList(item)
+	if err != nil {
+		return false
+	}
 	return itemToReturn.Failure
 }
 

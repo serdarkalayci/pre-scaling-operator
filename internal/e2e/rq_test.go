@@ -95,6 +95,11 @@ var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 
 					Expect(k8sClient.Create(context.Background(), &deploymentconfig)).Should(Succeed())
 
+					Eventually(func() int32 {
+						k8sClient.Get(context.Background(), key, &fetchedDeploymentConfig)
+						return fetchedDeploymentConfig.Status.AvailableReplicas
+					}, timeout, interval).Should(Equal(replicaCount))
+
 					time.Sleep(time.Second * 2)
 
 					Eventually(func() ocv1.DeploymentConfig {
@@ -114,7 +119,7 @@ var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 
 					Eventually(func() int32 {
 						k8sClient.Get(context.Background(), key, &fetchedDeploymentConfig)
-						return fetchedDeploymentConfig.Status.AvailableReplicas
+						return fetchedDeploymentConfig.Spec.Replicas
 					}, timeout, interval).Should(Equal(replicas32))
 
 				} else {
@@ -139,10 +144,10 @@ var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 
 					var replicas32 int32 = int32(expectedReplicas)
 
-					Eventually(func() bool {
+					Eventually(func() int32 {
 						k8sClient.Get(context.Background(), key, &fetchedDeployment)
-						return *fetchedDeployment.Spec.Replicas == replicas32 && fetchedDeployment.Status.ReadyReplicas == replicas32
-					}, timeout, interval).Should(Equal(true))
+						return *fetchedDeployment.Spec.Replicas
+					}, timeout, interval).Should(Equal(replicas32))
 				}
 
 			},
