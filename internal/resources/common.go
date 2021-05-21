@@ -245,12 +245,6 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 			} else if oldReplicaCount > desiredReplicaCount {
 				stepReplicaCount = oldReplicaCount - 1
 			}
-			// else if oldReplicaCount == desiredReplicaCount {
-			// 	log.Info("Finished scaling. Leaving early due to an update from another goroutine.")
-			// 	RegisterEvents(ctx, _client, recorder, nil, deploymentItem)
-			// 	g.GetDenyList().RemoveFromList(deploymentItem)
-			// 	return nil
-			// }
 
 			log.WithValues("ScalingItem: ", deploymentItem.Name).
 				WithValues("Namespace: ", deploymentItem.Namespace).
