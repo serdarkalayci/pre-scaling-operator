@@ -292,6 +292,10 @@ func changeAnnotationDeploymentReplicas(deployment v1.Deployment, replicas int32
 		"scaler/state-peak-replicas":    "7",
 	}
 
+	deployment.Labels = map[string]string{
+		"scaler/opt-in": "true",
+	}
+
 	return deployment
 }
 
@@ -301,6 +305,10 @@ func changeAnnotationDCReplicas(deploymentconfig ocv1.DeploymentConfig, replicas
 		"scaler/state-bau-replicas":     fmt.Sprint(replicas),
 		"scaler/state-default-replicas": "2",
 		"scaler/state-peak-replicas":    "7",
+	}
+
+	deploymentconfig.Labels = map[string]string{
+		"scaler/opt-in": "true",
 	}
 
 	return deploymentconfig
@@ -315,7 +323,7 @@ func createDeploymentScaler(deploymentInfo types.NamespacedName, upordown string
 			Namespace: deploymentInfo.Namespace,
 			Labels: map[string]string{
 				"app":           "random-generator-1",
-				"scaler/opt-in": "true",
+				"scaler/opt-in": "false",
 			},
 			Annotations: map[string]string{
 				"scaler/state-bau-replicas":     fmt.Sprint(replicas),
@@ -358,7 +366,7 @@ func createDeploymentConfigScaler(deploymentInfo types.NamespacedName, upordown 
 			Namespace: deploymentInfo.Namespace,
 			Labels: map[string]string{
 				"app":           "random-generator-1",
-				"scaler/opt-in": "true",
+				"scaler/opt-in": "false",
 			},
 			Annotations: map[string]string{
 				"scaler/state-bau-replicas":     fmt.Sprint(replicas),
