@@ -3,6 +3,7 @@ package reconciler
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/quotas"
@@ -40,8 +41,6 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	log := ctrl.Log.
 		WithValues("namespace", namespace)
 
-	log.Info("Reconciling namespace")
-
 	finalState, err := GetAppliedState(ctx, _client, namespace, stateDefinitions, clusterState)
 	if err != nil {
 		return nsEvents, finalState.Name, err
@@ -55,6 +54,12 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 		return nsEvents, finalState.Name, err
 	}
 	objectsToReconcile = objectsToReconcile + len(deployments)
+
+	if objectsToReconcile != 0 {
+		log.Info("Found opted in objects in Namespace. Reconciling namespace")
+	} else {
+		return nsEvents, finalState.Name, err
+	}
 
 	scaleReplicalist, err := resources.StateReplicasList(finalState, deployments)
 	if err != nil {
@@ -103,10 +108,6 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 		nsEvents.QuotaExceeded = namespace
 	}
 
-	if objectsToReconcile == 0 {
-		return nsEvents, finalState.Name, err
-	}
-
 	return nsEvents, finalState.Name, err
 }
 
@@ -132,10 +133,6 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 		return err
 	}
 
-	log = ctrl.Log.
-		WithValues("Allowed", allowed)
-	log.Info("Quota Check")
-
 	if allowed {
 		scalingItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(scalingItem)
 		if notFoundErr == nil {
@@ -159,6 +156,8 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 		}
 
 	} else {
+		log = ctrl.Log
+		log.Info(fmt.Sprintf("Quota check didn't pass in namespace %s for object %s", scalingItem.Namespace, scalingItem.Name))
 		return ReconcilerError{
 			msg: "Can't scale due to ResourceQuota violation!",
 		}

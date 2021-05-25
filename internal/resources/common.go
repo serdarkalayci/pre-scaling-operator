@@ -177,7 +177,6 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 	var stepReplicaCount int32
 	var stepCondition bool = true
 	var retryErr error = nil
-
 	stepReplicaCount = deploymentItem.SpecReplica
 	rateLimitingEnabled := states.GetStepScaleSetting(ctx, _client)
 	log.Info("Putting deploymentItem on denylist")
@@ -194,7 +193,7 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 
 			deploymentItem, _ = g.GetDenyList().GetDeploymentInfoFromList(deploymentItem)
 			desiredReplicaCount = deploymentItem.DesiredReplicas
-			oldReplicaCount = deploymentItem.SpecReplica
+
 			if desiredReplicaCount == -1 {
 				desiredReplicaCount = stateReplica.Replicas
 			}
@@ -239,28 +238,30 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 
 			}
 
+			oldReplicaCount = deploymentItem.SpecReplica
+
 			// decide if we need to step up or down
 			if oldReplicaCount < desiredReplicaCount {
 				stepReplicaCount = oldReplicaCount + 1
 			} else if oldReplicaCount > desiredReplicaCount {
 				stepReplicaCount = oldReplicaCount - 1
 			}
-			// else if oldReplicaCount == desiredReplicaCount {
-			// 	log.Info("Finished scaling. Leaving early due to an update from another goroutine.")
-			// 	RegisterEvents(ctx, _client, recorder, nil, deploymentItem)
-			// 	g.GetDenyList().RemoveFromList(deploymentItem)
-			// 	return nil
-			// }
 
-			log.WithValues("ScalingItem: ", deploymentItem.Name).
-				WithValues("Namespace: ", deploymentItem.Namespace).
-				WithValues("Stepreplicacount", stepReplicaCount).
-				WithValues("Oldreplicacount", oldReplicaCount).
-				WithValues("Desiredreplicacount", desiredReplicaCount).
-				WithValues("Wherefrom: ", whereFrom).
-				Info("Step Scaling!")
+			// check if desired is reached from a fresh item
+			//deploymentItem, _ = GetRefreshedScalingItem(ctx, _client, deploymentItem)
+			if deploymentItem.ReadyReplicas == deploymentItem.DesiredReplicas {
+				stepCondition = false
+			} else {
+				log.WithValues("ScalingItem: ", deploymentItem.Name).
+					WithValues("Namespace: ", deploymentItem.Namespace).
+					WithValues("Stepreplicacount", stepReplicaCount).
+					WithValues("Oldreplicacount", oldReplicaCount).
+					WithValues("Desiredreplicacount", desiredReplicaCount).
+					WithValues("Wherefrom: ", whereFrom).
+					Info("Step Scaling!")
 
-			retryErr = DoScaling(ctx, _client, deploymentItem, stepReplicaCount)
+				retryErr = DoScaling(ctx, _client, deploymentItem, stepReplicaCount)
+			}
 
 			if retryErr != nil {
 				//log.Error(retryErr, "Unable to scale the deploymentItem, err: %v")
@@ -270,11 +271,6 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 				return retryErr
 			}
 
-			// check if desired is reached from a fresh item
-			deploymentItem, _ = GetRefreshedScalingItem(ctx, _client, deploymentItem)
-			if deploymentItem.ReadyReplicas == deploymentItem.DesiredReplicas {
-				stepCondition = false
-			}
 		}
 	} else {
 		// Rapid scale. No Step Scale
