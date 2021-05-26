@@ -77,12 +77,8 @@ func NewConcurrentSlice() *ConcurrentSlice {
 
 func (cs *ConcurrentSlice) UpdateOrAppend(item ScalingInfo) {
 	if cs.IsInConcurrentList(item) {
-		cs.RemoveFromList(item)
 
-		cs.Lock()
-		defer cs.Unlock()
-
-		cs.items = append(cs.items, item)
+		cs.Update(item)
 	} else {
 		cs.Lock()
 		defer cs.Unlock()
@@ -115,6 +111,16 @@ func (cs *ConcurrentSlice) RemoveFromList(item ScalingInfo) {
 	for inList := range cs.Iter() {
 		if item.Name == inList.Value.Name && item.Namespace == inList.Value.Namespace {
 			denylist.items = RemoveIndex(cs.items, i)
+		}
+		i++
+	}
+}
+
+func (cs *ConcurrentSlice) Update(item ScalingInfo) {
+	i := 0
+	for inList := range cs.Iter() {
+		if item.Name == inList.Value.Name && item.Namespace == inList.Value.Namespace {
+			cs.items[i] = item
 		}
 		i++
 	}

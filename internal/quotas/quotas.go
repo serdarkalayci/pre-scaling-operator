@@ -3,6 +3,7 @@ package quotas
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	c "github.com/containersol/prescale-operator/internal"
@@ -29,7 +30,7 @@ func ResourceQuotaCheck(ctx context.Context, namespace string, limitsneeded core
 	rq, err := resourceQuota(ctx, namespace, kubernetesclient)
 	if err != nil {
 		if strings.Contains(err.Error(), c.RQNotFound) {
-			ctrl.Log.Info("WARNING: No Resource Quotas found for this namespace")
+			ctrl.Log.Info(fmt.Sprintf("WARNING: No Resource Quotas found for this namespace: %s", namespace))
 			return true, nil
 		}
 		return false, err

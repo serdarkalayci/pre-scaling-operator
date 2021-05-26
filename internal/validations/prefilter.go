@@ -85,12 +85,11 @@ func PreFilter(r record.EventRecorder) predicate.Predicate {
 
 			newoptin := labels.GetLabelValue(newlabels, "scaler/opt-in")
 			deploymentName := e.Object.GetName()
-			log := ctrl.Log
-			log.WithValues("OptIn is: ", newoptin)
-			log.Info("(CreateEvent) New deployment detected: " + deploymentName)
 
 			if newoptin {
 				generateOptInLabelCreateEvent(e, r, newoptin)
+				log := ctrl.Log
+				log.Info("(CreateEvent) New opted-in deployment detected: " + deploymentName)
 			}
 
 			return newoptin
