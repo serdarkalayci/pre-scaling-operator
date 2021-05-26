@@ -122,7 +122,7 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 	}
 
 	// Don't scale if we don't need to
-	if scalingItem.ReadyReplicas == stateReplica.Replicas && scalingItem.SpecReplica == stateReplica.Replicas{
+	if scalingItem.ReadyReplicas == stateReplica.Replicas && scalingItem.SpecReplica == stateReplica.Replicas {
 		return nil
 	}
 

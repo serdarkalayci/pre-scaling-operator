@@ -222,7 +222,7 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 						return err
 					}
 
-					if deploymentItem.ReadyReplicas == stepReplicaCount {
+					if deploymentItem.ReadyReplicas == stepReplicaCount || deploymentItem.SpecReplica == deploymentItem.ReadyReplicas {
 						stay = false
 					}
 					// k8s can't handle the deployment for some reason. We can't scale
