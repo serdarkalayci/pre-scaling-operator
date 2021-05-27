@@ -76,10 +76,16 @@ func NewConcurrentSlice() *ConcurrentSlice {
 }
 
 func (cs *ConcurrentSlice) UpdateOrAppend(item ScalingInfo) {
-	if cs.IsInConcurrentList(item) {
-
-		cs.Update(item)
-	} else {
+	found := false
+	i := 0
+	for inList := range cs.Iter() {
+		if item.Name == inList.Value.Name && item.Namespace == inList.Value.Namespace {
+			cs.items[i] = item
+			found = true
+		}
+		i++
+	}
+	if !found {
 		cs.Lock()
 		defer cs.Unlock()
 
@@ -90,6 +96,7 @@ func (cs *ConcurrentSlice) UpdateOrAppend(item ScalingInfo) {
 // Iter iterates over the items in the concurrent slice
 // Each item is sent over a channel, so that
 // we can iterate over the slice using the builin range keyword
+// Iter() is locking the slice. Therefore we can safely use Iter() to modify it
 func (cs *ConcurrentSlice) Iter() <-chan ConcurrentSliceItem {
 	c := make(chan ConcurrentSliceItem)
 
