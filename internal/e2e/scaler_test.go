@@ -98,6 +98,8 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 						return fetchedDeploymentConfig.Status.AvailableReplicas
 					}, timeout, interval).Should(Equal(initialReplicas))
 
+					time.Sleep(time.Second * 5)
+
 					Eventually(func() ocv1.DeploymentConfig {
 						k8sClient.Get(context.Background(), key, &fetchedDeploymentConfig)
 						return fetchedDeploymentConfig
@@ -133,6 +135,8 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 						k8sClient.Get(context.Background(), key, &fetchedDeployment)
 						return fetchedDeployment.Status.ReadyReplicas
 					}, timeout, interval).Should(Equal(int32(initialReplicas)))
+
+					time.Sleep(time.Second * 5)
 
 					Eventually(func() v1.Deployment {
 						k8sClient.Get(context.Background(), key, &fetchedDeployment)
