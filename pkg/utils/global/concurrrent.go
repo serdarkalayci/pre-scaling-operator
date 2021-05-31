@@ -286,6 +286,12 @@ func ConvertDeploymentConfigToItem(deploymentConfig ocv1.DeploymentConfig) Scali
 		// get the latest condition reason in case there is one.
 		resourceList = deploymentConfig.Spec.Template.Spec.Containers[0].Resources.Limits
 	}
+	var progressDeadLine int32 = 600
+	if deploymentConfig.Spec.Strategy.Type == "Rolling" {
+		progressDeadLine = int32(*deploymentConfig.Spec.Strategy.RollingParams.TimeoutSeconds)
+	} else if deploymentConfig.Spec.Strategy.Type == "Recreate" {
+		progressDeadLine = int32(*deploymentConfig.Spec.Strategy.RecreateParams.TimeoutSeconds)
+	}
 
 	failure := false
 	failureMessage := ""
@@ -306,6 +312,6 @@ func ConvertDeploymentConfigToItem(deploymentConfig ocv1.DeploymentConfig) Scali
 		DesiredReplicas:  -1,
 		ResourceList:     resourceList,
 		ConditionReason:  conditionReason,
-		ProgressDeadline: int32(*deploymentConfig.Spec.Strategy.RollingParams.TimeoutSeconds),
+		ProgressDeadline: progressDeadLine,
 	}
 }
