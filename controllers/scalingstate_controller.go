@@ -62,6 +62,12 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		WithValues("reconciler namespace", req.Namespace).
 		WithValues("reconciler object", req.Name)
 
+	ss := &v1alpha1.ScalingState{}
+	err := r.Get(ctx, req.NamespacedName, ss)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	clusterStateDefinitions, err := states.GetClusterScalingStates(ctx, r.Client)
 	if err != nil {
 		// If we encounter an error trying to retrieve the state definitions,
@@ -69,16 +75,13 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		log.Error(err, "Failed to get ClusterStateDefinitions")
 		return ctrl.Result{}, err
 	}
+
 	log.WithValues("Namespace", req.Namespace).
 		Info("Scalingstate Controller: Reconciling namespace")
-	events, state, err := reconciler.ReconcileNamespace(ctx, r.Client, req.Namespace, clusterStateDefinitions, states.State{}, r.Recorder)
-
+	events, state, err := reconciler.ReconcileNamespace(ctx, r.Client, req.Namespace, clusterStateDefinitions, states.State{}, r.Recorder, ss.Config.DryRun)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-
-	ss := &v1alpha1.ScalingState{}
-	err = r.Get(ctx, req.NamespacedName, ss)
 
 	if events.QuotaExceeded != "" {
 		r.Recorder.Event(ss, "Warning", "QuotaExceeded", fmt.Sprintf("Not enough available resources for namespace %s", events.QuotaExceeded))

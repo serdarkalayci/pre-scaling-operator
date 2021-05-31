@@ -43,6 +43,7 @@ type ClusterScalingStateDefinitionStatus struct {
 // ClusterScalingStateDefinitionConfiguration sets configuration for the Scaler operator
 type ClusterScalingStateDefinitionConfiguration struct {
 	RateLimiting bool `json:"rateLimiting"`
+	DryRun       bool `json:"dryRun"`
 }
 
 // +kubebuilder:object:root=true

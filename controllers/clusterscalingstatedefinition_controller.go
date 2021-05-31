@@ -64,6 +64,12 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 		WithValues("reconciler kind", "ClusterScalingStatesDefinition").
 		WithValues("reconciler object", req.Name)
 
+	cssd := &v1alpha1.ClusterScalingStateDefinition{}
+	err := r.Get(ctx, req.NamespacedName, cssd)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	clusterStateDefinitions, err := states.GetClusterScalingStates(ctx, r.Client)
 	if err != nil {
 		// If we encounter an error trying to retrieve the state definitions,
@@ -83,7 +89,7 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 	log.Info("Clusterscalingstatedefinition Controller: Reconciling namespaces")
 	for _, namespace := range namespaces.Items {
 
-		events, state, err := reconciler.ReconcileNamespace(ctx, r.Client, namespace.Name, clusterStateDefinitions, states.State{}, r.Recorder)
+		events, state, err := reconciler.ReconcileNamespace(ctx, r.Client, namespace.Name, clusterStateDefinitions, states.State{}, r.Recorder, cssd.Config.DryRun)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -96,9 +102,6 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 		appliedStates = append(appliedStates, state)
 
 	}
-
-	cssd := &v1alpha1.ClusterScalingStateDefinition{}
-	err = r.Get(ctx, req.NamespacedName, cssd)
 
 	if len(eventsList) != 0 {
 		r.Recorder.Event(cssd, "Warning", "QuotaExceeded", fmt.Sprintf("Not enough available resources for the following %d namespaces: %s", len(eventsList), eventsList))

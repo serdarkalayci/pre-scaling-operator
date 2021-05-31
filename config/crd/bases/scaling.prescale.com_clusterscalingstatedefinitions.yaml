@@ -31,9 +31,12 @@ spec:
             description: ClusterScalingStateDefinitionConfiguration sets configuration
               for the Scaler operator
             properties:
+              dryRun:
+                type: boolean
               rateLimiting:
                 type: boolean
             required:
+            - dryRun
             - rateLimiting
             type: object
           kind:

@@ -31,7 +31,7 @@ func (err ReconcilerError) Error() string {
 	return err.msg
 }
 
-func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State, recorder record.EventRecorder) (NamespaceEvents, string, error) {
+func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State, recorder record.EventRecorder, dryRun bool) (NamespaceEvents, string, error) {
 
 	var objectsToReconcile int
 	var nsEvents NamespaceEvents
@@ -39,7 +39,8 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	var limitsneeded corev1.ResourceList
 
 	log := ctrl.Log.
-		WithValues("namespace", namespace)
+		WithValues("namespace", namespace).
+		WithValues("Dry run is: ", dryRun)
 
 	finalState, err := GetAppliedState(ctx, _client, namespace, stateDefinitions, clusterState)
 	if err != nil {
