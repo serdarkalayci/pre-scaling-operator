@@ -363,7 +363,8 @@ func createDeploymentScaler(deploymentInfo types.NamespacedName, upordown string
 
 func createDeploymentConfigScaler(deploymentInfo types.NamespacedName, upordown string, casenumber int) *ocv1.DeploymentConfig {
 	replicas := ScalerTestCaseInitialReplicas(upordown)
-
+	var timeoutSeconds int64 = 30
+	var activeDeadlineSeconds int64 = 21600
 	deploymentConfig := &ocv1.DeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "case" + strconv.Itoa(casenumber),
@@ -380,6 +381,13 @@ func createDeploymentConfigScaler(deploymentInfo types.NamespacedName, upordown 
 		},
 
 		Spec: ocv1.DeploymentConfigSpec{
+			Strategy: ocv1.DeploymentStrategy{
+				Type: "Recreate",
+				RecreateParams: &ocv1.RecreateDeploymentStrategyParams{
+					TimeoutSeconds: &timeoutSeconds,
+				},
+				ActiveDeadlineSeconds: &activeDeadlineSeconds,
+			},
 			Replicas: replicas,
 			Template: &corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
