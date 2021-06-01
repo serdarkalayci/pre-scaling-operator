@@ -23,6 +23,7 @@ func TestReconcileNamespace(t *testing.T) {
 		stateDefinitions states.States
 		clusterState     states.State
 		dryRun           bool
+		rateLimiting     bool
 	}
 
 	_ = scalingv1alpha1.AddToScheme(scheme.Scheme)
@@ -55,7 +56,8 @@ func TestReconcileNamespace(t *testing.T) {
 					Name:     "bau",
 					Priority: 0,
 				},
-				dryRun: false,
+				dryRun:       false,
+				rateLimiting: true,
 			},
 			wantErr: false,
 		},
@@ -86,7 +88,7 @@ func TestReconcileNamespace(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if _, _, err := ReconcileNamespace(tt.args.ctx, tt.args._client, tt.args.namespace, tt.args.stateDefinitions, tt.args.clusterState, record.NewFakeRecorder(10), tt.args.dryRun); (err != nil) != tt.wantErr {
+			if _, _, err := ReconcileNamespace(tt.args.ctx, tt.args._client, tt.args.namespace, tt.args.stateDefinitions, tt.args.clusterState, record.NewFakeRecorder(10), tt.args.dryRun, tt.args.rateLimiting); (err != nil) != tt.wantErr {
 				t.Errorf("ReconcileNamespace() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

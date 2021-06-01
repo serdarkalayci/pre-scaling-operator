@@ -68,14 +68,14 @@ func GetNamespaceScalingStateName(ctx context.Context, _client client.Client, na
 	return scalingStates.Items[0].Spec.State, nil
 }
 
-func GetStepScaleSetting(ctx context.Context, _client client.Client) bool {
-	cssd, err := GetClusterScalingStateDefinitionsList(ctx, _client)
-	_ = err
-	if len(cssd.Items) == 0 {
-		return true
-	}
-	return cssd.Items[0].Config.RateLimiting
-}
+// func GetStepScaleSetting(ctx context.Context, _client client.Client) bool {
+// 	cssd, err := GetClusterScalingStateDefinitionsList(ctx, _client)
+// 	_ = err
+// 	if len(cssd.Items) == 0 {
+// 		return true
+// 	}
+// 	return cssd.Items[0].Config.RateLimiting
+// }
 
 func GetClusterScalingStateDefinitionsList(ctx context.Context, _client client.Client) (scalingv1alpha1.ClusterScalingStateDefinitionList, error) {
 	cssd := &scalingv1alpha1.ClusterScalingStateDefinitionList{}
@@ -130,74 +130,3 @@ func GetClusterScalingState(ctx context.Context, _client client.Client) (string,
 
 	return clusterScalingStates.Items[0].Spec.State, nil
 }
-
-//func GetNamespaceState(ctx context.Context, client client.Client, namespace string) State {
-//	// cssd here stand for ClusterScalingStateDefinitino
-//	scalingState := &scalingv1alpha1.ScalingState{}
-//	err := client.Get(ctx, req.NamespacedName, scalingState)
-//	if err != nil {
-//		if errors.IsNotFound(err) {
-//			// Request object not found, could have been deleted after reconcile request.
-//			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
-//			// Return and don't requeue
-//			log.Info("ScalingState resource not found. Ignoring since object must be deleted.")
-//			return ctrl.Result{}, nil
-//		}
-//		// Error reading the object - requeue the request.
-//		log.Error(err, "Failed to get ScalingState")
-//		return ctrl.Result{}, err
-//	}
-//
-//	// When a ScalingState is created or updated,
-//	// we need to check both it and the ClusterState in order to determine the actual state the namespace should be in.
-//	cssd := &scalingv1alpha1.ClusterScalingStateDefinitionList{}
-//	r.List(ctx, cssd, &client.ListOptions{})
-//
-//	if len(cssd.Items) == 0 {
-//		log.Info("No ClusterScalingStateDefinition Found. Doing Nothing.")
-//		// TODO Should we add errors here to crash the controller and make it explicit that one should be set ?
-//		return ctrl.Result{}, nil
-//	}
-//
-//	if len(cssd.Items) >= 2 {
-//		log.Info("More than 1 ClusterScalingStateDefinition found. Merging is not yet supported. Doing Nothing.")
-//		return ctrl.Result{}, nil
-//	}
-//
-//	clusterStateDefinitions := states.States{}
-//	for _, state := range cssd.Items[0].Spec {
-//		clusterStateDefinitions = append(clusterStateDefinitions, states.State{
-//			Name:     state.Name,
-//			Priority: state.Priority,
-//		})
-//	}
-//
-//	// We now have the definitions of which states are available to developers.
-//	// @TODO implement priority overrides, once the priority is set for a clusterstatedefinition
-//
-//	// Next we need to fetch the ClusterScalingState to determine which states are currently set in a namespace
-//	clusterScalingStates := &scalingv1alpha1.ClusterScalingStateList{}
-//	r.List(ctx, clusterScalingStates, &client.ListOptions{})
-//
-//	if len(clusterScalingStates.Items) >= 2 {
-//		log.Info("More than 1 ClusterScalingState found. Merging is not yet supported.")
-//		return ctrl.Result{}, nil
-//	}
-//
-//	if len(clusterScalingStates.Items) == 0 {
-//		log.Info("No ClusterScalingStates found to compare. Using only ScalingState for calculations.")
-//	}
-//
-//	selectedState := states.State{}
-//	namespaceState, err := clusterStateDefinitions.FindState(scalingState.Spec.State)
-//	if err != nil {
-//		log.Error(err, "Could not determine state from namespace state name", "state", scalingState.Spec.State)
-//	}
-//	if len(clusterScalingStates.Items) == 1 {
-//		clusterState, err := clusterStateDefinitions.FindState(clusterScalingStates.Items[0].Spec.State)
-//		if err != nil {
-//			log.Error(err, "Could not determine state from cluster state name", "state", clusterScalingStates.Items[0].Spec.State)
-//		}
-//		selectedState = states.GetPrioritisedState(namespaceState, clusterState)
-//	}
-//}

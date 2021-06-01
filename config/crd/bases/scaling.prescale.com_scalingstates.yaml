@@ -30,8 +30,11 @@ spec:
             properties:
               dryRun:
                 type: boolean
+              rateLimiting:
+                type: boolean
             required:
             - dryRun
+            - rateLimiting
             type: object
           kind:
             description: 'Kind is a string value representing the REST resource this

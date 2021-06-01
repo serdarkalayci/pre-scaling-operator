@@ -6,4 +6,5 @@ spec:
   # Add fields here
   state: peak
 config:
+  rateLimiting: true
   dryRun: true

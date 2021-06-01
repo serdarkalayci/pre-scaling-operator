@@ -52,7 +52,8 @@ type ScalingState struct {
 }
 
 type ScalingStateConfiguration struct {
-	DryRun bool `json:"dryRun"`
+	RateLimiting bool `json:"rateLimiting"`
+	DryRun       bool `json:"dryRun"`
 }
 
 // +kubebuilder:object:root=true

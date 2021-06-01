@@ -159,7 +159,7 @@ var _ = BeforeSuite(func() {
 
 }, 60)
 
-func CreateClusterScalingState(state string) v1alpha1.ClusterScalingState {
+func CreateClusterScalingState(state string, stepScale bool) v1alpha1.ClusterScalingState {
 
 	scalingState := &v1alpha1.ClusterScalingState{
 		TypeMeta: metav1.TypeMeta{
@@ -172,12 +172,15 @@ func CreateClusterScalingState(state string) v1alpha1.ClusterScalingState {
 		Spec: v1alpha1.ClusterScalingStateSpec{
 			State: state,
 		},
+		Config: v1alpha1.ClusterScalingStateConfiguration{
+			RateLimiting: stepScale,
+		},
 	}
 
 	return *scalingState
 }
 
-func CreateScalingState(state, namespace string) v1alpha1.ScalingState {
+func CreateScalingState(state, namespace string, stepScale bool) v1alpha1.ScalingState {
 
 	scalingState := &v1alpha1.ScalingState{
 		TypeMeta: metav1.TypeMeta{
@@ -191,12 +194,15 @@ func CreateScalingState(state, namespace string) v1alpha1.ScalingState {
 		Spec: v1alpha1.ScalingStateSpec{
 			State: state,
 		},
+		Config: v1alpha1.ScalingStateConfiguration{
+			RateLimiting: stepScale,
+		},
 	}
 
 	return *scalingState
 }
 
-func CreateClusterScalingStateDefinition(stepScale bool) v1alpha1.ClusterScalingStateDefinition {
+func CreateClusterScalingStateDefinition() v1alpha1.ClusterScalingStateDefinition {
 
 	states := []v1alpha1.States{
 		{
@@ -224,9 +230,6 @@ func CreateClusterScalingStateDefinition(stepScale bool) v1alpha1.ClusterScaling
 			Name: "global-state-definition",
 		},
 		Spec: states,
-		Config: v1alpha1.ClusterScalingStateDefinitionConfiguration{
-			RateLimiting: stepScale,
-		},
 	}
 
 	return *scalingState

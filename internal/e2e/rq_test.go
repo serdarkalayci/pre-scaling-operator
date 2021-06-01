@@ -39,8 +39,8 @@ var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 
 	BeforeEach(func() {
 
-		css = CreateClusterScalingState("bau")
-		cssd = CreateClusterScalingStateDefinition(true)
+		css = CreateClusterScalingState("bau", true)
+		cssd = CreateClusterScalingStateDefinition()
 
 		Expect(k8sClient.Create(context.Background(), &cssd)).Should(Succeed())
 		Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())

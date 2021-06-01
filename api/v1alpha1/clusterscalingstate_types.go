@@ -51,7 +51,8 @@ type ClusterScalingState struct {
 }
 
 type ClusterScalingStateConfiguration struct {
-	DryRun bool `json:"dryRun"`
+	RateLimiting bool `json:"rateLimiting"`
+	DryRun       bool `json:"dryRun"`
 }
 
 // +kubebuilder:object:root=true

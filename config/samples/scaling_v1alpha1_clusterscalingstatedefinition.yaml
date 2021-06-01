@@ -14,3 +14,4 @@ spec:
   priority: 10
 config:
   rateLimiting: true
+  dryRun: true
