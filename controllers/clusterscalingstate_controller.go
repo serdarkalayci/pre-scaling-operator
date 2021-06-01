@@ -61,6 +61,7 @@ func (r *ClusterScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.
 	var eventsList []string
 	var appliedStates []string
 	var appliedStateNamespaceList []string
+	var dryRunCluster string
 	log := r.Log.
 		WithValues("reconciler kind", "ClusterScalingState").
 		WithValues("reconciler object", req.Name)
@@ -93,22 +94,35 @@ func (r *ClusterScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.
 			return ctrl.Result{}, err
 		}
 
-		if events.QuotaExceeded != "" {
-			eventsList = append(eventsList, events.QuotaExceeded)
+		if !css.Config.DryRun {
+
+			if events.QuotaExceeded != "" {
+				eventsList = append(eventsList, events.QuotaExceeded)
+			}
+
+			appliedStateNamespaceList = append(appliedStateNamespaceList, namespace.Name)
+			appliedStates = append(appliedStates, state)
+
+		} else {
+			dryRunCluster = dryRunCluster + events.DryRunInfo
+		}
+	}
+
+	if !css.Config.DryRun {
+
+		if len(eventsList) != 0 {
+			r.Recorder.Event(css, "Warning", "QuotaExceeded", fmt.Sprintf("Not enough available resources for the following %d namespaces: %s", len(eventsList), eventsList))
 		}
 
-		appliedStateNamespaceList = append(appliedStateNamespaceList, namespace.Name)
-		appliedStates = append(appliedStates, state)
+		r.Recorder.Event(css, "Normal", "AppliedStates", fmt.Sprintf("The applied state for each of the %s namespaces is %s", appliedStateNamespaceList, appliedStates))
+
+		log.Info("Clusterscalingstate Reconciliation loop completed successfully")
+
+	} else {
+
+		r.Recorder.Event(css, "Normal", "DryRun", fmt.Sprintf("DryRun: %s", dryRunCluster))
 
 	}
-
-	if len(eventsList) != 0 {
-		r.Recorder.Event(css, "Warning", "QuotaExceeded", fmt.Sprintf("Not enough available resources for the following %d namespaces: %s", len(eventsList), eventsList))
-	}
-
-	r.Recorder.Event(css, "Normal", "AppliedStates", fmt.Sprintf("The applied state for each of the %s namespaces is %s", appliedStateNamespaceList, appliedStates))
-
-	log.Info("Clusterscalingstate Reconciliation loop completed successfully")
 
 	return ctrl.Result{}, nil
 

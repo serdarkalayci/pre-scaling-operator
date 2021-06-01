@@ -18,46 +18,48 @@ import (
 // +kubebuilder:rbac:groups="",resources=resourcequotas,verbs=list;
 
 //ResourceQuotaCheck function first checks if there are resourceQuota objects present and then validates if the namespace has enough resources to scale
-func ResourceQuotaCheck(ctx context.Context, namespace string, limitsneeded corev1.ResourceList) (bool, error) {
+func ResourceQuotaCheck(ctx context.Context, namespace string, limitsneeded corev1.ResourceList) (corev1.ResourceList, bool, error) {
 
 	var allowed bool
+	var finalLimits corev1.ResourceList
 
 	kubernetesclient, err := client.GetClientSet()
 	if err != nil {
-		return false, err
+		return finalLimits, false, err
 	}
 
 	rq, err := resourceQuota(ctx, namespace, kubernetesclient)
 	if err != nil {
 		if strings.Contains(err.Error(), c.RQNotFound) {
 			ctrl.Log.Info(fmt.Sprintf("WARNING: No Resource Quotas found for this namespace: %s", namespace))
-			return true, nil
+			return finalLimits, true, nil
 		}
-		return false, err
+		return finalLimits, false, err
 	}
 
 	if len(math.IsNegative(limitsneeded)) > 0 {
-		return true, nil
+		return finalLimits, true, nil
 	}
 
 	if math.IsZero(limitsneeded) {
 		ctrl.Log.Info("WARNING: No Resource limits are specified in the target object")
-		return true, nil
+		return finalLimits, true, nil
 	}
 
-	allowed, err = isAllowed(rq, limitsneeded)
+	finalLimits, allowed, err = isAllowed(rq, limitsneeded)
 	if err != nil {
 		ctrl.Log.Error(err, "Cannot find namespace quotas")
-		return false, err
+		return finalLimits, false, err
 	}
 
-	return allowed, nil
+	return finalLimits, allowed, nil
 }
 
 //This function will determine if we exceed the available resources in at least one resourcequota object
-func isAllowed(rq *corev1.ResourceQuotaList, limitsneeded corev1.ResourceList) (bool, error) {
+func isAllowed(rq *corev1.ResourceQuotaList, limitsneeded corev1.ResourceList) (corev1.ResourceList, bool, error) {
 
 	var leftovers corev1.ResourceList
+	var checklimits corev1.ResourceList
 	log := ctrl.Log.
 		WithValues("Limits needed", limitsneeded)
 	log.Info("Identified Resources")
@@ -69,18 +71,18 @@ func isAllowed(rq *corev1.ResourceQuotaList, limitsneeded corev1.ResourceList) (
 			WithValues("Leftover resources", leftovers)
 		log.Info("Resource Quota")
 
-		checklimits := math.Subtract(leftovers, math.TranslateResourcesToQuotaResources(limitsneeded))
+		checklimits = math.Subtract(leftovers, math.TranslateResourcesToQuotaResources(limitsneeded))
 
 		log = ctrl.Log.
 			WithValues("Limits", checklimits)
 		log.Info("Final checks")
 
 		if len(math.IsNegative(checklimits)) != 0 {
-			return false, nil
+			return checklimits, false, nil
 		}
 	}
 
-	return true, nil
+	return checklimits, true, nil
 }
 
 func resourceQuota(ctx context.Context, namespace string, kubernetesclient kubernetes.Interface) (*corev1.ResourceQuotaList, error) {

@@ -83,13 +83,21 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
-	if events.QuotaExceeded != "" {
-		r.Recorder.Event(ss, "Warning", "QuotaExceeded", fmt.Sprintf("Not enough available resources for namespace %s", events.QuotaExceeded))
+	if !ss.Config.DryRun {
+
+		if events.QuotaExceeded != "" {
+			r.Recorder.Event(ss, "Warning", "QuotaExceeded", fmt.Sprintf("Not enough available resources for namespace %s", events.QuotaExceeded))
+		}
+
+		r.Recorder.Event(ss, "Normal", "AppliedState", fmt.Sprintf("The applied state for this namespace is %s", state))
+
+		log.Info("Scalingstate Reconciliation loop completed successfully")
+
+	} else {
+
+		r.Recorder.Event(ss, "Normal", "DryRun", fmt.Sprintf("DryRun: %s", events.DryRunInfo))
+
 	}
-
-	r.Recorder.Event(ss, "Normal", "AppliedState", fmt.Sprintf("The applied state for this namespace is %s", state))
-
-	log.Info("Scalingstate Reconciliation loop completed successfully")
 
 	return ctrl.Result{}, nil
 }

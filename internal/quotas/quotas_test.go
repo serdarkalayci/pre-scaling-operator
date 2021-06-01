@@ -64,7 +64,7 @@ func Test_isAllowed(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := isAllowed(tt.args.rq, tt.args.limitsneeded)
+			_, got, err := isAllowed(tt.args.rq, tt.args.limitsneeded)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("isAllowed() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -139,7 +139,7 @@ func TestResourceQuotaCheck(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ResourceQuotaCheck(tt.args.ctx, tt.args.namespace, tt.args.limitsneeded)
+			_, got, err := ResourceQuotaCheck(tt.args.ctx, tt.args.namespace, tt.args.limitsneeded)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ResourceQuotaCheck() error = %v, wantErr %v", err, tt.wantErr)
 				return
