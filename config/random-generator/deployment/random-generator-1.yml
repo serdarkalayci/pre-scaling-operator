@@ -4,6 +4,7 @@ metadata:
   name: random-generator-1
   annotations:
     scaler/allow-autoscaling: "false" # Change to 'true' to allow scaling up
+    scaler/rapid-scaling: "false" # Change to 'true' to allow scaling up
     scaler/state-peak-replicas: "5"
     scaler/state-bau-replicas: "3"
     scaler/state-default-replicas: "1"

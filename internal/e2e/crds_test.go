@@ -43,7 +43,7 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 
 	BeforeEach(func() {
 
-		cssd = CreateClusterScalingStateDefinition(true)
+		cssd = CreateClusterScalingStateDefinition()
 
 		Expect(k8sClient.Create(context.Background(), &cssd)).Should(Succeed())
 
