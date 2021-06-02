@@ -55,17 +55,22 @@ func ResourceQuotaCheck(ctx context.Context, namespace string, limitsneeded core
 }
 
 //This function will determine if we exceed the available resources in at least one resourcequota object
-func isAllowed(rq *corev1.ResourceQuotaList, limitsneeded corev1.ResourceList) (bool, error) {
+func isAllowed(rql *corev1.ResourceQuotaList, limitsneeded corev1.ResourceList) (bool, error) {
 
 	var leftovers corev1.ResourceList
 	log := ctrl.Log.
 		WithValues("Limits needed", limitsneeded)
 	log.Info("Identified Resources")
 
-	for _, q := range rq.Items {
-		leftovers = math.Subtract(q.Status.Hard, q.Status.Used)
+	for _, rq := range rql.Items {
+		// we don't care about ResourceQuotas that contain persistentvolumeclaims or storageRequests
+		rq = sanitizeRQFromStorageAndPVC(rq)
+		if len(rq.Status.Hard) == 0 && len(rq.Status.Used) == 0 {
+			continue
+		}
+		leftovers = math.Subtract(rq.Status.Hard, rq.Status.Used)
 		log = ctrl.Log.
-			WithValues("Rq name", q.Name).
+			WithValues("Rq name", rq.Name).
 			WithValues("Leftover resources", leftovers)
 		log.Info("Resource Quota")
 
@@ -81,6 +86,25 @@ func isAllowed(rq *corev1.ResourceQuotaList, limitsneeded corev1.ResourceList) (
 	}
 
 	return true, nil
+}
+
+func sanitizeRQFromStorageAndPVC(rq corev1.ResourceQuota) corev1.ResourceQuota {
+	listHard := rq.Status.Hard
+	for key, _ := range listHard {
+		if key == "persistentvolumeclaims" || key == "requests.storage" {
+			delete(listHard, key)
+		}
+	}
+	rq.Status.Hard = listHard
+
+	listUsed := rq.Status.Used
+	for key, _ := range listUsed {
+		if key == "persistentvolumeclaims" || key == "requests.storage" {
+			delete(listUsed, key)
+		}
+	}
+	rq.Status.Used = listUsed
+	return rq
 }
 
 func resourceQuota(ctx context.Context, namespace string, kubernetesclient kubernetes.Interface) (*corev1.ResourceQuotaList, error) {
