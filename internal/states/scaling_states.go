@@ -3,8 +3,11 @@ package states
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
+	"github.com/containersol/prescale-operator/pkg/utils/annotations"
+	g "github.com/containersol/prescale-operator/pkg/utils/global"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -68,13 +71,17 @@ func GetNamespaceScalingStateName(ctx context.Context, _client client.Client, na
 	return scalingStates.Items[0].Spec.State, nil
 }
 
-func GetStepScaleSetting(ctx context.Context, _client client.Client) bool {
-	cssd, err := GetClusterScalingStateDefinitionsList(ctx, _client)
-	_ = err
-	if len(cssd.Items) == 0 {
-		return true
+func GetStepScaleSetting(deploymentItem g.ScalingInfo) bool {
+
+	scalingAnnotation := annotations.FilterByKeyPrefix("scaler/rapid-", deploymentItem.Annotations)
+
+	if len(scalingAnnotation) == 0 {
+		return false
 	}
-	return cssd.Items[0].Config.RateLimiting
+
+	rapidScaling, _ := strconv.ParseBool(scalingAnnotation["scaler/rapid-scaling"])
+
+	return rapidScaling
 }
 
 func GetClusterScalingStateDefinitionsList(ctx context.Context, _client client.Client) (scalingv1alpha1.ClusterScalingStateDefinitionList, error) {

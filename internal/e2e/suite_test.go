@@ -196,7 +196,7 @@ func CreateScalingState(state, namespace string) v1alpha1.ScalingState {
 	return *scalingState
 }
 
-func CreateClusterScalingStateDefinition(stepScale bool) v1alpha1.ClusterScalingStateDefinition {
+func CreateClusterScalingStateDefinition() v1alpha1.ClusterScalingStateDefinition {
 
 	states := []v1alpha1.States{
 		{
@@ -224,9 +224,6 @@ func CreateClusterScalingStateDefinition(stepScale bool) v1alpha1.ClusterScaling
 			Name: "global-state-definition",
 		},
 		Spec: states,
-		Config: v1alpha1.ClusterScalingStateDefinitionConfiguration{
-			RateLimiting: stepScale,
-		},
 	}
 
 	return *scalingState

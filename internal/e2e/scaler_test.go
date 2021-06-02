@@ -78,7 +78,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 		When("a deployment is already in place", func() {
 			table.DescribeTable("And then a deployment is being scaled..", func(scaleUpOrDown string, expectedReplicas int, stepscale bool) {
 
-				cssd = CreateClusterScalingStateDefinition(stepscale)
+				cssd = CreateClusterScalingStateDefinition()
 
 				Expect(k8sClient.Create(context.Background(), &cssd)).Should(Succeed())
 
@@ -88,7 +88,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 				initialReplicas := ScalerTestCaseInitialReplicas(scaleUpOrDown)
 				if OpenshiftCluster {
 
-					deploymentconfig = *createDeploymentConfigScaler(key, scaleUpOrDown, casenumber)
+					deploymentconfig = *createDeploymentConfigScaler(key, scaleUpOrDown, casenumber, strconv.FormatBool(stepscale))
 					Expect(k8sClient.Create(context.Background(), &deploymentconfig)).Should(Succeed())
 
 					// Wait for deploymentconfig to get ready
@@ -105,7 +105,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 						return fetchedDeploymentConfig
 					}, timeout, interval).Should(Not(BeNil()))
 
-					fetchedDeploymentConfig = changeAnnotationDCReplicas(fetchedDeploymentConfig, int32(expectedReplicas))
+					fetchedDeploymentConfig = changeAnnotationDCReplicas(fetchedDeploymentConfig, int32(expectedReplicas), strconv.FormatBool(stepscale))
 
 					// Update with the new changes
 					By("Then a deployment is updated")
@@ -126,7 +126,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 				} else {
 
-					deployment = createDeploymentScaler(key, scaleUpOrDown, casenumber)
+					deployment = createDeploymentScaler(key, scaleUpOrDown, casenumber, strconv.FormatBool(stepscale))
 					Expect(k8sClient.Create(context.Background(), &deployment)).Should(Succeed())
 
 					// Wait until deployment is ready
@@ -143,7 +143,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 						return fetchedDeployment
 					}, timeout, interval).Should(Not(BeNil()))
 
-					fetchedDeployment = changeAnnotationDeploymentReplicas(fetchedDeployment, int32(expectedReplicas))
+					fetchedDeployment = changeAnnotationDeploymentReplicas(fetchedDeployment, int32(expectedReplicas), strconv.FormatBool(stepscale))
 
 					// Update with the new changes
 					By("Then a deployment is updated")
@@ -288,12 +288,13 @@ func ScalerTestCaseInitialReplicas(upordown string) int32 {
 	return 5
 }
 
-func changeAnnotationDeploymentReplicas(deployment v1.Deployment, replicas int32) v1.Deployment {
+func changeAnnotationDeploymentReplicas(deployment v1.Deployment, replicas int32, stepScale string) v1.Deployment {
 
 	deployment.Annotations = map[string]string{
 		"scaler/state-bau-replicas":     fmt.Sprint(replicas), // That reflects the annotation change and will change replica # to 4
 		"scaler/state-default-replicas": "2",
 		"scaler/state-peak-replicas":    "7",
+		"scaler/rapid-scaling":          fmt.Sprintf(stepScale),
 	}
 
 	deployment.Labels = map[string]string{
@@ -303,12 +304,13 @@ func changeAnnotationDeploymentReplicas(deployment v1.Deployment, replicas int32
 	return deployment
 }
 
-func changeAnnotationDCReplicas(deploymentconfig ocv1.DeploymentConfig, replicas int32) ocv1.DeploymentConfig {
+func changeAnnotationDCReplicas(deploymentconfig ocv1.DeploymentConfig, replicas int32, stepScale string) ocv1.DeploymentConfig {
 
 	deploymentconfig.Annotations = map[string]string{
 		"scaler/state-bau-replicas":     fmt.Sprint(replicas),
 		"scaler/state-default-replicas": "2",
 		"scaler/state-peak-replicas":    "7",
+		"scaler/rapid-scaling":          fmt.Sprintf(stepScale),
 	}
 
 	deploymentconfig.Labels = map[string]string{
@@ -318,7 +320,7 @@ func changeAnnotationDCReplicas(deploymentconfig ocv1.DeploymentConfig, replicas
 	return deploymentconfig
 }
 
-func createDeploymentScaler(deploymentInfo types.NamespacedName, upordown string, casenumber int) v1.Deployment {
+func createDeploymentScaler(deploymentInfo types.NamespacedName, upordown string, casenumber int, stepScale string) v1.Deployment {
 
 	replicas := ScalerTestCaseInitialReplicas(upordown)
 	dep := &v1.Deployment{
@@ -333,6 +335,7 @@ func createDeploymentScaler(deploymentInfo types.NamespacedName, upordown string
 				"scaler/state-bau-replicas":     fmt.Sprint(replicas),
 				"scaler/state-default-replicas": "2",
 				"scaler/state-peak-replicas":    "7",
+				"scaler/rapid-scaling":          fmt.Sprintf(stepScale),
 			},
 		},
 
@@ -361,7 +364,7 @@ func createDeploymentScaler(deploymentInfo types.NamespacedName, upordown string
 	return *dep
 }
 
-func createDeploymentConfigScaler(deploymentInfo types.NamespacedName, upordown string, casenumber int) *ocv1.DeploymentConfig {
+func createDeploymentConfigScaler(deploymentInfo types.NamespacedName, upordown string, casenumber int, stepScale string) *ocv1.DeploymentConfig {
 	replicas := ScalerTestCaseInitialReplicas(upordown)
 	var timeoutSeconds int64 = 30
 	var activeDeadlineSeconds int64 = 21600
@@ -377,6 +380,7 @@ func createDeploymentConfigScaler(deploymentInfo types.NamespacedName, upordown 
 				"scaler/state-bau-replicas":     fmt.Sprint(replicas),
 				"scaler/state-default-replicas": "2",
 				"scaler/state-peak-replicas":    "7",
+				"scaler/rapid-scaling":          fmt.Sprintf(stepScale),
 			},
 		},
 
