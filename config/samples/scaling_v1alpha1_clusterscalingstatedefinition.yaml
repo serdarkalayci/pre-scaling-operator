@@ -13,5 +13,4 @@ spec:
   description: "Business as usual"
   priority: 10
 config:
-  rateLimiting: true
   dryRun: true

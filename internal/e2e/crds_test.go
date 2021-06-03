@@ -113,31 +113,31 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 				fetchedDeploymentList := []v1.Deployment{}
 
 				if casenumber == 1 {
-					css = CreateClusterScalingState("bau", true)
+					css = CreateClusterScalingState("bau")
 					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
 				} else if casenumber == 2 {
-					ss = CreateScalingState("peak", namespaceList[0].Name, true)
+					ss = CreateScalingState("peak", namespaceList[0].Name)
 					Expect(k8sClient.Create(context.Background(), &ss)).Should(Succeed())
 				} else if casenumber == 3 {
-					css = CreateClusterScalingState("bau", true)
+					css = CreateClusterScalingState("bau")
 					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
 
 					time.Sleep(time.Second * 5)
-					ss = CreateScalingState("peak", namespaceList[0].Name, true)
+					ss = CreateScalingState("peak", namespaceList[0].Name)
 					Expect(k8sClient.Create(context.Background(), &ss)).Should(Succeed())
 				} else if casenumber == 4 {
-					css = CreateClusterScalingState("peak", true)
+					css = CreateClusterScalingState("peak")
 					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
 
 					time.Sleep(time.Second * 5)
 
-					ss = CreateScalingState("bau", namespaceList[1].Name, true)
+					ss = CreateScalingState("bau", namespaceList[1].Name)
 					Expect(k8sClient.Create(context.Background(), &ss)).Should(Succeed())
 				} else if casenumber == 5 {
-					css = CreateClusterScalingState("bau", true)
+					css = CreateClusterScalingState("bau")
 					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
 
-					ss = CreateScalingState("peak", namespaceList[0].Name, true)
+					ss = CreateScalingState("peak", namespaceList[0].Name)
 					Expect(k8sClient.Create(context.Background(), &ss)).Should(Succeed())
 
 					time.Sleep(time.Second * 5)
@@ -151,7 +151,7 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 					cssdMofified := getModifiedClusterScalingStateDefinition(cssdList.Items[0], false, true)
 					Expect(k8sClient.Update(context.Background(), &cssdMofified)).Should(Succeed())
 				} else if casenumber == 6 {
-					css = CreateClusterScalingState("peak", true)
+					css = CreateClusterScalingState("peak")
 					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
 
 					time.Sleep(time.Second * 5)

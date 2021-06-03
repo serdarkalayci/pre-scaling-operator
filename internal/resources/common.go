@@ -157,7 +157,7 @@ func StateReplicasList(state states.State, deployments []g.ScalingInfo) ([]sr.St
 }
 
 // Main function to make scaling decisions. The step scaler scales 1 by 1 towards the desired replica count.
-func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem g.ScalingInfo, stateReplica sr.StateReplica, whereFrom string, recorder record.EventRecorder, rateLimiting bool) error {
+func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem g.ScalingInfo, stateReplica sr.StateReplica, whereFrom string, recorder record.EventRecorder) error {
 
 	log := ctrl.Log.
 		WithValues("deploymentItem", deploymentItem.Name).
@@ -178,7 +178,7 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 	var stepCondition bool = true
 	var retryErr error = nil
 	stepReplicaCount = deploymentItem.SpecReplica
-	rateLimitingEnabled := rateLimiting
+	rateLimitingEnabled := states.GetStepScaleSetting(deploymentItem)
 	log.Info("Putting deploymentItem on denylist")
 	deploymentItem.IsBeingScaled = true
 	g.GetDenyList().SetScalingItemOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, desiredReplicaCount)

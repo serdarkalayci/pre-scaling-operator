@@ -32,7 +32,7 @@ func (err ReconcilerError) Error() string {
 	return err.msg
 }
 
-func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State, recorder record.EventRecorder, dryRun, rateLimiting bool) (NamespaceEvents, string, error) {
+func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State, recorder record.EventRecorder, dryRun bool) (NamespaceEvents, string, error) {
 
 	var objectsToReconcile int
 	var nsEvents NamespaceEvents
@@ -103,7 +103,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 					continue
 				}
 				if !g.GetDenyList().IsDeploymentInFailureState(deployment) {
-					go resources.ScaleOrStepScale(ctx, _client, deployment, scaleReplicalist[i], "NSSCALER", recorder, rateLimiting)
+					go resources.ScaleOrStepScale(ctx, _client, deployment, scaleReplicalist[i], "NSSCALER", recorder)
 				}
 
 			}
@@ -135,7 +135,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 			}
 
 			if !g.GetDenyList().IsDeploymentInFailureState(deployment) {
-				nsEvents.DryRunInfo = nsEvents.DryRunInfo + fmt.Sprintf("\n||Application: %s||\n    ||Current replicas: %d ||New State and replicas: %s %d ||Step scaling: %t ||", scalingItem.Name, scalingItem.ReadyReplicas, scaleReplicalist[i].Name, scaleReplicalist[i].Replicas, rateLimiting)
+				nsEvents.DryRunInfo = nsEvents.DryRunInfo + fmt.Sprintf("\n||Application: %s||\n    ||Current replicas: %d ||New State and replicas: %s %d ||", scalingItem.Name, scalingItem.ReadyReplicas, scaleReplicalist[i].Name, scaleReplicalist[i].Replicas)
 			}
 		}
 
@@ -182,7 +182,7 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 					Info("Deployment is already being scaled at the moment. Updated desired replica count with new replica count")
 			}
 		} else {
-			err = resources.ScaleOrStepScale(ctx, _client, scalingItem, stateReplica, "deployScaler", recorder, false)
+			err = resources.ScaleOrStepScale(ctx, _client, scalingItem, stateReplica, "deployScaler", recorder)
 			if err != nil {
 				log.Error(err, "Error scaling object!")
 			}
