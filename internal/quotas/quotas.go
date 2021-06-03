@@ -10,6 +10,7 @@ import (
 	"github.com/containersol/prescale-operator/pkg/utils/client"
 	"github.com/containersol/prescale-operator/pkg/utils/math"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -18,48 +19,50 @@ import (
 // +kubebuilder:rbac:groups="",resources=resourcequotas,verbs=list;
 
 //ResourceQuotaCheck function first checks if there are resourceQuota objects present and then validates if the namespace has enough resources to scale
-func ResourceQuotaCheck(ctx context.Context, namespace string, limitsneeded corev1.ResourceList) (corev1.ResourceList, bool, error) {
+func ResourceQuotaCheck(ctx context.Context, namespace string, limitsneeded corev1.ResourceList) (string, string, bool, error) {
 
 	var allowed bool
-	var finalLimits corev1.ResourceList
+	var finalLimitsCPU, finalLimitsMemory string
 
 	kubernetesclient, err := client.GetClientSet()
 	if err != nil {
-		return finalLimits, false, err
+		return finalLimitsCPU, finalLimitsMemory, false, err
 	}
 
 	rq, err := resourceQuota(ctx, namespace, kubernetesclient)
 	if err != nil {
 		if strings.Contains(err.Error(), c.RQNotFound) {
 			ctrl.Log.Info(fmt.Sprintf("WARNING: No Resource Quotas found for this namespace: %s", namespace))
-			return finalLimits, true, nil
+			return finalLimitsCPU, finalLimitsMemory, true, nil
 		}
-		return finalLimits, false, err
+		return finalLimitsCPU, finalLimitsMemory, false, err
 	}
 
 	if len(math.IsNegative(limitsneeded)) > 0 {
-		return finalLimits, true, nil
+		return finalLimitsCPU, finalLimitsMemory, true, nil
 	}
 
 	if math.IsZero(limitsneeded) {
 		ctrl.Log.Info("WARNING: No Resource limits are specified in the target object")
-		return finalLimits, true, nil
+		return finalLimitsCPU, finalLimitsMemory, true, nil
 	}
 
-	finalLimits, allowed, err = isAllowed(rq, limitsneeded)
+	finalLimitsCPU, finalLimitsMemory, allowed, err = isAllowed(rq, limitsneeded)
 	if err != nil {
 		ctrl.Log.Error(err, "Cannot find namespace quotas")
-		return finalLimits, false, err
+		return finalLimitsCPU, finalLimitsMemory, false, err
 	}
 
-	return finalLimits, allowed, nil
+	return finalLimitsCPU, finalLimitsMemory, allowed, nil
 }
 
 //This function will determine if we exceed the available resources in at least one resourcequota object
-func isAllowed(rql *corev1.ResourceQuotaList, limitsneeded corev1.ResourceList) (corev1.ResourceList, bool, error) {
+func isAllowed(rql *corev1.ResourceQuotaList, limitsneeded corev1.ResourceList) (string, string, bool, error) {
 
 	var leftovers corev1.ResourceList
 	var checklimits corev1.ResourceList
+	var finalLimitsCPU, finalLimitsMemory string
+
 	log := ctrl.Log.
 		WithValues("Limits needed", limitsneeded)
 	log.Info("Identified Resources")
@@ -82,12 +85,30 @@ func isAllowed(rql *corev1.ResourceQuotaList, limitsneeded corev1.ResourceList) 
 			WithValues("Limits", checklimits)
 		log.Info("Final checks")
 
+		finalLimitsCPU, finalLimitsMemory = specificResourceQuotas(checklimits)
+
 		if len(math.IsNegative(checklimits)) != 0 {
-			return checklimits, false, nil
+			return finalLimitsCPU, finalLimitsMemory, false, nil
 		}
 	}
 
-	return checklimits, true, nil
+	return finalLimitsCPU, finalLimitsMemory, true, nil
+}
+
+func specificResourceQuotas(limits corev1.ResourceList) (string, string) {
+
+	var finalLimitsCPU, finalLimitsMemory resource.Quantity
+
+	for i, j := range limits {
+		if i == "limits.cpu" {
+			finalLimitsCPU = j
+		}
+		if i == "limits.memory" {
+			finalLimitsMemory = j
+		}
+	}
+
+	return finalLimitsCPU.String(), finalLimitsMemory.String()
 }
 
 func sanitizeRQFromStorageAndPVC(rq corev1.ResourceQuota) corev1.ResourceQuota {

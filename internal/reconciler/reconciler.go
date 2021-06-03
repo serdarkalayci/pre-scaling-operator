@@ -38,7 +38,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	var nsEvents NamespaceEvents
 
 	var limitsneeded corev1.ResourceList
-	var finalLimits corev1.ResourceList
+	var finalLimitsCPU, finalLimitsMemory string
 
 	log := ctrl.Log.
 		WithValues("namespace", namespace)
@@ -73,7 +73,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	limitsneeded = resources.LimitsNeededList(deployments, scaleReplicalist)
 
 	// After we have calculated the resources needed from all workloads in a given namespace, we can determine if the scaling should be allowed to go through
-	finalLimits, allowed, err := quotas.ResourceQuotaCheck(ctx, namespace, limitsneeded)
+	finalLimitsCPU, finalLimitsMemory, allowed, err := quotas.ResourceQuotaCheck(ctx, namespace, limitsneeded)
 	if err != nil {
 		log.Error(err, "Cannot calculate the resource quotas")
 		return nsEvents, finalState.Name, err
@@ -111,7 +111,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 			nsEvents.QuotaExceeded = namespace
 		}
 	} else {
-		nsEvents.DryRunInfo = fmt.Sprintf("\n|Namespace: %s| Quotas enough: %t CPU Limits: %v Memory Limits: %v|", namespace, allowed, finalLimits.Cpu(), finalLimits.Memory())
+		nsEvents.DryRunInfo = fmt.Sprintf("\n|Namespace: %s| Quotas enough: %t |CPU Available: %v |Memory Available: %v|", namespace, allowed, finalLimitsCPU, finalLimitsMemory)
 		for i, deployment := range deployments {
 
 			if deployment.SpecReplica == scaleReplicalist[i].Replicas {
@@ -135,7 +135,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 			}
 
 			if !g.GetDenyList().IsDeploymentInFailureState(deployment) {
-				nsEvents.DryRunInfo = nsEvents.DryRunInfo + fmt.Sprintf("\n||Application: %s||\n    ||Current replicas: %d ||New State and replicas: %s %d ||", scalingItem.Name, scalingItem.ReadyReplicas, scaleReplicalist[i].Name, scaleReplicalist[i].Replicas)
+				nsEvents.DryRunInfo = nsEvents.DryRunInfo + fmt.Sprintf("\n||Application: %s||\n    ||Current replicas: %d ||New State: %s ||New replicas: %d ||Rapid Scaling: %t ||", scalingItem.Name, scalingItem.ReadyReplicas, scaleReplicalist[i].Name, scaleReplicalist[i].Replicas, states.GetRapidScalingSetting(scalingItem))
 			}
 		}
 
@@ -160,7 +160,7 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 		return nil
 	}
 
-	_, allowed, err := quotas.ResourceQuotaCheck(ctx, scalingItem.Namespace, resources.LimitsNeeded(scalingItem, stateReplica.Replicas))
+	_, _, allowed, err := quotas.ResourceQuotaCheck(ctx, scalingItem.Namespace, resources.LimitsNeeded(scalingItem, stateReplica.Replicas))
 	if err != nil {
 		log.Error(err, "Cannot calculate the resource quotas")
 		return err
