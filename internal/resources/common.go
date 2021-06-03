@@ -178,11 +178,11 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 	var stepCondition bool = true
 	var retryErr error = nil
 	stepReplicaCount = deploymentItem.SpecReplica
-	rateLimitingEnabled := states.GetStepScaleSetting(deploymentItem)
+	rapidScalingEnabled := states.GetRapidScalingSetting(deploymentItem)
 	log.Info("Putting deploymentItem on denylist")
 	deploymentItem.IsBeingScaled = true
 	g.GetDenyList().SetScalingItemOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, desiredReplicaCount)
-	if rateLimitingEnabled {
+	if !rapidScalingEnabled {
 		log.WithValues("Deployment: ", deploymentItem.Name).
 			WithValues("Namespace: ", deploymentItem.Namespace).
 			WithValues("Wherefrom: ", whereFrom).

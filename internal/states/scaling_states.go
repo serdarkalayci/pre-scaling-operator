@@ -71,7 +71,7 @@ func GetNamespaceScalingStateName(ctx context.Context, _client client.Client, na
 	return scalingStates.Items[0].Spec.State, nil
 }
 
-func GetStepScaleSetting(deploymentItem g.ScalingInfo) bool {
+func GetRapidScalingSetting(deploymentItem g.ScalingInfo) bool {
 
 	scalingAnnotation := annotations.FilterByKeyPrefix("scaler/rapid-", deploymentItem.Annotations)
 
