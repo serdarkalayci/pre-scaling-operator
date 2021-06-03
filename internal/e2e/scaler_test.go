@@ -39,9 +39,9 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 	BeforeEach(func() {
 
-		cssd = CreateClusterScalingStateDefinition()
+		css = CreateClusterScalingState("bau")
 
-		Expect(k8sClient.Create(context.Background(), &cssd)).Should(Succeed())
+		Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
 
 		namespace = createNS(key)
 
@@ -80,7 +80,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 				cssd = CreateClusterScalingStateDefinition()
 
-				Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
+				Expect(k8sClient.Create(context.Background(), &cssd)).Should(Succeed())
 
 				key.Name = "case" + strconv.Itoa(casenumber)
 				fetchedDeployment := v1.Deployment{}
