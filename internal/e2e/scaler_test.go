@@ -112,7 +112,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 					Expect(k8sClient.Update(context.Background(), &fetchedDeploymentConfig)).Should(Succeed())
 
 					replicasReadyList, replicasSpecList := GetReplicaAndReadyList(expectedReplicas, key, OpenshiftCluster)
-					if rapidScale {
+					if !rapidScale {
 						Expect(reflect.DeepEqual(replicasReadyList, replicasSpecList)).To(BeTrue(), "Step scale assertion failed! The lists are not equal!")
 						Expect(AssessSmoothClimbOrDescend(replicasReadyList, scaleUpOrDown)).To(BeTrue(), "Step scale assertion failed! ReplicaReady list was not ascending or descending correctly")
 						Expect(AssessSmoothClimbOrDescend(replicasSpecList, scaleUpOrDown)).To(BeTrue(), "Step scale assertion failed! ReplicaSpec list was not ascending or descending correctly!")
