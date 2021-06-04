@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 
 	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/quotas"
 	"github.com/containersol/prescale-operator/internal/resources"
 	"github.com/containersol/prescale-operator/internal/states"
 	g "github.com/containersol/prescale-operator/pkg/utils/global"
+	"github.com/olekukonko/tablewriter"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
@@ -111,7 +114,20 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 			nsEvents.QuotaExceeded = namespace
 		}
 	} else {
-		nsEvents.DryRunInfo = fmt.Sprintf("\n|Namespace: %s| Quotas enough: %t |CPU Available: %v |Memory Available: %v|", namespace, allowed, finalLimitsCPU, finalLimitsMemory)
+
+		tableString := &strings.Builder{}
+		table := tablewriter.NewWriter(tableString)
+		table.SetHeader([]string{"Namespace", "Quotas enough", "Cpu left after scaling", "Memory left after scaling"})
+		table.Append([]string{namespace, strconv.FormatBool(allowed), finalLimitsCPU, finalLimitsMemory})
+		table.Render()
+
+		nsEvents.DryRunInfo = tableString.String()
+
+		var applicationData [][]string
+		tableString = &strings.Builder{}
+		table = tablewriter.NewWriter(tableString)
+		table.SetHeader([]string{"Application", "Current replicas", "New state", "New replicas", "Rapid Scaling"})
+
 		for i, deployment := range deployments {
 
 			if deployment.SpecReplica == scaleReplicalist[i].Replicas {
@@ -135,10 +151,19 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 			}
 
 			if !g.GetDenyList().IsDeploymentInFailureState(deployment) {
-				nsEvents.DryRunInfo = nsEvents.DryRunInfo + fmt.Sprintf("\n||Application: %s||\n    ||Current replicas: %d ||New State: %s ||New replicas: %d ||Rapid Scaling: %t ||", scalingItem.Name, scalingItem.ReadyReplicas, scaleReplicalist[i].Name, scaleReplicalist[i].Replicas, states.GetRapidScalingSetting(scalingItem))
+
+				applicationData = append(applicationData, []string{scalingItem.Name, fmt.Sprint(scalingItem.ReadyReplicas), scaleReplicalist[i].Name, fmt.Sprint(scaleReplicalist[i].Replicas), strconv.FormatBool(states.GetRapidScalingSetting(scalingItem))})
+
 			}
 		}
 
+		for _, v := range applicationData {
+			table.Append(v)
+		}
+
+		table.Render()
+
+		nsEvents.DryRunInfo = nsEvents.DryRunInfo + tableString.String()
 	}
 
 	return nsEvents, finalState.Name, err
