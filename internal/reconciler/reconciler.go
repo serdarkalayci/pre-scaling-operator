@@ -130,16 +130,8 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 		for i, deployment := range deployments {
 
-			// Keep this?
-			// if deployment.SpecReplica == scaleReplicalist[i].Replicas {
-			// 	continue
-			// }
+			applicationData = append(applicationData, []string{deployment.Name, fmt.Sprint(deployment.ReadyReplicas), scaleReplicalist[i].Name, fmt.Sprint(scaleReplicalist[i].Replicas), strconv.FormatBool(states.GetRapidScalingSetting(deployment))})
 
-			if !g.GetDenyList().IsDeploymentInFailureState(deployment) {
-
-				applicationData = append(applicationData, []string{deployment.Name, fmt.Sprint(deployment.ReadyReplicas), scaleReplicalist[i].Name, fmt.Sprint(scaleReplicalist[i].Replicas), strconv.FormatBool(states.GetRapidScalingSetting(deployment))})
-
-			}
 		}
 
 		for _, v := range applicationData {
