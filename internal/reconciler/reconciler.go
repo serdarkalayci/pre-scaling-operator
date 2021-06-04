@@ -130,29 +130,14 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 		for i, deployment := range deployments {
 
-			if deployment.SpecReplica == scaleReplicalist[i].Replicas {
-				continue
-			}
-
-			scalingItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(deployment)
-			if notFoundErr == nil {
-				if scalingItem.DesiredReplicas != scaleReplicalist[i].Replicas {
-					g.GetDenyList().SetScalingItemOnList(scalingItem, scalingItem.Failure, scalingItem.FailureMessage, scaleReplicalist[i].Replicas)
-					log.WithValues("Name: ", scalingItem.Name).
-						WithValues("Namespace: ", scalingItem.Namespace).
-						WithValues("Object: ", scalingItem.ScalingItemType.ItemTypeName).
-						WithValues("DesiredReplicacount on item: ", scalingItem.DesiredReplicas).
-						WithValues("New replica count:", scaleReplicalist[i].Replicas).
-						WithValues("Failure: ", scalingItem.Failure).
-						WithValues("Failure message: ", scalingItem.FailureMessage).
-						Info("Deployment is already being scaled at the moment. Updated desired replica count with new replica count")
-				}
-				continue
-			}
+			// Keep this?
+			// if deployment.SpecReplica == scaleReplicalist[i].Replicas {
+			// 	continue
+			// }
 
 			if !g.GetDenyList().IsDeploymentInFailureState(deployment) {
 
-				applicationData = append(applicationData, []string{scalingItem.Name, fmt.Sprint(scalingItem.ReadyReplicas), scaleReplicalist[i].Name, fmt.Sprint(scaleReplicalist[i].Replicas), strconv.FormatBool(states.GetRapidScalingSetting(scalingItem))})
+				applicationData = append(applicationData, []string{deployment.Name, fmt.Sprint(deployment.ReadyReplicas), scaleReplicalist[i].Name, fmt.Sprint(scaleReplicalist[i].Replicas), strconv.FormatBool(states.GetRapidScalingSetting(deployment))})
 
 			}
 		}
