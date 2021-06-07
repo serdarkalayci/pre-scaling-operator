@@ -41,6 +41,9 @@ type ClusterScalingStateDefinitionStatus struct {
 }
 
 // ClusterScalingStateDefinitionConfiguration sets configuration for the Scaler operator
+type ClusterScalingStateDefinitionConfiguration struct {
+	DryRun bool `json:"dryRun"`
+}
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
@@ -51,8 +54,9 @@ type ClusterScalingStateDefinition struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   []States                            `json:"spec,omitempty"`
-	Status ClusterScalingStateDefinitionStatus `json:"status,omitempty"`
+	Spec   []States                                   `json:"spec,omitempty"`
+	Config ClusterScalingStateDefinitionConfiguration `json:"config,omitempty"`
+	Status ClusterScalingStateDefinitionStatus        `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -46,8 +46,13 @@ type ScalingState struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ScalingStateSpec   `json:"spec,omitempty"`
-	Status ScalingStateStatus `json:"status,omitempty"`
+	Spec   ScalingStateSpec          `json:"spec,omitempty"`
+	Config ScalingStateConfiguration `json:"config,omitempty"`
+	Status ScalingStateStatus        `json:"status,omitempty"`
+}
+
+type ScalingStateConfiguration struct {
+	DryRun bool `json:"dryRun"`
 }
 
 // +kubebuilder:object:root=true

@@ -43,7 +43,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 		Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
 
-		namespace = createNS(key)
+		namespace = createScalerNS(key)
 
 		Expect(k8sClient.Create(context.Background(), &namespace)).Should(Succeed())
 
@@ -76,7 +76,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 	Context("Deployment scaling test", func() {
 		When("a deployment is already in place", func() {
-			table.DescribeTable("And then a deployment is being scaled..", func(scaleUpOrDown string, expectedReplicas int, stepscale bool) {
+			table.DescribeTable("And then a deployment is being scaled..", func(scaleUpOrDown string, expectedReplicas int, rapidScale bool) {
 
 				cssd = CreateClusterScalingStateDefinition()
 
@@ -88,7 +88,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 				initialReplicas := ScalerTestCaseInitialReplicas(scaleUpOrDown)
 				if OpenshiftCluster {
 
-					deploymentconfig = *createDeploymentConfigScaler(key, scaleUpOrDown, casenumber, strconv.FormatBool(stepscale))
+					deploymentconfig = *createDeploymentConfigScaler(key, scaleUpOrDown, casenumber, strconv.FormatBool(rapidScale))
 					Expect(k8sClient.Create(context.Background(), &deploymentconfig)).Should(Succeed())
 
 					// Wait for deploymentconfig to get ready
@@ -105,14 +105,14 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 						return fetchedDeploymentConfig
 					}, timeout, interval).Should(Not(BeNil()))
 
-					fetchedDeploymentConfig = changeAnnotationDCReplicas(fetchedDeploymentConfig, int32(expectedReplicas), strconv.FormatBool(stepscale))
+					fetchedDeploymentConfig = changeAnnotationDCReplicas(fetchedDeploymentConfig, int32(expectedReplicas), strconv.FormatBool(rapidScale))
 
 					// Update with the new changes
 					By("Then a deployment is updated")
 					Expect(k8sClient.Update(context.Background(), &fetchedDeploymentConfig)).Should(Succeed())
 
 					replicasReadyList, replicasSpecList := GetReplicaAndReadyList(expectedReplicas, key, OpenshiftCluster)
-					if stepscale {
+					if !rapidScale {
 						Expect(reflect.DeepEqual(replicasReadyList, replicasSpecList)).To(BeTrue(), "Step scale assertion failed! The lists are not equal!")
 						Expect(AssessSmoothClimbOrDescend(replicasReadyList, scaleUpOrDown)).To(BeTrue(), "Step scale assertion failed! ReplicaReady list was not ascending or descending correctly")
 						Expect(AssessSmoothClimbOrDescend(replicasSpecList, scaleUpOrDown)).To(BeTrue(), "Step scale assertion failed! ReplicaSpec list was not ascending or descending correctly!")
@@ -126,7 +126,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 				} else {
 
-					deployment = createDeploymentScaler(key, scaleUpOrDown, casenumber, strconv.FormatBool(stepscale))
+					deployment = createDeploymentScaler(key, scaleUpOrDown, casenumber, strconv.FormatBool(rapidScale))
 					Expect(k8sClient.Create(context.Background(), &deployment)).Should(Succeed())
 
 					// Wait until deployment is ready
@@ -143,7 +143,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 						return fetchedDeployment
 					}, timeout, interval).Should(Not(BeNil()))
 
-					fetchedDeployment = changeAnnotationDeploymentReplicas(fetchedDeployment, int32(expectedReplicas), strconv.FormatBool(stepscale))
+					fetchedDeployment = changeAnnotationDeploymentReplicas(fetchedDeployment, int32(expectedReplicas), strconv.FormatBool(rapidScale))
 
 					// Update with the new changes
 					By("Then a deployment is updated")
@@ -151,7 +151,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 					By("The deployment scaling is being assessed")
 					replicasReadyList, replicasSpecList := GetReplicaAndReadyList(expectedReplicas, key, OpenshiftCluster)
-					if stepscale {
+					if !rapidScale {
 						Expect(reflect.DeepEqual(replicasReadyList, replicasSpecList)).To(BeTrue(), "Step scale assertion failed! The lists are not equal!")
 						Expect(AssessSmoothClimbOrDescend(replicasReadyList, scaleUpOrDown)).To(BeTrue(), "Step scale assertion failed! ReplicaReady list was not ascending or descending correctly")
 						Expect(AssessSmoothClimbOrDescend(replicasSpecList, scaleUpOrDown)).To(BeTrue(), "Step scale assertion failed! ReplicaSpec list was not ascending or descending correctly!")
@@ -168,10 +168,10 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 			},
 
-				table.Entry("CASE 1  | Should step scale from 0 up to 8 |  ", "UP", 8, true),
-				table.Entry("CASE 2  | Should step scale from 8 down to 1 |  ", "DOWN", 1, true),
-				table.Entry("CASE 3  | Should rapid scale from 0 up to 8 |  ", "UP", 8, false),
-				table.Entry("CASE 4  | Should rapid scale from 8 down to 1 |  ", "DOWN", 1, false),
+				table.Entry("CASE 1  | Should step scale from 0 up to 8 |  ", "UP", 8, false),
+				table.Entry("CASE 2  | Should step scale from 8 down to 1 |  ", "DOWN", 1, false),
+				table.Entry("CASE 3  | Should rapid scale from 0 up to 8 |  ", "UP", 8, true),
+				table.Entry("CASE 4  | Should rapid scale from 8 down to 1 |  ", "DOWN", 1, true),
 			)
 		})
 	})
@@ -268,7 +268,7 @@ func GetReplicaAndReadyList(expectedReplicas int, key types.NamespacedName, open
 func AssessRapidScaleReplicaList(list []int32, initialReplicas int32, expectedReplicas int32) bool {
 
 	//First check if the list is ok
-	if len(list) > 2 || len(list) < 2 {
+	if len(list) != 2 {
 		return false
 	}
 
@@ -288,13 +288,13 @@ func ScalerTestCaseInitialReplicas(upordown string) int32 {
 	return 5
 }
 
-func changeAnnotationDeploymentReplicas(deployment v1.Deployment, replicas int32, stepScale string) v1.Deployment {
+func changeAnnotationDeploymentReplicas(deployment v1.Deployment, replicas int32, rapidScale string) v1.Deployment {
 
 	deployment.Annotations = map[string]string{
 		"scaler/state-bau-replicas":     fmt.Sprint(replicas), // That reflects the annotation change and will change replica # to 4
 		"scaler/state-default-replicas": "2",
 		"scaler/state-peak-replicas":    "7",
-		"scaler/rapid-scaling":          fmt.Sprintf(stepScale),
+		"scaler/rapid-scaling":          fmt.Sprintf(rapidScale),
 	}
 
 	deployment.Labels = map[string]string{
@@ -304,13 +304,13 @@ func changeAnnotationDeploymentReplicas(deployment v1.Deployment, replicas int32
 	return deployment
 }
 
-func changeAnnotationDCReplicas(deploymentconfig ocv1.DeploymentConfig, replicas int32, stepScale string) ocv1.DeploymentConfig {
+func changeAnnotationDCReplicas(deploymentconfig ocv1.DeploymentConfig, replicas int32, rapidScale string) ocv1.DeploymentConfig {
 
 	deploymentconfig.Annotations = map[string]string{
 		"scaler/state-bau-replicas":     fmt.Sprint(replicas),
 		"scaler/state-default-replicas": "2",
 		"scaler/state-peak-replicas":    "7",
-		"scaler/rapid-scaling":          fmt.Sprintf(stepScale),
+		"scaler/rapid-scaling":          fmt.Sprintf(rapidScale),
 	}
 
 	deploymentconfig.Labels = map[string]string{
@@ -320,7 +320,7 @@ func changeAnnotationDCReplicas(deploymentconfig ocv1.DeploymentConfig, replicas
 	return deploymentconfig
 }
 
-func createDeploymentScaler(deploymentInfo types.NamespacedName, upordown string, casenumber int, stepScale string) v1.Deployment {
+func createDeploymentScaler(deploymentInfo types.NamespacedName, upordown string, casenumber int, rapidScale string) v1.Deployment {
 
 	replicas := ScalerTestCaseInitialReplicas(upordown)
 	dep := &v1.Deployment{
@@ -335,7 +335,7 @@ func createDeploymentScaler(deploymentInfo types.NamespacedName, upordown string
 				"scaler/state-bau-replicas":     fmt.Sprint(replicas),
 				"scaler/state-default-replicas": "2",
 				"scaler/state-peak-replicas":    "7",
-				"scaler/rapid-scaling":          fmt.Sprintf(stepScale),
+				"scaler/rapid-scaling":          fmt.Sprintf(rapidScale),
 			},
 		},
 
@@ -364,7 +364,7 @@ func createDeploymentScaler(deploymentInfo types.NamespacedName, upordown string
 	return *dep
 }
 
-func createDeploymentConfigScaler(deploymentInfo types.NamespacedName, upordown string, casenumber int, stepScale string) *ocv1.DeploymentConfig {
+func createDeploymentConfigScaler(deploymentInfo types.NamespacedName, upordown string, casenumber int, rapidScale string) *ocv1.DeploymentConfig {
 	replicas := ScalerTestCaseInitialReplicas(upordown)
 	var timeoutSeconds int64 = 30
 	var activeDeadlineSeconds int64 = 21600
@@ -380,7 +380,7 @@ func createDeploymentConfigScaler(deploymentInfo types.NamespacedName, upordown 
 				"scaler/state-bau-replicas":     fmt.Sprint(replicas),
 				"scaler/state-default-replicas": "2",
 				"scaler/state-peak-replicas":    "7",
-				"scaler/rapid-scaling":          fmt.Sprintf(stepScale),
+				"scaler/rapid-scaling":          fmt.Sprintf(rapidScale),
 			},
 		},
 
@@ -409,4 +409,18 @@ func createDeploymentConfigScaler(deploymentInfo types.NamespacedName, upordown 
 		},
 	}
 	return deploymentConfig
+}
+
+func createScalerNS(deploymentInfo types.NamespacedName) corev1.Namespace {
+
+	ns := &corev1.Namespace{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: deploymentInfo.Namespace,
+		},
+		Spec:   corev1.NamespaceSpec{},
+		Status: corev1.NamespaceStatus{},
+	}
+
+	return *ns
 }

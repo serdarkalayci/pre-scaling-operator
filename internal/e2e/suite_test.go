@@ -172,6 +172,9 @@ func CreateClusterScalingState(state string) v1alpha1.ClusterScalingState {
 		Spec: v1alpha1.ClusterScalingStateSpec{
 			State: state,
 		},
+		Config: v1alpha1.ClusterScalingStateConfiguration{
+			DryRun: false,
+		},
 	}
 
 	return *scalingState
@@ -190,6 +193,9 @@ func CreateScalingState(state, namespace string) v1alpha1.ScalingState {
 		},
 		Spec: v1alpha1.ScalingStateSpec{
 			State: state,
+		},
+		Config: v1alpha1.ScalingStateConfiguration{
+			DryRun: false,
 		},
 	}
 
@@ -224,6 +230,9 @@ func CreateClusterScalingStateDefinition() v1alpha1.ClusterScalingStateDefinitio
 			Name: "global-state-definition",
 		},
 		Spec: states,
+		Config: v1alpha1.ClusterScalingStateDefinitionConfiguration{
+			DryRun: false,
+		},
 	}
 
 	return *scalingState

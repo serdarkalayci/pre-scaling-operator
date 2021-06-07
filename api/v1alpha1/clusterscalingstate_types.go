@@ -45,8 +45,13 @@ type ClusterScalingState struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ClusterScalingStateSpec   `json:"spec,omitempty"`
-	Status ClusterScalingStateStatus `json:"status,omitempty"`
+	Spec   ClusterScalingStateSpec          `json:"spec,omitempty"`
+	Config ClusterScalingStateConfiguration `json:"config,omitempty"`
+	Status ClusterScalingStateStatus        `json:"status,omitempty"`
+}
+
+type ClusterScalingStateConfiguration struct {
+	DryRun bool `json:"dryRun"`
 }
 
 // +kubebuilder:object:root=true

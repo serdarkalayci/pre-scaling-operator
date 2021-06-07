@@ -60,9 +60,16 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 	var eventsList []string
 	var appliedStates []string
 	var appliedStateNamespaceList []string
+	var dryRunCluster string
 	log := r.Log.
 		WithValues("reconciler kind", "ClusterScalingStatesDefinition").
 		WithValues("reconciler object", req.Name)
+
+	cssd := &v1alpha1.ClusterScalingStateDefinition{}
+	err := r.Get(ctx, req.NamespacedName, cssd)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
 	clusterStateDefinitions, err := states.GetClusterScalingStates(ctx, r.Client)
 	if err != nil {
@@ -83,29 +90,43 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 	log.Info("Clusterscalingstatedefinition Controller: Reconciling namespaces")
 	for _, namespace := range namespaces.Items {
 
-		events, state, err := reconciler.ReconcileNamespace(ctx, r.Client, namespace.Name, clusterStateDefinitions, states.State{}, r.Recorder)
+		events, state, err := reconciler.ReconcileNamespace(ctx, r.Client, namespace.Name, clusterStateDefinitions, states.State{}, r.Recorder, cssd.Config.DryRun)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 
-		if events.QuotaExceeded != "" {
-			eventsList = append(eventsList, events.QuotaExceeded)
+		if !cssd.Config.DryRun {
+
+			if events.QuotaExceeded != "" {
+				eventsList = append(eventsList, events.QuotaExceeded)
+			}
+
+			appliedStateNamespaceList = append(appliedStateNamespaceList, namespace.Name)
+			appliedStates = append(appliedStates, state)
+
+		} else {
+
+			dryRunCluster = dryRunCluster + events.DryRunInfo
+
 		}
 
-		appliedStateNamespaceList = append(appliedStateNamespaceList, namespace.Name)
-		appliedStates = append(appliedStates, state)
+	}
+
+	if !cssd.Config.DryRun {
+
+		if len(eventsList) != 0 {
+			r.Recorder.Event(cssd, "Warning", "QuotaExceeded", fmt.Sprintf("Not enough available resources for the following %d namespaces: %s", len(eventsList), eventsList))
+		}
+
+		r.Recorder.Event(cssd, "Normal", "AppliedStates", fmt.Sprintf("The applied state for each of the %s namespaces is %s", appliedStateNamespaceList, appliedStates))
+		log.Info("Clusterscalingstatedefinition Reconciliation loop completed")
+
+	} else {
+
+		r.Recorder.Event(cssd, "Normal", "DryRun", fmt.Sprintf("DryRun: %s", dryRunCluster))
 
 	}
 
-	cssd := &v1alpha1.ClusterScalingStateDefinition{}
-	err = r.Get(ctx, req.NamespacedName, cssd)
-
-	if len(eventsList) != 0 {
-		r.Recorder.Event(cssd, "Warning", "QuotaExceeded", fmt.Sprintf("Not enough available resources for the following %d namespaces: %s", len(eventsList), eventsList))
-	}
-
-	r.Recorder.Event(cssd, "Normal", "AppliedStates", fmt.Sprintf("The applied state for each of the %s namespaces is %s", appliedStateNamespaceList, appliedStates))
-	log.Info("Clusterscalingstatedefinition Reconciliation loop completed")
 	return ctrl.Result{}, nil
 }
 

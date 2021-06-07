@@ -12,3 +12,5 @@ spec:
 - name: bau
   description: "Business as usual"
   priority: 10
+config:
+  dryRun: false
