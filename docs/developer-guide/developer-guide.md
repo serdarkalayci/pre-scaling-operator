@@ -1,4 +1,4 @@
-# Operator Architecture
+# Operator Usage/ScalingStates
 
 The Operator can be used as a layer on top of the 
 (Horizontal Pod Autoscaler)[https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/],
