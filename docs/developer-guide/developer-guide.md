@@ -99,11 +99,6 @@ If the cluster is set to business-as-usual, and the namespace is set to peak, pe
 
 The priority settings here, delimits the ranking of a state over others.
 
-### Scaling state rate limit
-Each scaling state has rate-limiting settings which are applied during scale-ups. Scale downs are done at full speed, as scale-down is usually the safest of the two.
-
-These rate limits can be defined as applications-per-minute (Only X kubectl scale executions per minute)  or applications-at-once (Only x deployments may have ready !== desired at any one time)
-
 ## Operator is Opt-in only
 In order to protect the applications, and enable a gradual rollout of the Scaler in our platforms, the Operator is strictly opt-in.
 
