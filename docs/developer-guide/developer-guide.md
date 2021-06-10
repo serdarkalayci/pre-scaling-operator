@@ -20,15 +20,12 @@ spec:
   - name: bau
     description: "Business as usual. Scaling state of normal everyday operations"
     priority: 10
-    rate-limit: {}
-  - name: marketing-runs
+ - name: marketing-runs
     description: "Use when running marketing campaigns, and higher-than-normal load is expected"
     priority: 5
-    rate-limit: {}
   - name: peak
     description: "Maximum scale settings."
     priority: 1
-    rate-limit: {}
 config:
   dryRun: false
 ```

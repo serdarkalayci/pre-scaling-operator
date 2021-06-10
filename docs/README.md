@@ -7,7 +7,7 @@
 * Folder ./developer-guide: Information how to interact with the operator as a developer
 * [Goals page](goals.md) Goals/Objectives the Operator tries to accomplish
 * [Limitations](limitations.md) Current limitation the operator is operating under
-* [Roadmap](TOADMAP.md) Future roadmap of the operator. Where we want to go
+* [Roadmap](ROADMAP.md) Future roadmap of the operator. Where we want to go
 
 <span class="sidebar"></span>
 
@@ -46,7 +46,7 @@ The Operator has the following behaviour:
 
 * **Modification of `spec.replicas`:** If an application is opted in, and the application replica count is manipulated from elsewhere, the operator will set the replica count back to the replica count of the specific active scaling state.
 
-* **Modification of a state:** If there's a change to the replica-count for a state, the operator will take that change into account as long as the application is opted in. There is also an optional `admission-controller` that can prevent that modification all-together
+* **Modification of a state:** If there's a change to the replica-count for a state, the operator will take that change into account as long as the application is opted in. There is also an optional `admission-controller` that can prevent that modification all-together. You can find its repository link [here](https://github.com/ContainerSolutions/pre-scaling-operator-admission-controller)
 
 * **Default State:** All applications include a default state. The DevOps team can change the scalingstate to that default state at any time. The replica count for the default state is always what the deployment process would output into the `spec.replicas` field.
 
