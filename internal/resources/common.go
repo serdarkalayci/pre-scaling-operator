@@ -348,20 +348,38 @@ func GetRefreshedScalingItem(ctx context.Context, _client client.Client, deploym
 }
 
 //DeploymentLister lists all deployments in a namespace
-func ScalingItemLister(ctx context.Context, _client client.Client, namespace string, OptInLabel map[string]string) ([]g.ScalingInfo, error) {
+func ScalingItemNamespaceLister(ctx context.Context, _client client.Client, namespace string, OptInLabel map[string]string) ([]g.ScalingInfo, error) {
 
 	returnList := []g.ScalingInfo{}
 	deployments := v1.DeploymentList{}
 	deploymentconfigs := ocv1.DeploymentConfigList{}
-	err := _client.List(ctx, &deployments, client.MatchingLabels(OptInLabel), client.InNamespace(namespace))
-	if err != nil {
-		return []g.ScalingInfo{}, err
+
+	if namespace != "" {
+		err := _client.List(ctx, &deployments, client.MatchingLabels(OptInLabel), client.InNamespace(namespace))
+		if err != nil {
+			return []g.ScalingInfo{}, err
+		}
+	} else {
+		// List all deployments, clusterwide.
+		err := _client.List(ctx, &deployments, client.MatchingLabels(OptInLabel))
+		if err != nil {
+			return []g.ScalingInfo{}, err
+		}
 	}
 
 	if c.OpenshiftCluster {
-		err := _client.List(ctx, &deploymentconfigs, client.MatchingLabels(OptInLabel), client.InNamespace(namespace))
-		if err != nil {
-			return []g.ScalingInfo{}, err
+
+		if namespace != "" {
+			err := _client.List(ctx, &deploymentconfigs, client.MatchingLabels(OptInLabel), client.InNamespace(namespace))
+			if err != nil {
+				return []g.ScalingInfo{}, err
+			}
+		} else {
+			// List all deploymentconfigs, clusterwide.
+			err := _client.List(ctx, &deploymentconfigs, client.MatchingLabels(OptInLabel))
+			if err != nil {
+				return []g.ScalingInfo{}, err
+			}
 		}
 	}
 

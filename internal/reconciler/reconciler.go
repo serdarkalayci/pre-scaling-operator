@@ -35,6 +35,23 @@ func (err ReconcilerError) Error() string {
 	return err.msg
 }
 
+func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, stateDefinitions states.States, clusterState states.State, recorder record.EventRecorder, dryRun bool) (NamespaceEvents, string, error) {
+	log := ctrl.Log
+
+	var objectsToReconcile int
+	var nsEvents NamespaceEvents
+
+	scalingobjects, err := resources.ScalingItemNamespaceLister(ctx, _client, "", c.OptInLabel)
+	if err != nil {
+		log.Error(err, "error listing ScalingObjects")
+		return nsEvents, "", err
+	}
+
+	
+
+	return ReconcileNamespace(ctx, _client, "", stateDefinitions, clusterState, recorder, dryRun)
+}
+
 func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State, recorder record.EventRecorder, dryRun bool) (NamespaceEvents, string, error) {
 
 	var objectsToReconcile int
@@ -53,7 +70,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 	// We now need to look for objects (currently supported deployments and deploymentConfigs) which are opted in,
 	// then use their annotations to determine the correct scale
-	deployments, err := resources.ScalingItemLister(ctx, _client, namespace, c.OptInLabel)
+	deployments, err := resources.ScalingItemNamespaceLister(ctx, _client, namespace, c.OptInLabel)
 	if err != nil {
 		log.Error(err, "Cannot list deployments in namespace")
 		return nsEvents, finalState.Name, err
