@@ -601,3 +601,84 @@ func TestLimitsNeededList(t *testing.T) {
 		})
 	}
 }
+
+func TestNamespaceGrouping(t *testing.T) {
+	type args struct {
+		deploymentItems []g.ScalingInfo
+	}
+	tests := []struct {
+		name string
+		args args
+		want map[string]int
+	}{
+		{
+			name: "TestThreeNamespaces",
+			args: args{
+				deploymentItems: []g.ScalingInfo{
+					{
+						Name:         "foons2",
+						Namespace:    "ns2",
+						ResourceList: map[corev1.ResourceName]resource.Quantity{},
+						SpecReplica:  3,
+					},
+					{
+						Name:         "foons1",
+						Namespace:    "ns1",
+						ResourceList: map[corev1.ResourceName]resource.Quantity{},
+						SpecReplica:  3,
+					}, {
+						Name:         "barns3",
+						Namespace:    "ns3",
+						ResourceList: map[corev1.ResourceName]resource.Quantity{},
+						SpecReplica:  3,
+					},
+					{
+						Name:         "barns1",
+						Namespace:    "ns1",
+						ResourceList: map[corev1.ResourceName]resource.Quantity{},
+						SpecReplica:  3,
+					}, {
+						Name:         "bazns2",
+						Namespace:    "ns2",
+						ResourceList: map[corev1.ResourceName]resource.Quantity{},
+						SpecReplica:  3,
+					},
+					{
+						Name:         "barns2",
+						Namespace:    "ns2",
+						ResourceList: map[corev1.ResourceName]resource.Quantity{},
+						SpecReplica:  3,
+					},
+					{
+						Name:         "foons3",
+						Namespace:    "ns3",
+						ResourceList: map[corev1.ResourceName]resource.Quantity{},
+						SpecReplica:  3,
+					},
+				},
+			},
+			want: map[string]int{
+				"ns1": 2,
+				"ns2": 3,
+				"ns3": 2,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := GroupScalingItemByNamespace(tt.args.deploymentItems)
+			for key := range got {
+				expectedCount := tt.want[key]
+				length := len(got[key])
+				if length == 0 {
+					t.Errorf("Couldn't find key %s", key)
+				}
+
+				if length != expectedCount {
+					t.Errorf("Not correct count of objects in the map for key %s", key)
+				}
+			}
+
+		})
+	}
+}

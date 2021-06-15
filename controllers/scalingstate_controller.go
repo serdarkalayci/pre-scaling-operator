@@ -78,7 +78,7 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	log.WithValues("Namespace", req.Namespace).
 		Info("Scalingstate Controller: Reconciling namespace")
-	events, state, err := reconciler.ReconcileNamespace(ctx, r.Client, req.Namespace, clusterStateDefinitions, states.State{}, r.Recorder, ss.Config.DryRun)
+	events, state, err := reconciler.PrepareForNamespaceReconcile(ctx, r.Client, clusterStateDefinitions, states.State{}, r.Recorder, ss.Config.DryRun)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

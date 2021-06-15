@@ -15,83 +15,83 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-func TestReconcileNamespace(t *testing.T) {
-	type args struct {
-		ctx              context.Context
-		_client          client.Client
-		namespace        string
-		stateDefinitions states.States
-		clusterState     states.State
-		dryRun           bool
-	}
+// func TestReconcileNamespace(t *testing.T) {
+// 	type args struct {
+// 		ctx              context.Context
+// 		_client          client.Client
+// 		namespace        string
+// 		stateDefinitions states.States
+// 		clusterState     states.State
+// 		dryRun           bool
+// 	}
 
-	_ = scalingv1alpha1.AddToScheme(scheme.Scheme)
+// 	_ = scalingv1alpha1.AddToScheme(scheme.Scheme)
 
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "StateNotEmpty",
-			args: args{
-				ctx: context.TODO(),
-				_client: fake.
-					NewClientBuilder().
-					WithScheme(scheme.Scheme).
-					Build(),
-				namespace: "default",
-				stateDefinitions: []states.State{
-					{
-						Name:     "bau",
-						Priority: 0,
-					},
-					{
-						Name:     "peak",
-						Priority: 3,
-					},
-				},
-				clusterState: states.State{
-					Name:     "bau",
-					Priority: 0,
-				},
-				dryRun: false,
-			},
-			wantErr: false,
-		},
-		{
-			name: "StateEmpty",
-			args: args{
-				ctx: context.TODO(),
-				_client: fake.
-					NewClientBuilder().
-					WithScheme(scheme.Scheme).
-					Build(),
-				namespace: "default",
-				stateDefinitions: []states.State{
-					{
-						Name:     "bau",
-						Priority: 0,
-					},
-					{
-						Name:     "peak",
-						Priority: 3,
-					},
-				},
-				clusterState: states.State{},
-			},
-			wantErr: false,
-		},
-	}
+// 	tests := []struct {
+// 		name    string
+// 		args    args
+// 		wantErr bool
+// 	}{
+// 		{
+// 			name: "StateNotEmpty",
+// 			args: args{
+// 				ctx: context.TODO(),
+// 				_client: fake.
+// 					NewClientBuilder().
+// 					WithScheme(scheme.Scheme).
+// 					Build(),
+// 				namespace: "default",
+// 				stateDefinitions: []states.State{
+// 					{
+// 						Name:     "bau",
+// 						Priority: 0,
+// 					},
+// 					{
+// 						Name:     "peak",
+// 						Priority: 3,
+// 					},
+// 				},
+// 				clusterState: states.State{
+// 					Name:     "bau",
+// 					Priority: 0,
+// 				},
+// 				dryRun: false,
+// 			},
+// 			wantErr: false,
+// 		},
+// 		{
+// 			name: "StateEmpty",
+// 			args: args{
+// 				ctx: context.TODO(),
+// 				_client: fake.
+// 					NewClientBuilder().
+// 					WithScheme(scheme.Scheme).
+// 					Build(),
+// 				namespace: "default",
+// 				stateDefinitions: []states.State{
+// 					{
+// 						Name:     "bau",
+// 						Priority: 0,
+// 					},
+// 					{
+// 						Name:     "peak",
+// 						Priority: 3,
+// 					},
+// 				},
+// 				clusterState: states.State{},
+// 			},
+// 			wantErr: false,
+// 		},
+// 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if _, _, err := ReconcileNamespace(tt.args.ctx, tt.args._client, tt.args.namespace, tt.args.stateDefinitions, tt.args.clusterState, record.NewFakeRecorder(10), tt.args.dryRun); (err != nil) != tt.wantErr {
-				t.Errorf("ReconcileNamespace() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			if _, _, err := ReconcileNamespace(tt.args.ctx, tt.args._client, tt.args.namespace, tt.args.stateDefinitions, tt.args.clusterState, record.NewFakeRecorder(10), tt.args.dryRun); (err != nil) != tt.wantErr {
+// 				t.Errorf("ReconcileNamespace() error = %v, wantErr %v", err, tt.wantErr)
+// 			}
+// 		})
+// 	}
+// }
 
 func TestReconcileDeployment(t *testing.T) {
 	type args struct {

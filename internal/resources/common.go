@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -450,4 +451,40 @@ func RegisterEvents(ctx context.Context, _client client.Client, recorder record.
 
 	}
 
+}
+
+// NamespaceSorter sorts scalingobjects by namespace.
+type NameSpaceSorter []g.ScalingInfo
+
+func (a NameSpaceSorter) Len() int           { return len(a) }
+func (a NameSpaceSorter) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a NameSpaceSorter) Less(i, j int) bool { return a[i].Namespace < a[j].Namespace }
+
+func GroupScalingItemByNamespace(items []g.ScalingInfo) map[string][]g.ScalingInfo {
+	if len(items) == 0 {
+		return nil
+	}
+	sort.Slice(items[:], func(i, j int) bool {
+		return items[i].Namespace < items[j].Namespace
+	})
+
+	scalingObjectGrouped := make(map[string][]g.ScalingInfo)
+
+	var tempSclice []g.ScalingInfo
+	for i, item := range items {
+		namespace := item.Namespace
+		tempSclice = append(tempSclice, item)
+		if i != len(items)-1 {
+			if items[i+1].Namespace != namespace {
+				scalingObjectGrouped[namespace] = tempSclice
+				tempSclice = nil
+			}
+		} else {
+			// Put the last ns on
+			scalingObjectGrouped[namespace] = tempSclice
+		}
+
+	}
+
+	return scalingObjectGrouped
 }

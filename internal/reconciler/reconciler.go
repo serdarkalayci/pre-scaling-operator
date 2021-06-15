@@ -38,7 +38,7 @@ func (err ReconcilerError) Error() string {
 func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, stateDefinitions states.States, clusterState states.State, recorder record.EventRecorder, dryRun bool) (NamespaceEvents, string, error) {
 	log := ctrl.Log
 
-	var objectsToReconcile int
+	//var objectsToReconcile int
 	var nsEvents NamespaceEvents
 
 	scalingobjects, err := resources.ScalingItemNamespaceLister(ctx, _client, "", c.OptInLabel)
@@ -47,12 +47,23 @@ func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, st
 		return nsEvents, "", err
 	}
 
-	
+	if len(scalingobjects) == 0 {
+		return nsEvents, "", errors.New("no opted-in scalingobjects found")
+	}
 
-	return ReconcileNamespace(ctx, _client, "", stateDefinitions, clusterState, recorder, dryRun)
+	// Group the objects by namespace in order to decide how many to scale.
+	scalingObjectGrouped := resources.GroupScalingItemByNamespace(scalingobjects)
+	for namespaceKey := range scalingObjectGrouped {
+		if len(scalingObjectGrouped[namespaceKey]) >= 5 {
+			return ReconcileNamespace(ctx, _client, namespaceKey, scalingObjectGrouped[namespaceKey], stateDefinitions, clusterState, recorder, dryRun)
+		}
+
+	}
+
+	return nsEvents, "", errors.New("Fuck")
 }
 
-func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State, recorder record.EventRecorder, dryRun bool) (NamespaceEvents, string, error) {
+func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, scalingItems []g.ScalingInfo, stateDefinitions states.States, clusterState states.State, recorder record.EventRecorder, dryRun bool) (NamespaceEvents, string, error) {
 
 	var objectsToReconcile int
 	var nsEvents NamespaceEvents
