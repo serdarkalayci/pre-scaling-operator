@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 
 	c "github.com/containersol/prescale-operator/internal"
+	"github.com/containersol/prescale-operator/internal/reconciler"
 	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
 	"github.com/containersol/prescale-operator/internal/validations"
@@ -122,22 +122,6 @@ func StateReplicasList(state states.State, deployments []g.ScalingInfo) ([]sr.St
 				WithValues("namespace", deploymentItem.Namespace).
 				Error(err, "Cannot calculate state replicas. Please check deploymentItem annotations. Continuing.")
 			return []sr.StateReplica{}, err
-		}
-
-		optIn, err := OptinLabel(deploymentItem)
-		if err != nil {
-			if strings.Contains(err.Error(), c.LabelNotFound) {
-				return []sr.StateReplica{}, nil
-			}
-			log.Error(err, "Failed to validate the opt-in label")
-			return []sr.StateReplica{}, err
-		}
-
-		// Now we have all the state settings, we can set the replicas for the deploymentItem accordingly
-		if !optIn {
-			// the deploymentItem opted out. We need to set back to default.
-			log.Info("The deploymentItem opted out. Will scale back to default")
-			state.Name = c.DefaultReplicaAnnotation
 		}
 
 		stateReplica, err := stateReplicas.GetState(state.Name)
@@ -453,12 +437,40 @@ func RegisterEvents(ctx context.Context, _client client.Client, recorder record.
 
 }
 
-// NamespaceSorter sorts scalingobjects by namespace.
-type NameSpaceSorter []g.ScalingInfo
+type NamespaceScaleInfo struct {
+	ScalingItems []g.ScalingInfo
+	State        states.State
+	Error        error
+}
 
-func (a NameSpaceSorter) Len() int           { return len(a) }
-func (a NameSpaceSorter) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a NameSpaceSorter) Less(i, j int) bool { return a[i].Namespace < a[j].Namespace }
+func ReturnOnlyToBeScaledGrouped(ctx context.Context, _client client.Client, groupedItems map[string][]g.ScalingInfo, stateDefinitions states.States, clusterState states.State) map[string]NamespaceScaleInfo {
+
+	nsInfoMap := make(map[string]NamespaceScaleInfo)
+
+	for namespaceKey, scalingInfoList := range groupedItems {
+		finalState, err := reconciler.GetAppliedState(ctx, _client, namespaceKey, stateDefinitions, clusterState)
+
+		// Put in map but don't return
+		if err != nil {
+			nsInfoMap[namespaceKey] = NamespaceScaleInfo{
+				ScalingItems: scalingInfoList,
+				State:        finalState,
+				Error:        err,
+			}
+		}
+
+		scaleReplicalist, err := StateReplicasList(finalState, scalingInfoList)
+		if err != nil {
+
+		}
+
+	}
+
+	// if err != nil {
+	// 	return nsEvents, finalState.Name, err
+	// }
+	return nil
+}
 
 func GroupScalingItemByNamespace(items []g.ScalingInfo) map[string][]g.ScalingInfo {
 	if len(items) == 0 {

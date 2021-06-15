@@ -27,6 +27,12 @@ type NamespaceEvents struct {
 	DryRunInfo       string
 }
 
+type NamespaceInfo struct {
+	NSEvents     NamespaceEvents
+	AppliedState string
+	Error        error
+}
+
 type ReconcilerError struct {
 	msg string
 }
@@ -35,32 +41,74 @@ func (err ReconcilerError) Error() string {
 	return err.msg
 }
 
-func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, stateDefinitions states.States, clusterState states.State, recorder record.EventRecorder, dryRun bool) (NamespaceEvents, string, error) {
+func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, stateDefinitions states.States, clusterState states.State, recorder record.EventRecorder, dryRun bool) (map[string]NamespaceInfo, error) {
 	log := ctrl.Log
-
+	var eventsList []string
+	var appliedStateNamespaceList []string
+	var appliedStates []string
+	var dryRunCluster string
 	//var objectsToReconcile int
-	var nsEvents NamespaceEvents
+	nsInfoMap := make(map[string]NamespaceInfo)
 
 	scalingobjects, err := resources.ScalingItemNamespaceLister(ctx, _client, "", c.OptInLabel)
 	if err != nil {
 		log.Error(err, "error listing ScalingObjects")
-		return nsEvents, "", err
+		return nil, err
 	}
 
 	if len(scalingobjects) == 0 {
-		return nsEvents, "", errors.New("no opted-in scalingobjects found")
+		return nil, errors.New("no opted-in scalingobjects found")
 	}
 
 	// Group the objects by namespace in order to decide how many to scale.
 	scalingObjectGrouped := resources.GroupScalingItemByNamespace(scalingobjects)
+
+	scalingObjectGroupedToScale := resources.ReturnOnlyToBeScaledGrouped(ctx, _client, scalingObjectGrouped, stateDefinitions, clusterState)
+
 	for namespaceKey := range scalingObjectGrouped {
 		if len(scalingObjectGrouped[namespaceKey]) >= 5 {
-			return ReconcileNamespace(ctx, _client, namespaceKey, scalingObjectGrouped[namespaceKey], stateDefinitions, clusterState, recorder, dryRun)
+			nsEvents, state, err := ReconcileNamespace(ctx, _client, namespaceKey, scalingObjectGrouped[namespaceKey], stateDefinitions, clusterState, recorder, dryRun)
+			if err != nil {
+				nsInfoMap[namespaceKey] = NamespaceInfo{
+					NSEvents:     nsEvents,
+					AppliedState: state,
+				}
+				return nsInfoMap, err
+			}
+
+			if !dryRun {
+
+				if nsEvents.QuotaExceeded != "" {
+					eventsList = append(eventsList, nsEvents.QuotaExceeded)
+				}
+
+				appliedStateNamespaceList = append(appliedStateNamespaceList, namespaceKey)
+				appliedStates = append(appliedStates, state)
+
+			} else {
+				dryRunCluster = dryRunCluster + nsEvents.DryRunInfo
+			}
 		}
 
 	}
 
-	return nsEvents, "", errors.New("Fuck")
+	// if !dryRun {
+
+	// 	if len(eventsList) != 0 {
+	// 		r.Recorder.Event(css, "Warning", "QuotaExceeded", fmt.Sprintf("Not enough available resources for the following %d namespaces: %s", len(eventsList), eventsList))
+	// 	}
+
+	// 	r.Recorder.Event(css, "Normal", "AppliedStates", fmt.Sprintf("The applied state for each of the %s namespaces is %s", appliedStateNamespaceList, appliedStates))
+
+	// 	log.Info("Clusterscalingstate Reconciliation loop completed successfully")
+
+	// } else {
+
+	// 	r.Recorder.Event(css, "Normal", "DryRun", fmt.Sprintf("DryRun: %s", dryRunCluster))
+
+	// }
+
+	return nil, errors.New("")
 }
 
 func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, scalingItems []g.ScalingInfo, stateDefinitions states.States, clusterState states.State, recorder record.EventRecorder, dryRun bool) (NamespaceEvents, string, error) {

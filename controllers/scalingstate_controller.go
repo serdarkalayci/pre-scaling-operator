@@ -20,7 +20,9 @@ import (
 	"context"
 	"fmt"
 
+	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/reconciler"
+	"github.com/containersol/prescale-operator/internal/resources"
 	"github.com/containersol/prescale-operator/internal/states"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -78,7 +80,13 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	log.WithValues("Namespace", req.Namespace).
 		Info("Scalingstate Controller: Reconciling namespace")
-	events, state, err := reconciler.PrepareForNamespaceReconcile(ctx, r.Client, clusterStateDefinitions, states.State{}, r.Recorder, ss.Config.DryRun)
+	items, err := resources.ScalingItemNamespaceLister(ctx, r.Client, req.Namespace, c.OptInLabel)
+	if err != nil {
+		log.Error(err, fmt.Sprintf("error listing ScalingObjects in namespace %s", req.Namespace))
+		return ctrl.Result{}, err
+	}
+	
+	events, state, err := reconciler.ReconcileNamespace(ctx, r.Client, req.Namespace, items, clusterStateDefinitions, states.State{}, r.Recorder, ss.Config.DryRun)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

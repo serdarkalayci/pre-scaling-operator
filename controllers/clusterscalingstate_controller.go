@@ -23,7 +23,6 @@ import (
 	"github.com/containersol/prescale-operator/api/v1alpha1"
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
 	"github.com/go-logr/logr"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -80,31 +79,32 @@ func (r *ClusterScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.
 		return ctrl.Result{}, err
 	}
 
-	namespaces := corev1.NamespaceList{}
-	err = r.Client.List(ctx, &namespaces)
+	// namespaces := corev1.NamespaceList{}
+	// err = r.Client.List(ctx, &namespaces)
+	// if err != nil {
+	// 	log.Error(err, "Cannot list namespaces")
+	// 	return ctrl.Result{}, err
+	// }
+	log.Info("Clusterscalingstate Controller: Reconciling namespaces")
+
+	events, err := reconciler.PrepareForNamespaceReconcile(ctx, r.Client, clusterStateDefinitions, states.State{}, r.Recorder, css.Config.DryRun)
 	if err != nil {
-		log.Error(err, "Cannot list namespaces")
 		return ctrl.Result{}, err
 	}
-	log.Info("Clusterscalingstate Controller: Reconciling namespaces")
-	for _, namespace := range namespaces.Items {
 
-		events, state, err := reconciler.PrepareForNamespaceReconcile(ctx, r.Client, clusterStateDefinitions, states.State{}, r.Recorder, css.Config.DryRun)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-
+	// Loop over all the namespace events of the namespaces which have been reconciled
+	for namespaceKey, nsInfo := range events {
 		if !css.Config.DryRun {
 
-			if events.QuotaExceeded != "" {
-				eventsList = append(eventsList, events.QuotaExceeded)
+			if nsInfo.NSEvents.QuotaExceeded != "" {
+				eventsList = append(eventsList, nsInfo.NSEvents.QuotaExceeded)
 			}
 
-			appliedStateNamespaceList = append(appliedStateNamespaceList, namespace.Name)
-			appliedStates = append(appliedStates, state)
+			appliedStateNamespaceList = append(appliedStateNamespaceList, namespaceKey)
+			appliedStates = append(appliedStates, nsInfo.AppliedState)
 
 		} else {
-			dryRunCluster = dryRunCluster + events.DryRunInfo
+			dryRunCluster = dryRunCluster + nsInfo.NSEvents.DryRunInfo
 		}
 	}
 

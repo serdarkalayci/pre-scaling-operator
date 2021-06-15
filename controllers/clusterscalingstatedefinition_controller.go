@@ -88,28 +88,28 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 		return ctrl.Result{}, err
 	}
 	log.Info("Clusterscalingstatedefinition Controller: Reconciling namespaces")
-	for _, namespace := range namespaces.Items {
 
-		events, state, err := reconciler.PrepareForNamespaceReconcile(ctx, r.Client, clusterStateDefinitions, states.State{}, r.Recorder, cssd.Config.DryRun)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
+	events, err := reconciler.PrepareForNamespaceReconcile(ctx, r.Client, clusterStateDefinitions, states.State{}, r.Recorder, cssd.Config.DryRun)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
+	// TODO: Use "RequeAfter" of the controller Result to reque in order to loop over the next namespaces that are not reconciled yet
+
+	// Loop over all the namespace events of the namespaces which have been reconciled
+	for namespaceKey, nsInfo := range events {
 		if !cssd.Config.DryRun {
 
-			if events.QuotaExceeded != "" {
-				eventsList = append(eventsList, events.QuotaExceeded)
+			if nsInfo.NSEvents.QuotaExceeded != "" {
+				eventsList = append(eventsList, nsInfo.NSEvents.QuotaExceeded)
 			}
 
-			appliedStateNamespaceList = append(appliedStateNamespaceList, namespace.Name)
-			appliedStates = append(appliedStates, state)
+			appliedStateNamespaceList = append(appliedStateNamespaceList, namespaceKey)
+			appliedStates = append(appliedStates, nsInfo.AppliedState)
 
 		} else {
-
-			dryRunCluster = dryRunCluster + events.DryRunInfo
-
+			dryRunCluster = dryRunCluster + nsInfo.NSEvents.DryRunInfo
 		}
-
 	}
 
 	if !cssd.Config.DryRun {
