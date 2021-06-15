@@ -219,7 +219,7 @@ func GetAppliedState(ctx context.Context, _client client.Client, namespace strin
 	}
 
 	if namespaceState == (states.State{}) && clusterState == (states.State{}) {
-		return states.State{}, err
+		return states.State{}, errors.New("could not determine the final state. Do the states match the state definitions?")
 	}
 
 	finalState := stateDefinitions.FindPriorityState(namespaceState, clusterState)
@@ -269,7 +269,8 @@ func fetchNameSpaceState(ctx context.Context, _client client.Client, stateDefini
 			ctrl.Log.
 				V(3).
 				WithValues("state name", namespaceStateName).
-				Error(err, "Could not find ScalingState within ClusterStateDefinitions. Continuing without considering ScalingState.")
+				Error(err, fmt.Sprintf("Could not find ScalingState %s within ClusterStateDefinitions. Continuing without considering ScalingState.", namespaceStateName))
+			return states.State{}, err
 		}
 	}
 	return namespaceState, nil
