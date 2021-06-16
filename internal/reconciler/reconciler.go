@@ -65,7 +65,7 @@ func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, st
 
 	scalingObjectGroupedToScale := resources.ReturnOnlyToBeScaledGrouped(ctx, _client, scalingObjectGrouped, stateDefinitions, clusterState)
 
-	for namespaceKey := range scalingObjectGrouped {
+	for namespaceKey := range scalingObjectGroupedToScale {
 		if len(scalingObjectGrouped[namespaceKey]) >= 5 {
 			nsEvents, state, err := ReconcileNamespace(ctx, _client, namespaceKey, scalingObjectGrouped[namespaceKey], stateDefinitions, clusterState, recorder, dryRun)
 			if err != nil {
@@ -122,7 +122,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	log := ctrl.Log.
 		WithValues("namespace", namespace)
 
-	finalState, err := GetAppliedState(ctx, _client, namespace, stateDefinitions, clusterState)
+	finalState, err := states.GetAppliedState(ctx, _client, namespace, stateDefinitions, clusterState)
 	if err != nil {
 		return nsEvents, finalState.Name, err
 	}
@@ -275,78 +275,4 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 	}
 
 	return nil
-}
-
-func GetAppliedState(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State) (states.State, error) {
-	// Here we allow overriding the cluster state by passing it in.
-	// This allows us to not recall the client when looping namespaces
-	if clusterState == (states.State{}) {
-		var err error
-		clusterState, err = fetchClusterState(ctx, _client, stateDefinitions)
-		if err != nil {
-			return states.State{}, err
-		}
-	}
-
-	// If we receive an error here, we cannot handle it and should return
-	namespaceState, err := fetchNameSpaceState(ctx, _client, stateDefinitions, namespace)
-	if err != nil {
-		return states.State{}, err
-	}
-
-	if namespaceState == (states.State{}) && clusterState == (states.State{}) {
-		return states.State{}, err
-	}
-
-	finalState := stateDefinitions.FindPriorityState(namespaceState, clusterState)
-	return finalState, nil
-}
-
-func fetchClusterState(ctx context.Context, _client client.Client, stateDefinitions states.States) (states.State, error) {
-	clusterStateName, err := states.GetClusterScalingState(ctx, _client)
-	if err != nil {
-		switch err.(type) {
-		case states.NotFound:
-		case states.TooMany:
-			ctrl.Log.V(3).Info("Could not process cluster state, but continuing safely.")
-		default:
-			// For the moment, we cannot deal with any other error.
-			return states.State{}, errors.New("could not retrieve cluster states")
-		}
-	}
-	clusterState := states.State{}
-	if clusterStateName != "" {
-		err = stateDefinitions.FindState(clusterStateName, &clusterState)
-		if err != nil {
-			ctrl.Log.
-				V(3).
-				WithValues("state name", clusterStateName).
-				Error(err, "Could not find ClusterScalingState within ClusterStateDefinitions. Continuing without considering ClusterScalingState.")
-		}
-	}
-	return clusterState, nil
-}
-
-func fetchNameSpaceState(ctx context.Context, _client client.Client, stateDefinitions states.States, namespace string) (states.State, error) {
-	namespaceStateName, err := states.GetNamespaceScalingStateName(ctx, _client, namespace)
-	if err != nil {
-		switch err.(type) {
-		case states.NotFound:
-		case states.TooMany:
-			ctrl.Log.V(3).Info("Could not process namespaced state, but continuing safely.")
-		default:
-			return states.State{}, err
-		}
-	}
-	namespaceState := states.State{}
-	if namespaceStateName != "" {
-		err = stateDefinitions.FindState(namespaceStateName, &namespaceState)
-		if err != nil {
-			ctrl.Log.
-				V(3).
-				WithValues("state name", namespaceStateName).
-				Error(err, "Could not find ScalingState within ClusterStateDefinitions. Continuing without considering ScalingState.")
-		}
-	}
-	return namespaceState, nil
 }

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	c "github.com/containersol/prescale-operator/internal"
-	"github.com/containersol/prescale-operator/internal/reconciler"
 	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
 	"github.com/containersol/prescale-operator/internal/validations"
@@ -448,7 +447,7 @@ func ReturnOnlyToBeScaledGrouped(ctx context.Context, _client client.Client, gro
 	nsInfoMap := make(map[string]NamespaceScaleInfo)
 
 	for namespaceKey, scalingInfoList := range groupedItems {
-		finalState, err := reconciler.GetAppliedState(ctx, _client, namespaceKey, stateDefinitions, clusterState)
+		finalState, err := states.GetAppliedState(ctx, _client, namespaceKey, stateDefinitions, clusterState)
 
 		// Put in map but don't return
 		if err != nil {
@@ -459,7 +458,7 @@ func ReturnOnlyToBeScaledGrouped(ctx context.Context, _client client.Client, gro
 			}
 		}
 
-		scaleReplicalist, err := StateReplicasList(finalState, scalingInfoList)
+		//scaleReplicalist, err := StateReplicasList(finalState, scalingInfoList)
 		if err != nil {
 
 		}
