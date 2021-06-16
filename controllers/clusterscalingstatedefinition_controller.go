@@ -89,7 +89,7 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 	}
 	log.Info("Clusterscalingstatedefinition Controller: Reconciling namespaces")
 
-	events, err := reconciler.PrepareForNamespaceReconcile(ctx, r.Client, clusterStateDefinitions, states.State{}, r.Recorder, cssd.Config.DryRun)
+	events, err := reconciler.PrepareForNamespaceReconcile(ctx, r.Client, "", clusterStateDefinitions, states.State{}, r.Recorder, cssd.Config.DryRun)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

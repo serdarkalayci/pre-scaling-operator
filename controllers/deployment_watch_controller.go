@@ -66,7 +66,7 @@ func (r *DeploymentWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// We need to calculate the desired state before we try to reconcile the deployment
-	finalState, err := reconciler.GetAppliedState(ctx, r.Client, req.Namespace, stateDefinitions, states.State{})
+	finalState, err := states.GetAppliedState(ctx, r.Client, req.Namespace, stateDefinitions, states.State{})
 	if err != nil {
 		return ctrl.Result{}, err
 	}

@@ -190,6 +190,16 @@ func (cs *ConcurrentSlice) IsBeingScaled(item ScalingInfo) bool {
 	return result
 }
 
+func IsAnyBeingScaled(items []ScalingInfo) bool {
+
+	for _, item := range items {
+		if GetDenyList().IsBeingScaled(item) {
+			return true
+		}
+	}
+	return false
+}
+
 func (cs *ConcurrentSlice) SetScalingItemOnList(item ScalingInfo, failure bool, failureMessage string, desiredReplicas int32) ScalingInfo {
 	item.Failure = failure
 	item.FailureMessage = failureMessage

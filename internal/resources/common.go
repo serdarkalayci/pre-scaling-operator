@@ -141,8 +141,7 @@ func StateReplicasList(state states.State, deployments []g.ScalingInfo) ([]sr.St
 }
 
 // Main function to make scaling decisions. The step scaler scales 1 by 1 towards the desired replica count.
-func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem g.ScalingInfo, stateReplica sr.StateReplica, whereFrom string, recorder record.EventRecorder) error {
-
+func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem g.ScalingInfo, whereFrom string, recorder record.EventRecorder) error {
 	log := ctrl.Log.
 		WithValues("deploymentItem", deploymentItem.Name).
 		WithValues("namespace", deploymentItem.Namespace)
@@ -150,10 +149,10 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 
 	var oldReplicaCount int32
 	oldReplicaCount = deploymentItem.SpecReplica
-	desiredReplicaCount := stateReplica.Replicas
-
+	desiredReplicaCount := deploymentItem.DesiredReplicas
+	initialDesiredReplicaCount := deploymentItem.DesiredReplicas
 	// We need to skip this check in case of failure in order to get a new object from DoScaling() to check on the state on the cluster.
-	if oldReplicaCount == stateReplica.Replicas && !deploymentItem.Failure {
+	if oldReplicaCount == desiredReplicaCount && !deploymentItem.Failure {
 		log.Info("No Update on deploymentItem. Desired replica count already matches current.")
 		return nil
 	}
@@ -177,10 +176,6 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 
 			deploymentItem, _ = g.GetDenyList().GetDeploymentInfoFromList(deploymentItem)
 			desiredReplicaCount = deploymentItem.DesiredReplicas
-
-			if desiredReplicaCount == -1 {
-				desiredReplicaCount = stateReplica.Replicas
-			}
 
 			// Wait until deploymentItem is ready for the next step and check if it's failing for some reason
 			waitTime := time.Duration(time.Duration(deploymentItem.ProgressDeadline))*time.Second + time.Second
@@ -222,6 +217,10 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 
 			}
 
+			if desiredReplicaCount == -1 {
+				desiredReplicaCount = initialDesiredReplicaCount
+			}
+
 			oldReplicaCount = deploymentItem.SpecReplica
 
 			// decide if we need to step up or down
@@ -250,7 +249,7 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 			if retryErr != nil {
 				//log.Error(retryErr, "Unable to scale the deploymentItem, err: %v")
 				deploymentItem.IsBeingScaled = false
-				g.GetDenyList().SetScalingItemOnList(deploymentItem, true, retryErr.Error(), stateReplica.Replicas)
+				g.GetDenyList().SetScalingItemOnList(deploymentItem, true, retryErr.Error(), desiredReplicaCount)
 				RegisterEvents(ctx, _client, recorder, retryErr, deploymentItem)
 				return retryErr
 			}
@@ -263,7 +262,7 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 		if retryErr != nil {
 			//log.Error(retryErr, "Unable to scale the deploymentItem, err: %v")
 			deploymentItem.IsBeingScaled = false
-			g.GetDenyList().SetScalingItemOnList(deploymentItem, true, retryErr.Error(), stateReplica.Replicas)
+			g.GetDenyList().SetScalingItemOnList(deploymentItem, true, retryErr.Error(), desiredReplicaCount)
 			RegisterEvents(ctx, _client, recorder, retryErr, deploymentItem)
 			return retryErr
 		}
@@ -437,38 +436,60 @@ func RegisterEvents(ctx context.Context, _client client.Client, recorder record.
 }
 
 type NamespaceScaleInfo struct {
-	ScalingItems []g.ScalingInfo
-	State        states.State
-	Error        error
+	ScalingItems        []g.ScalingInfo
+	ReplicaList         []sr.StateReplica
+	FinalNamespaceState states.State
+	ScaleNameSpace      bool
+	StateError          error
+	ReplicaListError    error
 }
 
-func ReturnOnlyToBeScaledGrouped(ctx context.Context, _client client.Client, groupedItems map[string][]g.ScalingInfo, stateDefinitions states.States, clusterState states.State) map[string]NamespaceScaleInfo {
+func MakeScaleDecision(ctx context.Context, _client client.Client, groupedItems map[string][]g.ScalingInfo, stateDefinitions states.States, clusterState states.State) map[string]NamespaceScaleInfo {
 
 	nsInfoMap := make(map[string]NamespaceScaleInfo)
 
 	for namespaceKey, scalingInfoList := range groupedItems {
-		finalState, err := states.GetAppliedState(ctx, _client, namespaceKey, stateDefinitions, clusterState)
+		finalState, staterr := states.GetAppliedState(ctx, _client, namespaceKey, stateDefinitions, clusterState)
 
-		// Put in map but don't return
-		if err != nil {
+		if staterr != nil {
 			nsInfoMap[namespaceKey] = NamespaceScaleInfo{
-				ScalingItems: scalingInfoList,
-				State:        finalState,
-				Error:        err,
+				ScalingItems:        scalingInfoList,
+				ReplicaList:         []sr.StateReplica{},
+				FinalNamespaceState: finalState,
+				ScaleNameSpace:      false,
+				StateError:          staterr,
+				ReplicaListError:    nil,
 			}
+			// Continue with this error instead of the potentially next one.
+			continue
 		}
 
-		//scaleReplicalist, err := StateReplicasList(finalState, scalingInfoList)
-		if err != nil {
+		scaleReplicalist, replicalisterr := StateReplicasList(finalState, scalingInfoList)
+
+		scaleNameSpace := false
+		// Don't scale the namespace if something in there is scaled at the moment
+		if !g.IsAnyBeingScaled(scalingInfoList) {
+			// Find out if we need to scale the namespace at all. (Desired != Current)
+			for i, item := range scalingInfoList {
+				if item.SpecReplica != scaleReplicalist[i].Replicas {
+					scalingInfoList[i].DesiredReplicas = scaleReplicalist[i].Replicas
+					scaleNameSpace = true
+				}
+			}
 
 		}
+		putOnMap := NamespaceScaleInfo{
+			ScalingItems:        scalingInfoList,
+			ReplicaList:         scaleReplicalist,
+			FinalNamespaceState: finalState,
+			ScaleNameSpace:      scaleNameSpace,
+			StateError:          staterr,
+			ReplicaListError:    replicalisterr,
+		}
+		nsInfoMap[namespaceKey] = putOnMap
 
 	}
-
-	// if err != nil {
-	// 	return nsEvents, finalState.Name, err
-	// }
-	return nil
+	return nsInfoMap
 }
 
 func GroupScalingItemByNamespace(items []g.ScalingInfo) map[string][]g.ScalingInfo {

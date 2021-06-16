@@ -10,6 +10,7 @@ import (
 	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/quotas"
 	"github.com/containersol/prescale-operator/internal/resources"
+	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
 	g "github.com/containersol/prescale-operator/pkg/utils/global"
 	"github.com/olekukonko/tablewriter"
@@ -41,19 +42,30 @@ func (err ReconcilerError) Error() string {
 	return err.msg
 }
 
-func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, stateDefinitions states.States, clusterState states.State, recorder record.EventRecorder, dryRun bool) (map[string]NamespaceInfo, error) {
+func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, namespace string, stateDefinitions states.States, clusterState states.State, recorder record.EventRecorder, dryRun bool) (map[string]NamespaceInfo, error) {
 	log := ctrl.Log
 	var eventsList []string
 	var appliedStateNamespaceList []string
 	var appliedStates []string
 	var dryRunCluster string
+	var err error
+	var scalingobjects []g.ScalingInfo
 	//var objectsToReconcile int
+
 	nsInfoMap := make(map[string]NamespaceInfo)
 
-	scalingobjects, err := resources.ScalingItemNamespaceLister(ctx, _client, "", c.OptInLabel)
-	if err != nil {
-		log.Error(err, "error listing ScalingObjects")
-		return nil, err
+	if namespace == "" {
+		scalingobjects, err = resources.ScalingItemNamespaceLister(ctx, _client, "", c.OptInLabel)
+		if err != nil {
+			log.Error(err, "error listing ScalingObjects")
+			return nil, err
+		}
+	} else {
+		scalingobjects, err = resources.ScalingItemNamespaceLister(ctx, _client, namespace, c.OptInLabel)
+		if err != nil {
+			log.Error(err, fmt.Sprintf("error listing ScalingObjects in namespace %s", namespace))
+			return nil, err
+		}
 	}
 
 	if len(scalingobjects) == 0 {
@@ -63,11 +75,11 @@ func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, st
 	// Group the objects by namespace in order to decide how many to scale.
 	scalingObjectGrouped := resources.GroupScalingItemByNamespace(scalingobjects)
 
-	scalingObjectGroupedToScale := resources.ReturnOnlyToBeScaledGrouped(ctx, _client, scalingObjectGrouped, stateDefinitions, clusterState)
+	scalingObjectGroupedToScale := resources.MakeScaleDecision(ctx, _client, scalingObjectGrouped, stateDefinitions, clusterState)
 
 	for namespaceKey := range scalingObjectGroupedToScale {
-		if len(scalingObjectGrouped[namespaceKey]) >= 5 {
-			nsEvents, state, err := ReconcileNamespace(ctx, _client, namespaceKey, scalingObjectGrouped[namespaceKey], stateDefinitions, clusterState, recorder, dryRun)
+		if scalingObjectGroupedToScale[namespaceKey].ScaleNameSpace || dryRun {
+			nsEvents, state, err := ReconcileNamespace(ctx, _client, namespaceKey, scalingObjectGroupedToScale[namespaceKey].ScalingItems, scalingObjectGroupedToScale[namespaceKey].ReplicaList, scalingObjectGroupedToScale[namespaceKey].FinalNamespaceState, recorder, dryRun)
 			if err != nil {
 				nsInfoMap[namespaceKey] = NamespaceInfo{
 					NSEvents:     nsEvents,
@@ -75,7 +87,6 @@ func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, st
 				}
 				return nsInfoMap, err
 			}
-
 			if !dryRun {
 
 				if nsEvents.QuotaExceeded != "" {
@@ -108,12 +119,12 @@ func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, st
 
 	// }
 
-	return nil, errors.New("")
+	return nil, nil
 }
 
-func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, scalingItems []g.ScalingInfo, stateDefinitions states.States, clusterState states.State, recorder record.EventRecorder, dryRun bool) (NamespaceEvents, string, error) {
+func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, scalingItems []g.ScalingInfo, scaleReplicalist []sr.StateReplica, finalState states.State, recorder record.EventRecorder, dryRun bool) (NamespaceEvents, string, error) {
 
-	var objectsToReconcile int
+	//	var objectsToReconcile int
 	var nsEvents NamespaceEvents
 
 	var limitsneeded corev1.ResourceList
@@ -122,34 +133,34 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	log := ctrl.Log.
 		WithValues("namespace", namespace)
 
-	finalState, err := states.GetAppliedState(ctx, _client, namespace, stateDefinitions, clusterState)
-	if err != nil {
-		return nsEvents, finalState.Name, err
-	}
+	//finalState, err := states.GetAppliedState(ctx, _client, namespace, stateDefinitions, clusterState)
+	// if err != nil {
+	// 	return nsEvents, finalState.Name, err
+	// }
 
 	// We now need to look for objects (currently supported deployments and deploymentConfigs) which are opted in,
 	// then use their annotations to determine the correct scale
-	deployments, err := resources.ScalingItemNamespaceLister(ctx, _client, namespace, c.OptInLabel)
-	if err != nil {
-		log.Error(err, "Cannot list deployments in namespace")
-		return nsEvents, finalState.Name, err
-	}
-	objectsToReconcile = objectsToReconcile + len(deployments)
+	// deployments, err := resources.ScalingItemNamespaceLister(ctx, _client, namespace, c.OptInLabel)
+	// if err != nil {
+	// 	log.Error(err, "Cannot list deployments in namespace")
+	// 	return nsEvents, finalState.Name, err
+	// }
+	// objectsToReconcile = objectsToReconcile + len(deployments)
 
-	if objectsToReconcile != 0 {
-		log.Info("Found opted in objects in Namespace. Reconciling namespace")
-	} else {
-		return nsEvents, finalState.Name, err
-	}
+	// if objectsToReconcile != 0 {
+	// 	log.Info("Found opted in objects in Namespace. Reconciling namespace")
+	// } else {
+	// 	return nsEvents, finalState.Name, err
+	// }
 
-	scaleReplicalist, err := resources.StateReplicasList(finalState, deployments)
-	if err != nil {
-		log.Error(err, "Cannot fetch replicas of all opted-in deployments")
-		return nsEvents, finalState.Name, err
-	}
+	//scaleReplicalist, err := resources.StateReplicasList(finalState, deployments)
+	// if err != nil {
+	// 	log.Error(err, "Cannot fetch replicas of all opted-in deployments")
+	// 	return nsEvents, finalState.Name, err
+	// }
 
 	//Here we calculate the resource limits we need from all deployments combined
-	limitsneeded = resources.LimitsNeededList(deployments, scaleReplicalist)
+	limitsneeded = resources.LimitsNeededList(scalingItems, scaleReplicalist)
 
 	// After we have calculated the resources needed from all workloads in a given namespace, we can determine if the scaling should be allowed to go through
 	finalLimitsCPU, finalLimitsMemory, allowed, err := quotas.ResourceQuotaCheck(ctx, namespace, limitsneeded)
@@ -160,29 +171,29 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 	if !dryRun {
 		if allowed {
-			for i, deployment := range deployments {
+			for i, scalingItem := range scalingItems {
 				// Don't scale if we don't need to
-				if deployment.SpecReplica == scaleReplicalist[i].Replicas {
+				if scalingItem.SpecReplica == scaleReplicalist[i].Replicas {
 					continue
 				}
 
-				scalingItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(deployment)
+				scalingItemFresh, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(scalingItem)
 				if notFoundErr == nil {
-					if scalingItem.DesiredReplicas != scaleReplicalist[i].Replicas {
-						g.GetDenyList().SetScalingItemOnList(scalingItem, scalingItem.Failure, scalingItem.FailureMessage, scaleReplicalist[i].Replicas)
-						log.WithValues("Name: ", scalingItem.Name).
-							WithValues("Namespace: ", scalingItem.Namespace).
-							WithValues("Object: ", scalingItem.ScalingItemType.ItemTypeName).
-							WithValues("DesiredReplicacount on item: ", scalingItem.DesiredReplicas).
+					if scalingItemFresh.DesiredReplicas != scalingItem.DesiredReplicas {
+						g.GetDenyList().SetScalingItemOnList(scalingItemFresh, scalingItemFresh.Failure, scalingItemFresh.FailureMessage, scaleReplicalist[i].Replicas)
+						log.WithValues("Name: ", scalingItemFresh.Name).
+							WithValues("Namespace: ", scalingItemFresh.Namespace).
+							WithValues("Object: ", scalingItemFresh.ScalingItemType.ItemTypeName).
+							WithValues("DesiredReplicacount on item: ", scalingItemFresh.DesiredReplicas).
 							WithValues("New replica count:", scaleReplicalist[i].Replicas).
-							WithValues("Failure: ", scalingItem.Failure).
-							WithValues("Failure message: ", scalingItem.FailureMessage).
+							WithValues("Failure: ", scalingItemFresh.Failure).
+							WithValues("Failure message: ", scalingItemFresh.FailureMessage).
 							Info("Deployment is already being scaled at the moment. Updated desired replica count with new replica count")
 					}
 					continue
 				}
-				if !g.GetDenyList().IsDeploymentInFailureState(deployment) {
-					go resources.ScaleOrStepScale(ctx, _client, deployment, scaleReplicalist[i], "NSSCALER", recorder)
+				if !g.GetDenyList().IsDeploymentInFailureState(scalingItem) {
+					go resources.ScaleOrStepScale(ctx, _client, scalingItem, "NSSCALER", recorder)
 				}
 
 			}
@@ -204,7 +215,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 		table = tablewriter.NewWriter(tableString)
 		table.SetHeader([]string{"Application", "Current replicas", "New state", "New replicas", "Rapid Scaling"})
 
-		for i, deployment := range deployments {
+		for i, deployment := range scalingItems {
 
 			applicationData = append(applicationData, []string{deployment.Name, fmt.Sprint(deployment.ReadyReplicas), scaleReplicalist[i].Name, fmt.Sprint(scaleReplicalist[i].Replicas), strconv.FormatBool(states.GetRapidScalingSetting(deployment))})
 
@@ -260,7 +271,8 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 					Info("Deployment is already being scaled at the moment. Updated desired replica count with new replica count")
 			}
 		} else {
-			err = resources.ScaleOrStepScale(ctx, _client, scalingItem, stateReplica, "deployScaler", recorder)
+			scalingItem.DesiredReplicas = stateReplica.Replicas
+			err = resources.ScaleOrStepScale(ctx, _client, scalingItem, "deployScaler", recorder)
 			if err != nil {
 				log.Error(err, "Error scaling object!")
 			}
