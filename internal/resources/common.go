@@ -451,7 +451,7 @@ type OverallNsInfo struct {
 }
 
 func MakeScaleDecision(ctx context.Context, _client client.Client, groupedItems map[string][]g.ScalingInfo, stateDefinitions states.States, clusterState states.State, maxConcurrentNsReconcile int) OverallNsInfo {
-
+	log := ctrl.Log
 	nsInfoMap := make(map[string]NamespaceScaleInfo)
 	numberNsbeingScaled := 0
 	numberNsToScale := 0
@@ -475,19 +475,37 @@ func MakeScaleDecision(ctx context.Context, _client client.Client, groupedItems 
 
 		scaleNameSpace := false
 		// Don't scale the namespace if something in there is scaled at the moment
-		if !g.IsAnyBeingScaled(scalingInfoList) {
-			// Find out if we need to scale the namespace at all. (Desired != Current)
-			for i, item := range scalingInfoList {
-				if item.SpecReplica != scaleReplicalist[i].Replicas {
-					scalingInfoList[i].DesiredReplicas = scaleReplicalist[i].Replicas
-					scaleNameSpace = true
 
+		// Find out if we need to scale the namespace at all. (Desired != Current)
+		for i, item := range scalingInfoList {
+
+			itemFromList, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(item)
+			if notFoundErr == nil {
+				if itemFromList.DesiredReplicas != scaleReplicalist[i].Replicas && g.GetDenyList().IsBeingScaled(itemFromList) {
+					// Intercept the (step)scaler here with the new DesiredReplicas
+					g.GetDenyList().SetScalingItemOnList(itemFromList, itemFromList.Failure, itemFromList.FailureMessage, scaleReplicalist[i].Replicas)
+					log.WithValues("Name: ", itemFromList.Name).
+						WithValues("Namespace: ", itemFromList.Namespace).
+						WithValues("Object: ", itemFromList.ScalingItemType.ItemTypeName).
+						WithValues("DesiredReplicacount on item: ", itemFromList.DesiredReplicas).
+						WithValues("New replica count:", scaleReplicalist[i].Replicas).
+						WithValues("Failure: ", itemFromList.Failure).
+						WithValues("Failure message: ", itemFromList.FailureMessage).
+						Info("(From NSPrepare): Deployment is already being scaled at the moment. Updated desired replica count with new replica count")
+					continue
 				}
 			}
+			if item.SpecReplica != scaleReplicalist[i].Replicas {
+				scalingInfoList[i].DesiredReplicas = scaleReplicalist[i].Replicas
+				scaleNameSpace = true
 
-		} else {
+			}
+		}
+
+		if g.IsAnyBeingScaled(scalingInfoList) {
 			numberNsbeingScaled++
 		}
+
 		putOnMap := NamespaceScaleInfo{
 			ScalingItems:        scalingInfoList,
 			ReplicaList:         scaleReplicalist,
@@ -497,8 +515,8 @@ func MakeScaleDecision(ctx context.Context, _client client.Client, groupedItems 
 			ReplicaListError:    replicalisterr,
 		}
 		nsInfoMap[namespaceKey] = putOnMap
-
 	}
+
 	// Figure out if we need to limit the number of namespaces to scale concurrently based on ""
 	nsScaleBudget := maxConcurrentNsReconcile - numberNsbeingScaled
 	for namespaceKey, item := range nsInfoMap {
