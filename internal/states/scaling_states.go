@@ -207,7 +207,7 @@ func GetAppliedState(ctx context.Context, _client client.Client, namespace strin
 	}
 
 	if namespaceState == (State{}) && clusterState == (State{}) {
-		return State{}, err
+		return State{}, errors.New("no clusterstate or namespace state found!")
 	}
 
 	finalState := stateDefinitions.FindPriorityState(namespaceState, clusterState)
