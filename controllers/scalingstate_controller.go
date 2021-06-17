@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,7 +27,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 
+	"github.com/containersol/prescale-operator/api/v1alpha1"
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
+	"github.com/containersol/prescale-operator/internal/reconciler"
+	"github.com/containersol/prescale-operator/internal/states"
 )
 
 // ScalingStateReconciler reconciles a ScalingState object
@@ -53,53 +57,50 @@ type ScalingStateReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.7.0/pkg/reconcile
 func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	// log := r.Log.
-	// 	WithValues("reconciler kind", "ScalingState").
-	// 	WithValues("reconciler namespace", req.Namespace).
-	// 	WithValues("reconciler object", req.Name)
+	log := r.Log.
+		WithValues("reconciler kind", "ScalingState").
+		WithValues("reconciler namespace", req.Namespace).
+		WithValues("reconciler object", req.Name)
 
-	// ss := &v1alpha1.ScalingState{}
-	// err := r.Get(ctx, req.NamespacedName, ss)
-	// if err != nil {
-	// 	return ctrl.Result{}, err
-	// }
+	ss := &v1alpha1.ScalingState{}
+	err := r.Get(ctx, req.NamespacedName, ss)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
-	// clusterStateDefinitions, err := states.GetClusterScalingStates(ctx, r.Client)
-	// if err != nil {
-	// 	// If we encounter an error trying to retrieve the state definitions,
-	// 	// we will not be able to compute anything else.
-	// 	log.Error(err, "Failed to get ClusterStateDefinitions")
-	// 	return ctrl.Result{}, err
-	// }
+	clusterStateDefinitions, err := states.GetClusterScalingStates(ctx, r.Client)
+	if err != nil {
+		// If we encounter an error trying to retrieve the state definitions,
+		// we will not be able to compute anything else.
+		log.Error(err, "Failed to get ClusterStateDefinitions")
+		return ctrl.Result{}, err
+	}
 
-	// log.WithValues("Namespace", req.Namespace).
-	// 	Info("Scalingstate Controller: Reconciling namespace")
-	// items, err := resources.ScalingItemNamespaceLister(ctx, r.Client, req.Namespace, c.OptInLabel)
-	// if err != nil {
-	// 	log.Error(err, fmt.Sprintf("error listing ScalingObjects in namespace %s", req.Namespace))
-	// 	return ctrl.Result{}, err
-	// }
+	log.WithValues("Namespace", req.Namespace).
+		Info("Scalingstate Controller: Reconciling namespace")
 
-	// events, state, err := reconciler.ReconcileNamespace(ctx, r.Client, req.Namespace, items, clusterStateDefinitions, states.State{}, r.Recorder, ss.Config.DryRun)
-	// if err != nil {
-	// 	return ctrl.Result{}, err
-	// }
+	nsInfos, _, err := reconciler.PrepareForNamespaceReconcile(ctx, r.Client, req.Namespace, clusterStateDefinitions, states.State{}, r.Recorder, ss.Config.DryRun)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
-	// if !ss.Config.DryRun {
+	for _, nsInfo := range nsInfos {
+		if !ss.Config.DryRun {
 
-	// 	if events.QuotaExceeded != "" {
-	// 		r.Recorder.Event(ss, "Warning", "QuotaExceeded", fmt.Sprintf("Not enough available resources for namespace %s", events.QuotaExceeded))
-	// 	}
+			if nsInfo.NSEvents.QuotaExceeded != "" {
+				r.Recorder.Event(ss, "Warning", "QuotaExceeded", fmt.Sprintf("Not enough available resources for namespace %s", nsInfo.NSEvents.QuotaExceeded))
+			}
 
-	// 	r.Recorder.Event(ss, "Normal", "AppliedState", fmt.Sprintf("The applied state for this namespace is %s", state))
+			r.Recorder.Event(ss, "Normal", "AppliedState", fmt.Sprintf("The applied state for this namespace is %s", nsInfo.AppliedState))
 
-	// 	log.Info("Scalingstate Reconciliation loop completed successfully")
+			log.Info("Scalingstate Reconciliation loop completed successfully")
 
-	// } else {
+		} else {
 
-	// 	r.Recorder.Event(ss, "Normal", "DryRun", fmt.Sprintf("DryRun: %s", events.DryRunInfo))
+			r.Recorder.Event(ss, "Normal", "DryRun", fmt.Sprintf("DryRun: %s", nsInfo.NSEvents.DryRunInfo))
 
-	// }
+		}
+	}
 
 	return ctrl.Result{}, nil
 }

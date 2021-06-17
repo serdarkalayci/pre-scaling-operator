@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -89,7 +90,7 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 	}
 	log.Info("Clusterscalingstatedefinition Controller: Reconciling namespaces")
 
-	events, err := reconciler.PrepareForNamespaceReconcile(ctx, r.Client, "", clusterStateDefinitions, states.State{}, r.Recorder, cssd.Config.DryRun)
+	events, retrigger, err := reconciler.PrepareForNamespaceReconcile(ctx, r.Client, "", clusterStateDefinitions, states.State{}, r.Recorder, cssd.Config.DryRun)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -125,6 +126,9 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 
 		r.Recorder.Event(cssd, "Normal", "DryRun", fmt.Sprintf("DryRun: %s", dryRunCluster))
 
+	}
+	if retrigger {
+		return ctrl.Result{RequeueAfter: time.Second * 30}, nil
 	}
 
 	return ctrl.Result{}, nil

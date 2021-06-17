@@ -160,28 +160,28 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 			},
 
-				// Default Replica Count from test if oldoptin = true: 3
-				// Default Replica Count from test if oldoptin = false: 1
-				// Default fallback annotation count: 2
-				// bau Annoation (if changed) will change to :4
-				// Replica change (that needs to be rectified): 5
-				// Structure:  ("Description of the case" , annotationchange, replicachange, oldoptin, newoptin, expectedReplicas)
-				table.Entry("CASE 1  | Should scale to 4 | Annotation has changed. ", true, true, true, true, 4),
-				table.Entry("CASE 2  | Should go to 5    | Deployment has been disabled and replica has been modified", true, true, true, false, 5),
-				table.Entry("CASE 3  | Should scale to 4 | Deployment opted in and annotation changed", true, true, false, true, 4),
-				table.Entry("CASE 4  | Should be at 5    | Deployment opted out. Will go to modified replica count (5)", true, true, false, false, 5),
-				table.Entry("CASE 5  | Should scale to 4 | Annotation has been modified.", true, false, true, true, 4),
-				table.Entry("CASE 6  | Should stay at 3  | Deployment has been disabled", true, false, true, false, 3),
-				table.Entry("CASE 7  | Should scale to 4 | Deployment opted in and annotation changed.", true, false, false, true, 4),
-				table.Entry("CASE 8  | Should be at 1    | Deployment opted out", true, false, false, false, 1),
-				table.Entry("CASE 9  | Should scale to 3 | Replica count has been modified. Rectify back to 'bau'", false, true, true, true, 3),
-				table.Entry("CASE 10 | Should go to 5    | Deployment has been disabled and replica has been modified", false, true, true, false, 5),
-				table.Entry("CASE 11 | Should scale to 3 | Deployment opted in. Scale to 'bau'", false, true, false, true, 3),
-				table.Entry("CASE 12 | Should be at 5    | Deployment opted out. Will go to modified replica count (5)", false, true, false, false, 5),
-				table.Entry("CASE 13 | Stay at Bau  	 | Something else on the deployment changed. Don't do anything", false, false, true, true, 3),
-				table.Entry("CASE 14 | Should stay at 3  | Deployment has been disabled", false, false, true, false, 3),
-				table.Entry("CASE 15 | Should scale to 3 | Deployment opted in. Scale to 'bau'", false, false, false, true, 3),
-				table.Entry("CASE 16 | Should be at 1    | Nothing happend", false, false, false, false, 1),
+			// Default Replica Count from test if oldoptin = true: 3
+			// Default Replica Count from test if oldoptin = false: 1
+			// Default fallback annotation count: 2
+			// bau Annoation (if changed) will change to :4
+			// Replica change (that needs to be rectified): 5
+			// Structure:  ("Description of the case" , annotationchange, replicachange, oldoptin, newoptin, expectedReplicas)
+			// table.Entry("CASE 1  | Should scale to 4 | Annotation has changed. ", true, true, true, true, 4),
+			// table.Entry("CASE 2  | Should go to 5    | Deployment has been disabled and replica has been modified", true, true, true, false, 5),
+			// table.Entry("CASE 3  | Should scale to 4 | Deployment opted in and annotation changed", true, true, false, true, 4),
+			// table.Entry("CASE 4  | Should be at 5    | Deployment opted out. Will go to modified replica count (5)", true, true, false, false, 5),
+			// table.Entry("CASE 5  | Should scale to 4 | Annotation has been modified.", true, false, true, true, 4),
+			// table.Entry("CASE 6  | Should stay at 3  | Deployment has been disabled", true, false, true, false, 3),
+			// table.Entry("CASE 7  | Should scale to 4 | Deployment opted in and annotation changed.", true, false, false, true, 4),
+			// table.Entry("CASE 8  | Should be at 1    | Deployment opted out", true, false, false, false, 1),
+			// table.Entry("CASE 9  | Should scale to 3 | Replica count has been modified. Rectify back to 'bau'", false, true, true, true, 3),
+			// table.Entry("CASE 10 | Should go to 5    | Deployment has been disabled and replica has been modified", false, true, true, false, 5),
+			// table.Entry("CASE 11 | Should scale to 3 | Deployment opted in. Scale to 'bau'", false, true, false, true, 3),
+			// table.Entry("CASE 12 | Should be at 5    | Deployment opted out. Will go to modified replica count (5)", false, true, false, false, 5),
+			// table.Entry("CASE 13 | Stay at Bau  	 | Something else on the deployment changed. Don't do anything", false, false, true, true, 3),
+			// table.Entry("CASE 14 | Should stay at 3  | Deployment has been disabled", false, false, true, false, 3),
+			// table.Entry("CASE 15 | Should scale to 3 | Deployment opted in. Scale to 'bau'", false, false, false, true, 3),
+			// table.Entry("CASE 16 | Should be at 1    | Nothing happend", false, false, false, false, 1),
 			)
 		})
 	})

@@ -444,10 +444,17 @@ type NamespaceScaleInfo struct {
 	ReplicaListError    error
 }
 
-func MakeScaleDecision(ctx context.Context, _client client.Client, groupedItems map[string][]g.ScalingInfo, stateDefinitions states.States, clusterState states.State) map[string]NamespaceScaleInfo {
+type OverallNsInfo struct {
+	NSScaleInfo           map[string]NamespaceScaleInfo
+	NumberofNsBeingScaled int
+	NumberofNsToScale     int
+}
+
+func MakeScaleDecision(ctx context.Context, _client client.Client, groupedItems map[string][]g.ScalingInfo, stateDefinitions states.States, clusterState states.State, maxConcurrentNsReconcile int) OverallNsInfo {
 
 	nsInfoMap := make(map[string]NamespaceScaleInfo)
-
+	numberNsbeingScaled := 0
+	numberNsToScale := 0
 	for namespaceKey, scalingInfoList := range groupedItems {
 		finalState, staterr := states.GetAppliedState(ctx, _client, namespaceKey, stateDefinitions, clusterState)
 
@@ -474,9 +481,12 @@ func MakeScaleDecision(ctx context.Context, _client client.Client, groupedItems 
 				if item.SpecReplica != scaleReplicalist[i].Replicas {
 					scalingInfoList[i].DesiredReplicas = scaleReplicalist[i].Replicas
 					scaleNameSpace = true
+
 				}
 			}
 
+		} else {
+			numberNsbeingScaled++
 		}
 		putOnMap := NamespaceScaleInfo{
 			ScalingItems:        scalingInfoList,
@@ -489,7 +499,24 @@ func MakeScaleDecision(ctx context.Context, _client client.Client, groupedItems 
 		nsInfoMap[namespaceKey] = putOnMap
 
 	}
-	return nsInfoMap
+	// Figure out if we need to limit the number of namespaces to scale concurrently based on ""
+	nsScaleBudget := maxConcurrentNsReconcile - numberNsbeingScaled
+	for namespaceKey, item := range nsInfoMap {
+		if item.ScaleNameSpace {
+			numberNsToScale++
+			nsScaleBudget--
+		}
+		if nsScaleBudget < 0 {
+			item.ScaleNameSpace = false
+			nsInfoMap[namespaceKey] = item
+		}
+	}
+
+	return OverallNsInfo{
+		NSScaleInfo:           nsInfoMap,
+		NumberofNsBeingScaled: numberNsbeingScaled,
+		NumberofNsToScale:     numberNsToScale,
+	}
 }
 
 func GroupScalingItemByNamespace(items []g.ScalingInfo) map[string][]g.ScalingInfo {

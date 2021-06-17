@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/containersol/prescale-operator/api/v1alpha1"
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
@@ -79,21 +80,19 @@ func (r *ClusterScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.
 		return ctrl.Result{}, err
 	}
 
-	// namespaces := corev1.NamespaceList{}
-	// err = r.Client.List(ctx, &namespaces)
-	// if err != nil {
-	// 	log.Error(err, "Cannot list namespaces")
-	// 	return ctrl.Result{}, err
-	// }
 	log.Info("Clusterscalingstate Controller: Reconciling namespaces")
 
-	events, err := reconciler.PrepareForNamespaceReconcile(ctx, r.Client, "", clusterStateDefinitions, states.State{}, r.Recorder, css.Config.DryRun)
+	nsInfos, retrigger, err := reconciler.PrepareForNamespaceReconcile(ctx, r.Client, "", clusterStateDefinitions, states.State{}, r.Recorder, css.Config.DryRun)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Loop over all the namespace events of the namespaces which have been reconciled
-	for namespaceKey, nsInfo := range events {
+	for namespaceKey, nsInfo := range nsInfos {
+		if nsInfo.Error != nil {
+			log.Error(err, fmt.Sprintf("Error while Reconciling namespace %s", namespaceKey))
+			continue
+		}
 		if !css.Config.DryRun {
 
 			if nsInfo.NSEvents.QuotaExceeded != "" {
@@ -122,6 +121,9 @@ func (r *ClusterScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.
 
 		r.Recorder.Event(css, "Normal", "DryRun", fmt.Sprintf("DryRun: %s", dryRunCluster))
 
+	}
+	if retrigger {
+		return ctrl.Result{RequeueAfter: time.Second * 30}, nil
 	}
 
 	return ctrl.Result{}, nil
