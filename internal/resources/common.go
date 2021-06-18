@@ -473,7 +473,7 @@ func MakeScaleDecision(ctx context.Context, _client client.Client, groupedItems 
 
 	maxConcurrentNsReconcile, err := strconv.Atoi(os.Getenv(c.EnvMaxConcurrentNamespaceReconciles))
 	if err != nil {
-		log.Error(err, fmt.Sprintf("Error evaluating environment variable %s",c.EnvMaxConcurrentNamespaceReconciles )) 
+		log.Error(err, fmt.Sprintf("Error evaluating environment variable %s", c.EnvMaxConcurrentNamespaceReconciles))
 		return OverallNsInfo{}, err
 	}
 	if maxConcurrentNsReconcile == 0 {
@@ -565,8 +565,7 @@ func MakeScaleDecision(ctx context.Context, _client client.Client, groupedItems 
 			}
 			nsInfoMap[namespaceKey] = putOnMap
 
-		}
-		if !dryRun {
+		} else if allowed {
 			scaleNameSpace := false
 			// Find out if we need to scale the namespace at all. (Desired != Current)
 			for i, item := range scalingInfoList {
@@ -608,18 +607,18 @@ func MakeScaleDecision(ctx context.Context, _client client.Client, groupedItems 
 			}
 			nsInfoMap[namespaceKey] = putOnMap
 		}
-	}
-
-	// Figure out if we need to limit the number of namespaces to scale concurrently based on env var "MaxConcurrentNamespaceReconciles"
-	nsScaleBudget := maxConcurrentNsReconcile - numberNsbeingScaled
-	for namespaceKey, item := range nsInfoMap {
-		if item.ScaleNameSpace {
-			numberNsToScale++
-			nsScaleBudget--
-		}
-		if nsScaleBudget < 0 {
-			item.ScaleNameSpace = false
-			nsInfoMap[namespaceKey] = item
+		
+		// Figure out if we need to limit the number of namespaces to scale concurrently based on env var "MaxConcurrentNamespaceReconciles"
+		nsScaleBudget := maxConcurrentNsReconcile - numberNsbeingScaled
+		for namespaceKey, item := range nsInfoMap {
+			if item.ScaleNameSpace {
+				numberNsToScale++
+				nsScaleBudget--
+			}
+			if nsScaleBudget < 0 {
+				item.ScaleNameSpace = false
+				nsInfoMap[namespaceKey] = item
+			}
 		}
 	}
 
