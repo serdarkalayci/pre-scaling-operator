@@ -412,7 +412,7 @@ func TestStateReplicasList(t *testing.T) {
 			name: "TestOptedOutDeployment",
 			args: args{
 				state: states.State{
-					Name: "foo",
+					Name: "default",
 				},
 				deploymentItems: []g.ScalingInfo{
 					{
