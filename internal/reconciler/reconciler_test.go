@@ -18,6 +18,7 @@ import (
 // 		ctx              context.Context
 // 		_client          client.Client
 // 		namespace        string
+// 		deployment       v1.Deployment
 // 		stateDefinitions states.States
 // 		clusterState     states.State
 // 		dryRun           bool
@@ -39,6 +40,33 @@ import (
 // 					WithScheme(scheme.Scheme).
 // 					Build(),
 // 				namespace: "default",
+// 				deployment: v1.Deployment{
+// 					Spec: v1.DeploymentSpec{
+// 						Replicas:                new(int32),
+// 						ProgressDeadlineSeconds: new(int32),
+// 						Template: corev1.PodTemplateSpec{
+// 							ObjectMeta: metav1.ObjectMeta{
+// 								Namespace: "default",
+// 								Name:      "foo",
+// 								Annotations: map[string]string{
+// 									"scaler/state-bau-replicas":  "2",
+// 									"scaler/state-peak-replicas": "5"},
+// 								Labels: map[string]string{"scaler/opt-in": "true"},
+// 							},
+// 							Spec: corev1.PodSpec{Containers: []corev1.Container{
+// 								{
+// 									Resources: corev1.ResourceRequirements{
+// 										Limits: map[corev1.ResourceName]resource.Quantity{},
+// 									},
+// 								},
+// 							},
+// 							},
+// 						},
+// 					},
+// 					Status: v1.DeploymentStatus{
+// 						Replicas: 3,
+// 					},
+// 				},
 // 				stateDefinitions: []states.State{
 // 					{
 // 						Name:     "bau",
@@ -66,6 +94,33 @@ import (
 // 					WithScheme(scheme.Scheme).
 // 					Build(),
 // 				namespace: "default",
+// 				deployment: v1.Deployment{
+// 					Spec: v1.DeploymentSpec{
+// 						Replicas:                new(int32),
+// 						ProgressDeadlineSeconds: new(int32),
+// 						Template: corev1.PodTemplateSpec{
+// 							ObjectMeta: metav1.ObjectMeta{
+// 								Namespace: "default",
+// 								Name:      "foo",
+// 								Annotations: map[string]string{
+// 									"scaler/state-bau-replicas":  "2",
+// 									"scaler/state-peak-replicas": "5"},
+// 								Labels: map[string]string{"scaler/opt-in": "true"},
+// 							},
+// 							Spec: corev1.PodSpec{Containers: []corev1.Container{
+// 								{
+// 									Resources: corev1.ResourceRequirements{
+// 										Limits: map[corev1.ResourceName]resource.Quantity{},
+// 									},
+// 								},
+// 							},
+// 							},
+// 						},
+// 					},
+// 					Status: v1.DeploymentStatus{
+// 						Replicas: 3,
+// 					},
+// 				},
 // 				stateDefinitions: []states.State{
 // 					{
 // 						Name:     "bau",
@@ -84,7 +139,11 @@ import (
 
 // 	for _, tt := range tests {
 // 		t.Run(tt.name, func(t *testing.T) {
-// 			if _, _, err := ReconcileNamespace(tt.args.ctx, tt.args._client, tt.args.namespace, tt.args.stateDefinitions, tt.args.clusterState, record.NewFakeRecorder(10), tt.args.dryRun); (err != nil) != tt.wantErr {
+// 			// Objects to track in the fake client.
+
+// 			tt.args._client.Create(tt.args.ctx, &tt.args.deployment, &client.CreateOptions{})
+
+// 			if _, _, err := PrepareForNamespaceReconcile(tt.args.ctx, tt.args._client, tt.args.namespace, tt.args.stateDefinitions, tt.args.clusterState, record.NewFakeRecorder(10), tt.args.dryRun); (err != nil) != tt.wantErr {
 // 				t.Errorf("ReconcileNamespace() error = %v, wantErr %v", err, tt.wantErr)
 // 			}
 // 		})

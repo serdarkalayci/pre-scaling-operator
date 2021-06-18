@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"time"
 
-	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/api/v1alpha1"
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
+	c "github.com/containersol/prescale-operator/internal"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"

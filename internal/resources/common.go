@@ -607,7 +607,7 @@ func MakeScaleDecision(ctx context.Context, _client client.Client, groupedItems 
 			}
 			nsInfoMap[namespaceKey] = putOnMap
 		}
-		
+
 		// Figure out if we need to limit the number of namespaces to scale concurrently based on env var "MaxConcurrentNamespaceReconciles"
 		nsScaleBudget := maxConcurrentNsReconcile - numberNsbeingScaled
 		for namespaceKey, item := range nsInfoMap {
