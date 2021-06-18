@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/api/v1alpha1"
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
 	"github.com/go-logr/logr"
@@ -123,7 +124,7 @@ func (r *ClusterScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.
 
 	}
 	if retrigger {
-		return ctrl.Result{RequeueAfter: time.Second * 30}, nil
+		return ctrl.Result{RequeueAfter: time.Second * c.RetriggerControllerSeconds}, nil
 	}
 
 	return ctrl.Result{}, nil

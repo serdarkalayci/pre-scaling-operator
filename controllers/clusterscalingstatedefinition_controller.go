@@ -31,6 +31,7 @@ import (
 
 	"github.com/containersol/prescale-operator/api/v1alpha1"
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
+	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/reconciler"
 	"github.com/containersol/prescale-operator/internal/states"
 )
@@ -128,7 +129,7 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 
 	}
 	if retrigger {
-		return ctrl.Result{RequeueAfter: time.Second * 30}, nil
+		return ctrl.Result{RequeueAfter: time.Second * c.RetriggerControllerSeconds}, nil
 	}
 
 	return ctrl.Result{}, nil
