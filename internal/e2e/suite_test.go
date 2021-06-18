@@ -22,6 +22,7 @@ import (
 	"time"
 
 	c "github.com/containersol/prescale-operator/internal"
+	"github.com/joho/godotenv"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	dc "github.com/openshift/api/apps/v1"
@@ -146,6 +147,7 @@ var _ = BeforeSuite(func() {
 		Expect(err).ToNot(HaveOccurred())
 	}
 
+	godotenv.Load("../../.env")
 	go func() {
 		err = k8sManager.Start(ctrl.SetupSignalHandler())
 		Expect(err).ToNot(HaveOccurred())

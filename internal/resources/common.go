@@ -3,7 +3,9 @@ package resources
 import (
 	"context"
 	"fmt"
+	"os"
 	"sort"
+	"strconv"
 	"time"
 
 	c "github.com/containersol/prescale-operator/internal"
@@ -450,11 +452,19 @@ type OverallNsInfo struct {
 	NumberofNsToScale     int
 }
 
-func MakeScaleDecision(ctx context.Context, _client client.Client, groupedItems map[string][]g.ScalingInfo, stateDefinitions states.States, clusterState states.State, maxConcurrentNsReconcile int) OverallNsInfo {
+func MakeScaleDecision(ctx context.Context, _client client.Client, groupedItems map[string][]g.ScalingInfo, stateDefinitions states.States, clusterState states.State) (OverallNsInfo, error) {
 	log := ctrl.Log
 	nsInfoMap := make(map[string]NamespaceScaleInfo)
 	numberNsbeingScaled := 0
 	numberNsToScale := 0
+	maxConcurrentNsReconcile, err := strconv.Atoi(os.Getenv("MaxConcurrentNamespaceReconciles"))
+	if err != nil {
+		return OverallNsInfo{}, err
+	}
+	if maxConcurrentNsReconcile == 0 {
+		maxConcurrentNsReconcile = 1
+	}
+
 	for namespaceKey, scalingInfoList := range groupedItems {
 		finalState, staterr := states.GetAppliedState(ctx, _client, namespaceKey, stateDefinitions, clusterState)
 
@@ -474,8 +484,6 @@ func MakeScaleDecision(ctx context.Context, _client client.Client, groupedItems 
 		scaleReplicalist, replicalisterr := StateReplicasList(finalState, scalingInfoList)
 
 		scaleNameSpace := false
-		// Don't scale the namespace if something in there is scaled at the moment
-
 		// Find out if we need to scale the namespace at all. (Desired != Current)
 		for i, item := range scalingInfoList {
 
@@ -534,7 +542,7 @@ func MakeScaleDecision(ctx context.Context, _client client.Client, groupedItems 
 		NSScaleInfo:           nsInfoMap,
 		NumberofNsBeingScaled: numberNsbeingScaled,
 		NumberofNsToScale:     numberNsToScale,
-	}
+	}, nil
 }
 
 func GroupScalingItemByNamespace(items []g.ScalingInfo) map[string][]g.ScalingInfo {

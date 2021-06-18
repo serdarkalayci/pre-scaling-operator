@@ -22,6 +22,7 @@ import (
 
 	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/validations"
+	"github.com/joho/godotenv"
 	"github.com/robfig/cron"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -152,6 +153,8 @@ func main() {
 		r.RectifyScaleItemsInFailureState(mgr.GetClient(), mgr.GetEventRecorderFor("clusterscalingstatedefinition-controller"))
 	})
 	z.Start()
+
+	godotenv.Load("./.env")
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

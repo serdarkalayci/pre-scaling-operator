@@ -6,6 +6,7 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/go-logr/logr v0.3.0
 	github.com/google/go-cmp v0.5.4 // indirect
+	github.com/joho/godotenv v1.3.0
 	github.com/olekukonko/tablewriter v0.0.0-20170122224234-a0225b3f23b5
 	github.com/onsi/ginkgo v1.15.2
 	github.com/onsi/gomega v1.10.2

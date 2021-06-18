@@ -48,7 +48,6 @@ func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, na
 	var err error
 	var scalingobjects []g.ScalingInfo
 	var reTrigger bool = false
-	var maxConcurrentNsReconcile = 2
 
 	nsInfoMap := make(map[string]NamespaceInfo)
 
@@ -73,7 +72,11 @@ func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, na
 	// Group the objects by namespace in order to decide how many to scale.
 	scalingObjectGrouped := resources.GroupScalingItemByNamespace(scalingobjects)
 
-	overallNsInformation := resources.MakeScaleDecision(ctx, _client, scalingObjectGrouped, stateDefinitions, clusterState, maxConcurrentNsReconcile)
+	overallNsInformation, err := resources.MakeScaleDecision(ctx, _client, scalingObjectGrouped, stateDefinitions, clusterState)
+
+	if err != nil {
+		return nil, false, err
+	}
 
 	for namespaceKey := range overallNsInformation.NSScaleInfo {
 		if overallNsInformation.NSScaleInfo[namespaceKey].ScaleNameSpace || dryRun {
