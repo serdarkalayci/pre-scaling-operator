@@ -405,7 +405,7 @@ func TestStateReplicasList(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    []sr.StateReplica
+		want    []g.ScalingInfo
 		wantErr bool
 	}{
 		{
@@ -445,14 +445,14 @@ func TestStateReplicasList(t *testing.T) {
 					},
 				},
 			},
-			want: []sr.StateReplica{
+			want: []g.ScalingInfo{
 				{
-					Name:     "default",
-					Replicas: 1,
+					State:           "default",
+					DesiredReplicas: 1,
 				},
 				{
-					Name:     "default",
-					Replicas: 3,
+					State:           "default",
+					DesiredReplicas: 3,
 				},
 			},
 			wantErr: false,
@@ -473,7 +473,7 @@ func TestStateReplicasList(t *testing.T) {
 						Failure:         false,
 						FailureMessage:  "",
 						ReadyReplicas:   1,
-						DesiredReplicas: 2,
+						DesiredReplicas: 1,
 					},
 					{
 						Name:            "foo2",
@@ -484,12 +484,21 @@ func TestStateReplicasList(t *testing.T) {
 						Failure:         false,
 						FailureMessage:  "",
 						ReadyReplicas:   1,
-						DesiredReplicas: 2,
+						DesiredReplicas: 1,
 					},
 				},
 			},
-			want:    []sr.StateReplica{},
-			wantErr: true,
+			want: []g.ScalingInfo{
+				{
+					State:           "",
+					DesiredReplicas: 1,
+				},
+				{
+					State:           "",
+					DesiredReplicas: 1,
+				},
+			},
+			wantErr: false,
 		},
 	}
 
@@ -500,8 +509,14 @@ func TestStateReplicasList(t *testing.T) {
 				t.Errorf("StateReplicasList() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DeploymentStateReplicasList() = %v, want %v", got, tt.want)
+			for i, itemGot := range got {
+				if itemGot.DesiredReplicas != tt.want[i].DesiredReplicas {
+					t.Errorf("DesiredReplicas not correct = %d, want %d", itemGot.DesiredReplicas, tt.want[i].DesiredReplicas)
+				}
+				if itemGot.State != tt.want[i].State {
+					t.Errorf("State is not correct = %s, want %s", itemGot.State, tt.want[i].State)
+				}
+
 			}
 		})
 	}
@@ -705,4 +720,3 @@ func TestNamespaceGrouping(t *testing.T) {
 		})
 	}
 }
-

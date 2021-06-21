@@ -8,7 +8,6 @@ import (
 	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/quotas"
 	"github.com/containersol/prescale-operator/internal/resources"
-	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
 	g "github.com/containersol/prescale-operator/pkg/utils/global"
 
@@ -58,7 +57,6 @@ func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, na
 		return nil, false, errors.New("no opted-in scalingobjects found")
 	}
 
-	
 	scalingObjectGrouped := resources.GroupScalingItemByNamespace(scalingobjects)
 
 	overallNsInformation, err := resources.MakeNamespacesScaleDecisions(ctx, _client, scalingObjectGrouped, stateDefinitions, clusterState, dryRun)
@@ -69,7 +67,7 @@ func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, na
 	for namespaceKey, value := range overallNsInformation.NSScaleInfo {
 		if overallNsInformation.NSScaleInfo[namespaceKey].ScaleNameSpace && !dryRun {
 			overallNsInformation.NumberofNsToScale--
-			ReconcileNamespace(ctx, _client, namespaceKey, overallNsInformation.NSScaleInfo[namespaceKey].ScalingItems, overallNsInformation.NSScaleInfo[namespaceKey].ReplicaList, overallNsInformation.NSScaleInfo[namespaceKey].FinalNamespaceState, recorder, dryRun)
+			ReconcileNamespace(ctx, _client, namespaceKey, overallNsInformation.NSScaleInfo[namespaceKey].ScalingItems, overallNsInformation.NSScaleInfo[namespaceKey].FinalNamespaceState, recorder, dryRun)
 		}
 		// Accumulate the information to return to the controller
 		nsInfoMap[namespaceKey] = NamespaceInfo{
@@ -84,7 +82,7 @@ func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, na
 
 }
 
-func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, scalingItems []g.ScalingInfo, scaleReplicalist []sr.StateReplica, finalState states.State, recorder record.EventRecorder, dryRun bool) {
+func ReconcileNamespace(ctx context.Context, _client client.Client, namespace string, scalingItems []g.ScalingInfo, finalState states.State, recorder record.EventRecorder, dryRun bool) {
 
 	//	var objectsToReconcile int
 
@@ -101,21 +99,21 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 		// 	return nsEvents, finalState.Name, err
 		// }
 
-	for i, scalingItem := range scalingItems {
+	for _, scalingItem := range scalingItems {
 		// Don't scale if we don't need to
-		if scalingItem.SpecReplica == scaleReplicalist[i].Replicas {
+		if scalingItem.SpecReplica == scalingItem.DesiredReplicas {
 			continue
 		}
 
 		scalingItemFresh, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(scalingItem)
 		if notFoundErr == nil {
 			if scalingItemFresh.DesiredReplicas != scalingItem.DesiredReplicas {
-				g.GetDenyList().SetScalingItemOnList(scalingItemFresh, scalingItemFresh.Failure, scalingItemFresh.FailureMessage, scaleReplicalist[i].Replicas)
+				g.GetDenyList().SetScalingItemOnList(scalingItemFresh, scalingItemFresh.Failure, scalingItemFresh.FailureMessage, scalingItem.DesiredReplicas)
 				log.WithValues("Name: ", scalingItemFresh.Name).
 					WithValues("Namespace: ", scalingItemFresh.Namespace).
 					WithValues("Object: ", scalingItemFresh.ScalingItemType.ItemTypeName).
-					WithValues("DesiredReplicacount on item: ", scalingItemFresh.DesiredReplicas).
-					WithValues("New replica count:", scaleReplicalist[i].Replicas).
+					WithValues("DesiredReplica count on item: ", scalingItemFresh.DesiredReplicas).
+					WithValues("New replica count:", scalingItem.DesiredReplicas).
 					WithValues("Failure: ", scalingItemFresh.Failure).
 					WithValues("Failure message: ", scalingItemFresh.FailureMessage).
 					Info("Deployment is already being scaled at the moment. Updated desired replica count with new replica count")
