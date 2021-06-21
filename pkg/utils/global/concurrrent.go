@@ -25,6 +25,7 @@ type ScalingInfo struct {
 	SpecReplica      int32
 	ReadyReplicas    int32
 	DesiredReplicas  int32
+	State            string
 	ProgressDeadline int32
 	ResourceList     corev1.ResourceList
 	ConditionReason  string

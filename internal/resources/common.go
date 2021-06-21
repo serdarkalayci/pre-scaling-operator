@@ -135,12 +135,11 @@ func StateReplicas(state states.State, deploymentItem g.ScalingInfo) (sr.StateRe
 	return stateReplica, nil
 }
 
-func StateReplicasList(state states.State, deployments []g.ScalingInfo) ([]sr.StateReplica, error) {
+func DetermineDesiredReplicas(state states.State, deployments []g.ScalingInfo) ([]g.ScalingInfo, error) {
 
-	var stateReplicaList []sr.StateReplica
 	var err error
 
-	for _, deploymentItem := range deployments {
+	for i, deploymentItem := range deployments {
 		log := ctrl.Log.
 			WithValues("deploymentItem", deploymentItem.Name).
 			WithValues("namespace", deploymentItem.Namespace)
@@ -149,7 +148,7 @@ func StateReplicasList(state states.State, deployments []g.ScalingInfo) ([]sr.St
 			log.WithValues("deploymentItem", deploymentItem.Name).
 				WithValues("namespace", deploymentItem.Namespace).
 				Error(err, "Cannot calculate state replicas. Please check deploymentItem annotations. Continuing.")
-			return []sr.StateReplica{}, err
+			continue
 		}
 
 		stateReplica, err := stateReplicas.GetState(state.Name)
@@ -158,15 +157,15 @@ func StateReplicasList(state states.State, deployments []g.ScalingInfo) ([]sr.St
 			// We will ignore any that are not set
 			log.WithValues("set states", stateReplicas).
 				WithValues("namespace state", state.Name).
-				Info("State could not be found")
-			return []sr.StateReplica{}, err
+				Info(fmt.Sprintf("State could not be found on scalingItem %s in namespace %s", deploymentItem.Name, deploymentItem.Namespace))
+			continue
 		}
-
-		stateReplicaList = append(stateReplicaList, stateReplica)
+		deployments[i].DesiredReplicas = stateReplica.Replicas
+		deployments[i].State = stateReplica.Name
 
 	}
 
-	return stateReplicaList, err
+	return deployments, err
 }
 
 // Main function to make scaling decisions. The step scaler scales 1 by 1 towards the desired replica count.
@@ -313,11 +312,11 @@ func LimitsNeeded(deploymentItem g.ScalingInfo, replicas int32) corev1.ResourceL
 	return math.Mul(math.ReplicaCalc(replicas, deploymentItem.SpecReplica), deploymentItem.ResourceList)
 }
 
-func LimitsNeededList(deployments []g.ScalingInfo, scaleReplicalist []sr.StateReplica) corev1.ResourceList {
+func LimitsNeededList(deployments []g.ScalingInfo) corev1.ResourceList {
 
 	var limitsneeded corev1.ResourceList
-	for i, deploymentItem := range deployments {
-		limitsneeded = math.Add(limitsneeded, math.Mul(math.ReplicaCalc(scaleReplicalist[i].Replicas, deploymentItem.SpecReplica), deploymentItem.ResourceList))
+	for _, deploymentItem := range deployments {
+		limitsneeded = math.Add(limitsneeded, math.Mul(math.ReplicaCalc(deploymentItem.DesiredReplicas, deploymentItem.SpecReplica), deploymentItem.ResourceList))
 	}
 	return limitsneeded
 }
@@ -499,11 +498,11 @@ func MakeNamespacesScaleDecisions(ctx context.Context, _client client.Client, gr
 			continue
 		}
 
-		scaleReplicalist, replicalisterr := StateReplicasList(finalState, scalingInfoList)
+		scalingInfoList, replicalisterr := DetermineDesiredReplicas(finalState, scalingInfoList)
 
 		// Resource Quota Check //
 		//Here we calculate the resource limits we need from all deployments combined
-		limitsneeded = LimitsNeededList(scalingInfoList, scaleReplicalist)
+		limitsneeded = LimitsNeededList(scalingInfoList)
 
 		// After we have calculated the resources needed from all workloads in a given namespace, we can determine if the scaling should be allowed to go through
 		finalLimitsCPU, finalLimitsMemory, allowed, rqCheckErr := quotas.ResourceQuotaCheck(ctx, namespaceKey, limitsneeded)
@@ -511,7 +510,6 @@ func MakeNamespacesScaleDecisions(ctx context.Context, _client client.Client, gr
 			log.Error(err, "Cannot calculate the resource quotas")
 			putOnMap := NamespaceScaleInfo{
 				ScalingItems:            scalingInfoList,
-				ReplicaList:             scaleReplicalist,
 				FinalNamespaceState:     finalState,
 				ScaleNameSpace:          false,
 				StateError:              staterr,
@@ -541,9 +539,9 @@ func MakeNamespacesScaleDecisions(ctx context.Context, _client client.Client, gr
 			table = tablewriter.NewWriter(tableString)
 			table.SetHeader([]string{"Application", "Current replicas", "New state", "New replicas", "Rapid Scaling"})
 
-			for i, deployment := range scalingInfoList {
+			for _, deployment := range scalingInfoList {
 
-				applicationData = append(applicationData, []string{deployment.Name, fmt.Sprint(deployment.ReadyReplicas), scaleReplicalist[i].Name, fmt.Sprint(scaleReplicalist[i].Replicas), strconv.FormatBool(states.GetRapidScalingSetting(deployment))})
+				applicationData = append(applicationData, []string{deployment.Name, fmt.Sprint(deployment.ReadyReplicas), deployment.State, fmt.Sprint(deployment.DesiredReplicas), strconv.FormatBool(states.GetRapidScalingSetting(deployment))})
 
 			}
 
@@ -556,7 +554,6 @@ func MakeNamespacesScaleDecisions(ctx context.Context, _client client.Client, gr
 			nsEvents.DryRunInfo = nsEvents.DryRunInfo + tableString.String()
 			putOnMap := NamespaceScaleInfo{
 				ScalingItems:            scalingInfoList,
-				ReplicaList:             scaleReplicalist,
 				FinalNamespaceState:     finalState,
 				ScaleNameSpace:          false,
 				StateError:              staterr,
@@ -573,22 +570,22 @@ func MakeNamespacesScaleDecisions(ctx context.Context, _client client.Client, gr
 
 				itemFromList, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(item)
 				if notFoundErr == nil {
-					if itemFromList.DesiredReplicas != scaleReplicalist[i].Replicas && g.GetDenyList().IsBeingScaled(itemFromList) {
+					if itemFromList.DesiredReplicas != item.DesiredReplicas && g.GetDenyList().IsBeingScaled(itemFromList) {
 						// Intercept the (step)scaler here with the new DesiredReplicas
-						g.GetDenyList().SetScalingItemOnList(itemFromList, itemFromList.Failure, itemFromList.FailureMessage, scaleReplicalist[i].Replicas)
+						g.GetDenyList().SetScalingItemOnList(itemFromList, itemFromList.Failure, itemFromList.FailureMessage, item.DesiredReplicas)
 						log.WithValues("Name: ", itemFromList.Name).
 							WithValues("Namespace: ", itemFromList.Namespace).
 							WithValues("Object: ", itemFromList.ScalingItemType.ItemTypeName).
 							WithValues("DesiredReplicacount on item: ", itemFromList.DesiredReplicas).
-							WithValues("New replica count:", scaleReplicalist[i].Replicas).
+							WithValues("New replica count:", item.DesiredReplicas).
 							WithValues("Failure: ", itemFromList.Failure).
 							WithValues("Failure message: ", itemFromList.FailureMessage).
 							Info("(From NSScaleDecision): Deployment is already being scaled at the moment. Updated desired replica count with new replica count")
 						continue
 					}
 				}
-				if item.SpecReplica != scaleReplicalist[i].Replicas {
-					scalingInfoList[i].DesiredReplicas = scaleReplicalist[i].Replicas
+				if item.SpecReplica != item.DesiredReplicas {
+					scalingInfoList[i].DesiredReplicas = item.DesiredReplicas
 					scaleNameSpace = true
 
 				}
@@ -600,7 +597,6 @@ func MakeNamespacesScaleDecisions(ctx context.Context, _client client.Client, gr
 
 			putOnMap := NamespaceScaleInfo{
 				ScalingItems:        scalingInfoList,
-				ReplicaList:         scaleReplicalist,
 				FinalNamespaceState: finalState,
 				ScaleNameSpace:      scaleNameSpace,
 				StateError:          staterr,

@@ -495,7 +495,7 @@ func TestStateReplicasList(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := StateReplicasList(tt.args.state, tt.args.deploymentItems)
+			got, err := DetermineDesiredReplicas(tt.args.state, tt.args.deploymentItems)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("StateReplicasList() error = %v, wantErr %v", err, tt.wantErr)
 				return
