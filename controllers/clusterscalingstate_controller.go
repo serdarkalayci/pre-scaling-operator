@@ -88,6 +88,10 @@ func (r *ClusterScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.
 		return ctrl.Result{}, err
 	}
 
+	if nsInfos == nil && !retrigger && err == nil {
+		return ctrl.Result{}, nil
+	}
+
 	// Loop over all the namespace events of the namespaces which have been reconciled
 	for namespaceKey, nsInfo := range nsInfos {
 		if nsInfo.Error != nil {
@@ -124,6 +128,7 @@ func (r *ClusterScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.
 
 	}
 	if retrigger {
+		log.Info(fmt.Sprintf("Not all namespaces reconciled. Retriggering ClusterScalingStateController in %d", c.RetriggerControllerSeconds))
 		return ctrl.Result{RequeueAfter: time.Second * c.RetriggerControllerSeconds}, nil
 	}
 

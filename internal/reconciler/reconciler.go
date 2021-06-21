@@ -2,7 +2,6 @@ package reconciler
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	c "github.com/containersol/prescale-operator/internal"
@@ -54,7 +53,8 @@ func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, na
 	}
 
 	if len(scalingobjects) == 0 {
-		return nil, false, errors.New("no opted-in scalingobjects found")
+		log.Info("nothing to reconcile. No opted in Deployments or DeploymentConfigs found.")
+		return nil, false, nil
 	}
 
 	scalingObjectGrouped := resources.GroupScalingItemByNamespace(scalingobjects)
@@ -88,16 +88,6 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 	log := ctrl.Log.
 		WithValues("namespace", namespace)
-
-		// //Here we calculate the resource limits we need from all deployments combined
-		// limitsneeded = resources.LimitsNeededList(scalingItems, scaleReplicalist)
-
-		// // After we have calculated the resources needed from all workloads in a given namespace, we can determine if the scaling should be allowed to go through
-		// finalLimitsCPU, finalLimitsMemory, allowed, err := quotas.ResourceQuotaCheck(ctx, namespace, limitsneeded)
-		// if err != nil {
-		// 	log.Error(err, "Cannot calculate the resource quotas")
-		// 	return nsEvents, finalState.Name, err
-		// }
 
 	for _, scalingItem := range scalingItems {
 		// Don't scale if we don't need to

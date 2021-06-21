@@ -30,7 +30,6 @@ import (
 
 type NamespaceScaleInfo struct {
 	ScalingItems            []g.ScalingInfo
-	ReplicaList             []sr.StateReplica
 	FinalNamespaceState     states.State
 	ScaleNameSpace          bool
 	StateError              error
@@ -488,7 +487,6 @@ func MakeNamespacesScaleDecisions(ctx context.Context, _client client.Client, gr
 		if staterr != nil {
 			nsInfoMap[namespaceKey] = NamespaceScaleInfo{
 				ScalingItems:        scalingInfoList,
-				ReplicaList:         []sr.StateReplica{},
 				FinalNamespaceState: finalState,
 				ScaleNameSpace:      false,
 				StateError:          staterr,

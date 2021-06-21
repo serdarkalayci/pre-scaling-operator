@@ -91,15 +91,17 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 	}
 	log.Info("Clusterscalingstatedefinition Controller: Reconciling namespaces")
 
-	events, retrigger, err := reconciler.PrepareForNamespaceReconcile(ctx, r.Client, "", clusterStateDefinitions, states.State{}, r.Recorder, cssd.Config.DryRun)
+	nsInfos, retrigger, err := reconciler.PrepareForNamespaceReconcile(ctx, r.Client, "", clusterStateDefinitions, states.State{}, r.Recorder, cssd.Config.DryRun)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// TODO: Use "RequeAfter" of the controller Result to reque in order to loop over the next namespaces that are not reconciled yet
+	if nsInfos == nil && !retrigger && err == nil {
+		return ctrl.Result{}, nil
+	}
 
 	// Loop over all the namespace events of the namespaces which have been reconciled
-	for namespaceKey, nsInfo := range events {
+	for namespaceKey, nsInfo := range nsInfos {
 		if !cssd.Config.DryRun {
 
 			if nsInfo.NSEvents.QuotaExceeded != "" {
@@ -129,6 +131,7 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 
 	}
 	if retrigger {
+		log.Info(fmt.Sprintf("Not all namespaces reconciled. Retriggering ClusterScalingStateDefinitionController in %d", c.RetriggerControllerSeconds))
 		return ctrl.Result{RequeueAfter: time.Second * c.RetriggerControllerSeconds}, nil
 	}
 
