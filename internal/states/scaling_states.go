@@ -48,7 +48,7 @@ func (s States) FindState(name string, _state *State) error {
 			return nil
 		}
 	}
-	return NotFound{msg: "Could not find state"}
+	return NotFound{msg: fmt.Sprintf("Could not find state: %s", name)}
 }
 
 func (s States) FindPriorityState(a State, b State) State {
