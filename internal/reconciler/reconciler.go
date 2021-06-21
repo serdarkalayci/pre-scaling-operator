@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	c "github.com/containersol/prescale-operator/internal"
+	constants "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/quotas"
 	"github.com/containersol/prescale-operator/internal/resources"
 	"github.com/containersol/prescale-operator/internal/states"
@@ -39,13 +39,13 @@ func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, na
 	nsInfoMap := make(map[string]NamespaceInfo)
 
 	if namespace == "" {
-		scalingobjects, err = resources.ScalingItemNamespaceLister(ctx, _client, "", c.OptInLabel)
+		scalingobjects, err = resources.ScalingItemNamespaceLister(ctx, _client, "", constants.OptInLabel)
 		if err != nil {
 			log.Error(err, "error listing ScalingObjects")
 			return nil, true, err
 		}
 	} else {
-		scalingobjects, err = resources.ScalingItemNamespaceLister(ctx, _client, namespace, c.OptInLabel)
+		scalingobjects, err = resources.ScalingItemNamespaceLister(ctx, _client, namespace, constants.OptInLabel)
 		if err != nil {
 			log.Error(err, fmt.Sprintf("error listing ScalingObjects in namespace %s", namespace))
 			return nil, true, err

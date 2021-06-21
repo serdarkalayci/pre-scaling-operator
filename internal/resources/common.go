@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	c "github.com/containersol/prescale-operator/internal"
+	constants "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/quotas"
 	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
@@ -377,7 +377,7 @@ func ScalingItemNamespaceLister(ctx context.Context, _client client.Client, name
 		}
 	}
 
-	if c.OpenshiftCluster {
+	if constants.OpenshiftCluster {
 
 		if namespace != "" {
 			err := _client.List(ctx, &deploymentconfigs, client.MatchingLabels(OptInLabel), client.InNamespace(namespace))
@@ -470,11 +470,8 @@ func MakeNamespacesScaleDecisions(ctx context.Context, _client client.Client, gr
 	numberNsToScale := 0
 	var limitsneeded corev1.ResourceList
 
-	maxConcurrentNsReconcile, err := strconv.Atoi(os.Getenv(c.EnvMaxConcurrentNamespaceReconciles))
-	if err != nil {
-		log.Error(err, fmt.Sprintf("Error evaluating environment variable %s", c.EnvMaxConcurrentNamespaceReconciles))
-		return OverallNsInfo{}, err
-	}
+	maxConcurrentNsReconcile, _ := strconv.Atoi(os.Getenv(constants.EnvMaxConcurrentNamespaceReconciles))
+
 	if maxConcurrentNsReconcile == 0 {
 		maxConcurrentNsReconcile = 1
 	}
@@ -504,8 +501,8 @@ func MakeNamespacesScaleDecisions(ctx context.Context, _client client.Client, gr
 
 		// After we have calculated the resources needed from all workloads in a given namespace, we can determine if the scaling should be allowed to go through
 		finalLimitsCPU, finalLimitsMemory, allowed, rqCheckErr := quotas.ResourceQuotaCheck(ctx, namespaceKey, limitsneeded)
-		if err != nil {
-			log.Error(err, "Cannot calculate the resource quotas")
+		if rqCheckErr != nil {
+			log.Error(rqCheckErr, "Cannot calculate the resource quotas")
 			putOnMap := NamespaceScaleInfo{
 				ScalingItems:            scalingInfoList,
 				FinalNamespaceState:     finalState,

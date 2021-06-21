@@ -20,7 +20,6 @@ import (
 	"flag"
 	"os"
 
-	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/validations"
 	"github.com/joho/godotenv"
 	"github.com/robfig/cron"

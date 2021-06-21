@@ -3,8 +3,9 @@ package reconciler
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
-
+	constants "github.com/containersol/prescale-operator/internal"
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
 	"github.com/containersol/prescale-operator/internal/states"
 	g "github.com/containersol/prescale-operator/pkg/utils/global"
@@ -333,6 +334,7 @@ func TestPrepareNamespaces(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			os.Setenv(constants.EnvMaxConcurrentNamespaceReconciles, "2")
 			nsInfoMap, _, err := PrepareForNamespaceReconcile(tt.args.ctx, tt.args._client, tt.args.namespace, tt.args.stateDefinitions, tt.args.clusterState, record.NewFakeRecorder(10), tt.args.dryRun)
 			if err != nil {
 				t.Errorf(fmt.Sprintf("Error during preparation/reconcile. %s", err))

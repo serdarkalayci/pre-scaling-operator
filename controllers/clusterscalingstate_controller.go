@@ -23,7 +23,7 @@ import (
 
 	"github.com/containersol/prescale-operator/api/v1alpha1"
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
-	c "github.com/containersol/prescale-operator/internal"
+	constants "github.com/containersol/prescale-operator/internal"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -128,8 +128,8 @@ func (r *ClusterScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.
 
 	}
 	if retrigger {
-		log.Info(fmt.Sprintf("Not all namespaces reconciled. Retriggering ClusterScalingStateController in %d", c.RetriggerControllerSeconds))
-		return ctrl.Result{RequeueAfter: time.Second * c.RetriggerControllerSeconds}, nil
+		log.Info(fmt.Sprintf("Not all namespaces reconciled. Retriggering ClusterScalingStateController in %d seconds", constants.RetriggerControllerSeconds))
+		return ctrl.Result{RequeueAfter: time.Second * constants.RetriggerControllerSeconds}, nil
 	}
 
 	return ctrl.Result{}, nil

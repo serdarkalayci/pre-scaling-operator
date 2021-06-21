@@ -122,7 +122,7 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 			r.Recorder.Event(cssd, "Warning", "QuotaExceeded", fmt.Sprintf("Not enough available resources for the following %d namespaces: %s", len(eventsList), eventsList))
 		}
 
-		r.Recorder.Event(cssd, "Normal", "AppliedStates", fmt.Sprintf("The applied state for each of the %s namespaces is %s", appliedStateNamespaceList, appliedStates))
+		r.Recorder.Event(cssd, "Normal", "AppliedStates", fmt.Sprintf("The applied state for each of the %s namespaces is %s seconds", appliedStateNamespaceList, appliedStates))
 		log.Info("Clusterscalingstatedefinition Reconciliation loop completed")
 
 	} else {

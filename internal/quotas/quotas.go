@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	c "github.com/containersol/prescale-operator/internal"
+	constants "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/pkg/utils/client"
 	"github.com/containersol/prescale-operator/pkg/utils/math"
 	corev1 "k8s.io/api/core/v1"
@@ -31,7 +31,7 @@ func ResourceQuotaCheck(ctx context.Context, namespace string, limitsneeded core
 
 	rq, err := resourceQuota(ctx, namespace, kubernetesclient)
 	if err != nil {
-		if strings.Contains(err.Error(), c.RQNotFound) {
+		if strings.Contains(err.Error(), constants.RQNotFound) {
 			ctrl.Log.Info(fmt.Sprintf("WARNING: No Resource Quotas found for this namespace: %s", namespace))
 			return finalLimitsCPU, finalLimitsMemory, true, nil
 		}
@@ -140,7 +140,7 @@ func resourceQuota(ctx context.Context, namespace string, kubernetesclient kuber
 	}
 
 	if len(rq.Items) == 0 {
-		return &corev1.ResourceQuotaList{}, errors.New(c.RQNotFound)
+		return &corev1.ResourceQuotaList{}, errors.New(constants.RQNotFound)
 	}
 
 	return rq, nil
