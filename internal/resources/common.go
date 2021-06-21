@@ -566,7 +566,7 @@ func MakeNamespacesScaleDecisions(ctx context.Context, _client client.Client, gr
 		} else if allowed {
 			scaleNameSpace := false
 			// Find out if we need to scale the namespace at all. (Desired != Current)
-			for i, item := range scalingInfoList {
+			for _, item := range scalingInfoList {
 
 				itemFromList, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(item)
 				if notFoundErr == nil {
@@ -576,7 +576,7 @@ func MakeNamespacesScaleDecisions(ctx context.Context, _client client.Client, gr
 						log.WithValues("Name: ", itemFromList.Name).
 							WithValues("Namespace: ", itemFromList.Namespace).
 							WithValues("Object: ", itemFromList.ScalingItemType.ItemTypeName).
-							WithValues("DesiredReplicacount on item: ", itemFromList.DesiredReplicas).
+							WithValues("DesiredReplica count on item: ", itemFromList.DesiredReplicas).
 							WithValues("New replica count:", item.DesiredReplicas).
 							WithValues("Failure: ", itemFromList.Failure).
 							WithValues("Failure message: ", itemFromList.FailureMessage).
@@ -585,9 +585,7 @@ func MakeNamespacesScaleDecisions(ctx context.Context, _client client.Client, gr
 					}
 				}
 				if item.SpecReplica != item.DesiredReplicas {
-					scalingInfoList[i].DesiredReplicas = item.DesiredReplicas
 					scaleNameSpace = true
-
 				}
 			}
 
