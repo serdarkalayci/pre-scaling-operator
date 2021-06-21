@@ -28,6 +28,30 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+type NamespaceScaleInfo struct {
+	ScalingItems            []g.ScalingInfo
+	ReplicaList             []sr.StateReplica
+	FinalNamespaceState     states.State
+	ScaleNameSpace          bool
+	StateError              error
+	ReplicaListError        error
+	ResourceQuotaCheckError error
+	NamespaceEvents         NamespaceEvents
+}
+
+type OverallNsInfo struct {
+	NSScaleInfo           map[string]NamespaceScaleInfo
+	NumberofNsBeingScaled int
+	NumberofNsToScale     int
+}
+
+type NamespaceEvents struct {
+	QuotaExceeded    string
+	ReconcileSuccess []string
+	ReconcileFailure []string
+	DryRunInfo       string
+}
+
 type ScaleError struct {
 	msg string
 }
@@ -440,31 +464,8 @@ func RegisterEvents(ctx context.Context, _client client.Client, recorder record.
 
 }
 
-type NamespaceScaleInfo struct {
-	ScalingItems            []g.ScalingInfo
-	ReplicaList             []sr.StateReplica
-	FinalNamespaceState     states.State
-	ScaleNameSpace          bool
-	StateError              error
-	ReplicaListError        error
-	ResourceQuotaCheckError error
-	NamespaceEvents         NamespaceEvents
-}
-
-type OverallNsInfo struct {
-	NSScaleInfo           map[string]NamespaceScaleInfo
-	NumberofNsBeingScaled int
-	NumberofNsToScale     int
-}
-
-type NamespaceEvents struct {
-	QuotaExceeded    string
-	ReconcileSuccess []string
-	ReconcileFailure []string
-	DryRunInfo       string
-}
-
-func MakeScaleDecision(ctx context.Context, _client client.Client, groupedItems map[string][]g.ScalingInfo, stateDefinitions states.States, clusterState states.State, dryRun bool) (OverallNsInfo, error) {
+// Determines if the given namespaces need to be scaled or not. Determining factors are: final state, Resource quota checks, MaxConcurrentReconciles, and if they're already being scaled
+func MakeNamespacesScaleDecisions(ctx context.Context, _client client.Client, groupedNamespaces map[string][]g.ScalingInfo, stateDefinitions states.States, clusterState states.State, dryRun bool) (OverallNsInfo, error) {
 	log := ctrl.Log
 	nsInfoMap := make(map[string]NamespaceScaleInfo)
 	numberNsbeingScaled := 0
@@ -480,7 +481,7 @@ func MakeScaleDecision(ctx context.Context, _client client.Client, groupedItems 
 		maxConcurrentNsReconcile = 1
 	}
 
-	for namespaceKey, scalingInfoList := range groupedItems {
+	for namespaceKey, scalingInfoList := range groupedNamespaces {
 		finalState, staterr := states.GetAppliedState(ctx, _client, namespaceKey, stateDefinitions, clusterState)
 		var finalLimitsCPU, finalLimitsMemory string
 		var nsEvents NamespaceEvents
@@ -582,7 +583,7 @@ func MakeScaleDecision(ctx context.Context, _client client.Client, groupedItems 
 							WithValues("New replica count:", scaleReplicalist[i].Replicas).
 							WithValues("Failure: ", itemFromList.Failure).
 							WithValues("Failure message: ", itemFromList.FailureMessage).
-							Info("(From NSPrepare): Deployment is already being scaled at the moment. Updated desired replica count with new replica count")
+							Info("(From NSScaleDecision): Deployment is already being scaled at the moment. Updated desired replica count with new replica count")
 						continue
 					}
 				}
@@ -629,6 +630,7 @@ func MakeScaleDecision(ctx context.Context, _client client.Client, groupedItems 
 	}, nil
 }
 
+// Groups the given objects by their namespaces in a map. Returns the namespaces alphabetically
 func GroupScalingItemByNamespace(items []g.ScalingInfo) map[string][]g.ScalingInfo {
 	if len(items) == 0 {
 		return nil

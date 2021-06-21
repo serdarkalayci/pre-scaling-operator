@@ -663,6 +663,29 @@ func TestNamespaceGrouping(t *testing.T) {
 				"ns3": 2,
 			},
 		},
+		{
+			name: "TestOneNamespace",
+			args: args{
+				deploymentItems: []g.ScalingInfo{
+					{
+						Name:         "foons2",
+						Namespace:    "ns2",
+						ResourceList: map[corev1.ResourceName]resource.Quantity{},
+						SpecReplica:  3,
+					},
+				},
+			},
+			want: map[string]int{
+				"ns2": 1,
+			},
+		},
+		{
+			name: "TestNoItems",
+			args: args{
+				deploymentItems: []g.ScalingInfo{},
+			},
+			want: map[string]int{},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -682,3 +705,4 @@ func TestNamespaceGrouping(t *testing.T) {
 		})
 	}
 }
+

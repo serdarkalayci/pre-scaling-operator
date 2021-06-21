@@ -58,10 +58,10 @@ func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, na
 		return nil, false, errors.New("no opted-in scalingobjects found")
 	}
 
-	// Group the objects by namespace in order to decide how many to scale.
+	
 	scalingObjectGrouped := resources.GroupScalingItemByNamespace(scalingobjects)
 
-	overallNsInformation, err := resources.MakeScaleDecision(ctx, _client, scalingObjectGrouped, stateDefinitions, clusterState, dryRun)
+	overallNsInformation, err := resources.MakeNamespacesScaleDecisions(ctx, _client, scalingObjectGrouped, stateDefinitions, clusterState, dryRun)
 	if err != nil {
 		return nil, false, err
 	}
