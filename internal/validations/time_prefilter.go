@@ -12,7 +12,11 @@ import (
 func StartupFilter() predicate.Predicate {
 	return predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
-			return time.Since(constants.StartTime).Seconds() < 10
+			startTime := constants.StartTime
+			if time.Since(startTime).Seconds() < 10 {
+				return false
+			}
+			return true
 		},
 	}
 }

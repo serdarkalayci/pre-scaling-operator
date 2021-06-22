@@ -123,7 +123,7 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 			r.Recorder.Event(cssd, "Warning", "QuotaExceeded", fmt.Sprintf("Not enough available resources for the following %d namespaces: %s", len(eventsList), eventsList))
 		}
 
-		r.Recorder.Event(cssd, "Normal", "AppliedStates", fmt.Sprintf("The applied state for each of the %s namespaces is %s seconds", appliedStateNamespaceList, appliedStates))
+		r.Recorder.Event(cssd, "Normal", "AppliedStates", fmt.Sprintf("The applied state for each of the %s namespaces is %s ", appliedStateNamespaceList, appliedStates))
 		log.Info("Clusterscalingstatedefinition Reconciliation loop completed")
 
 	} else {
@@ -137,7 +137,7 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 	}
 
 	// Trigger again in order to catch resources which have been created or updated within the first 10 seconds of startup
-	if time.Since(constants.StartTime).Seconds() < 10 {
+	if time.Since(constants.StartTime).Seconds() < 12 {
 		log.Info("Startup complete. Retriggering ClusterScalingStateDefinitionController one more time")
 		return ctrl.Result{RequeueAfter: time.Second * c.RetriggerControllerSeconds}, nil
 	}

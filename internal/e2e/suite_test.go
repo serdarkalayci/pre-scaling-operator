@@ -146,6 +146,7 @@ var _ = BeforeSuite(func() {
 		}).SetupWithManager(k8sManager)
 		Expect(err).ToNot(HaveOccurred())
 	}
+	constants.StartTime = time.Now()
 
 	godotenv.Load("../../.env")
 	go func() {
