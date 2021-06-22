@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -30,6 +31,7 @@ import (
 
 	"github.com/containersol/prescale-operator/api/v1alpha1"
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
+	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/reconciler"
 	"github.com/containersol/prescale-operator/internal/states"
 )
@@ -88,28 +90,30 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 		return ctrl.Result{}, err
 	}
 	log.Info("Clusterscalingstatedefinition Controller: Reconciling namespaces")
-	for _, namespace := range namespaces.Items {
 
-		events, state, err := reconciler.ReconcileNamespace(ctx, r.Client, namespace.Name, clusterStateDefinitions, states.State{}, r.Recorder, cssd.Config.DryRun)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
+	nsInfos, retrigger, err := reconciler.PrepareForNamespaceReconcile(ctx, r.Client, "", clusterStateDefinitions, states.State{}, r.Recorder, cssd.Config.DryRun)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
+	if nsInfos == nil && !retrigger && err == nil {
+		return ctrl.Result{}, nil
+	}
+
+	// Loop over all the namespace events of the namespaces which have been reconciled
+	for namespaceKey, nsInfo := range nsInfos {
 		if !cssd.Config.DryRun {
 
-			if events.QuotaExceeded != "" {
-				eventsList = append(eventsList, events.QuotaExceeded)
+			if nsInfo.NSEvents.QuotaExceeded != "" {
+				eventsList = append(eventsList, nsInfo.NSEvents.QuotaExceeded)
 			}
 
-			appliedStateNamespaceList = append(appliedStateNamespaceList, namespace.Name)
-			appliedStates = append(appliedStates, state)
+			appliedStateNamespaceList = append(appliedStateNamespaceList, namespaceKey)
+			appliedStates = append(appliedStates, nsInfo.AppliedState)
 
 		} else {
-
-			dryRunCluster = dryRunCluster + events.DryRunInfo
-
+			dryRunCluster = dryRunCluster + nsInfo.NSEvents.DryRunInfo
 		}
-
 	}
 
 	if !cssd.Config.DryRun {
@@ -118,13 +122,17 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 			r.Recorder.Event(cssd, "Warning", "QuotaExceeded", fmt.Sprintf("Not enough available resources for the following %d namespaces: %s", len(eventsList), eventsList))
 		}
 
-		r.Recorder.Event(cssd, "Normal", "AppliedStates", fmt.Sprintf("The applied state for each of the %s namespaces is %s", appliedStateNamespaceList, appliedStates))
+		r.Recorder.Event(cssd, "Normal", "AppliedStates", fmt.Sprintf("The applied state for each of the %s namespaces is %s seconds", appliedStateNamespaceList, appliedStates))
 		log.Info("Clusterscalingstatedefinition Reconciliation loop completed")
 
 	} else {
 
 		r.Recorder.Event(cssd, "Normal", "DryRun", fmt.Sprintf("DryRun: %s", dryRunCluster))
 
+	}
+	if retrigger {
+		log.Info(fmt.Sprintf("Not all namespaces reconciled. Retriggering ClusterScalingStateDefinitionController in %d", c.RetriggerControllerSeconds))
+		return ctrl.Result{RequeueAfter: time.Second * c.RetriggerControllerSeconds}, nil
 	}
 
 	return ctrl.Result{}, nil

@@ -20,18 +20,18 @@ import (
 	"flag"
 	"os"
 
-	c "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/validations"
+	"github.com/joho/godotenv"
 	"github.com/robfig/cron"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-
+	constants "github.com/containersol/prescale-operator/internal"
 	dc "github.com/openshift/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -122,11 +122,11 @@ func main() {
 	}
 
 	//We need to identify if the operator is running on an Openshift cluster. If yes, we activate the deploymentconfig watcher
-	c.OpenshiftCluster, err = validations.ClusterCheck()
+	constants.OpenshiftCluster, err = validations.ClusterCheck()
 	if err != nil {
 		setupLog.Error(err, "unable to identify cluster")
 	}
-	if c.OpenshiftCluster {
+	if constants.OpenshiftCluster {
 		if err = (&controllers.DeploymentConfigWatcher{
 			Client:   mgr.GetClient(),
 			Log:      ctrl.Log.WithName("controllers").WithName("DeploymentConfigWatcher"),
@@ -152,6 +152,8 @@ func main() {
 		r.RectifyScaleItemsInFailureState(mgr.GetClient(), mgr.GetEventRecorderFor("clusterscalingstatedefinition-controller"))
 	})
 	z.Start()
+
+	godotenv.Load("./.env")
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

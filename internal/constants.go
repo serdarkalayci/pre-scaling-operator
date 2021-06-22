@@ -17,6 +17,10 @@ const (
 
 	//Key for the default replica annotation
 	DefaultReplicaAnnotation = "default"
+
+	EnvMaxConcurrentNamespaceReconciles = "MaxConcurrentNamespaceReconciles"
+
+	RetriggerControllerSeconds = 15
 )
 
 var (

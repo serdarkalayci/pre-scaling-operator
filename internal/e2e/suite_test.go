@@ -21,7 +21,8 @@ import (
 	"testing"
 	"time"
 
-	c "github.com/containersol/prescale-operator/internal"
+	constants "github.com/containersol/prescale-operator/internal"
+	"github.com/joho/godotenv"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	dc "github.com/openshift/api/apps/v1"
@@ -135,8 +136,8 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	//OpenshiftCluster, _ := validations.ClusterCheck()
-	c.OpenshiftCluster, err = validations.ClusterCheck()
-	if c.OpenshiftCluster {
+	constants.OpenshiftCluster, err = validations.ClusterCheck()
+	if constants.OpenshiftCluster {
 		err = (&controllers.DeploymentConfigWatcher{
 			Client:   k8sManager.GetClient(),
 			Log:      ctrl.Log.WithName("controllers").WithName("DeploymentConfigWatcher"),
@@ -146,6 +147,7 @@ var _ = BeforeSuite(func() {
 		Expect(err).ToNot(HaveOccurred())
 	}
 
+	godotenv.Load("../../.env")
 	go func() {
 		err = k8sManager.Start(ctrl.SetupSignalHandler())
 		Expect(err).ToNot(HaveOccurred())

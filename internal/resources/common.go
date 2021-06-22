@@ -3,15 +3,20 @@ package resources
 import (
 	"context"
 	"fmt"
+	"os"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
-	c "github.com/containersol/prescale-operator/internal"
+	constants "github.com/containersol/prescale-operator/internal"
+	"github.com/containersol/prescale-operator/internal/quotas"
 	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
 	"github.com/containersol/prescale-operator/internal/validations"
 	g "github.com/containersol/prescale-operator/pkg/utils/global"
 	"github.com/containersol/prescale-operator/pkg/utils/math"
+	"github.com/olekukonko/tablewriter"
 	ocv1 "github.com/openshift/api/apps/v1"
 	"github.com/prometheus/common/log"
 	v1 "k8s.io/api/apps/v1"
@@ -22,6 +27,29 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
+
+type NamespaceScaleInfo struct {
+	ScalingItems            []g.ScalingInfo
+	FinalNamespaceState     states.State
+	ScaleNameSpace          bool
+	StateError              error
+	ReplicaListError        error
+	ResourceQuotaCheckError error
+	NamespaceEvents         NamespaceEvents
+}
+
+type OverallNsInfo struct {
+	NSScaleInfo           map[string]NamespaceScaleInfo
+	NumberofNsBeingScaled int
+	NumberofNsToScale     int
+}
+
+type NamespaceEvents struct {
+	QuotaExceeded    string
+	ReconcileSuccess []string
+	ReconcileFailure []string
+	DryRunInfo       string
+}
 
 type ScaleError struct {
 	msg string
@@ -106,12 +134,11 @@ func StateReplicas(state states.State, deploymentItem g.ScalingInfo) (sr.StateRe
 	return stateReplica, nil
 }
 
-func StateReplicasList(state states.State, deployments []g.ScalingInfo) ([]sr.StateReplica, error) {
+func DetermineDesiredReplicas(state states.State, deployments []g.ScalingInfo) ([]g.ScalingInfo, error) {
 
-	var stateReplicaList []sr.StateReplica
 	var err error
 
-	for _, deploymentItem := range deployments {
+	for i, deploymentItem := range deployments {
 		log := ctrl.Log.
 			WithValues("deploymentItem", deploymentItem.Name).
 			WithValues("namespace", deploymentItem.Namespace)
@@ -120,23 +147,7 @@ func StateReplicasList(state states.State, deployments []g.ScalingInfo) ([]sr.St
 			log.WithValues("deploymentItem", deploymentItem.Name).
 				WithValues("namespace", deploymentItem.Namespace).
 				Error(err, "Cannot calculate state replicas. Please check deploymentItem annotations. Continuing.")
-			return []sr.StateReplica{}, err
-		}
-
-		optIn, err := OptinLabel(deploymentItem)
-		if err != nil {
-			if strings.Contains(err.Error(), c.LabelNotFound) {
-				return []sr.StateReplica{}, nil
-			}
-			log.Error(err, "Failed to validate the opt-in label")
-			return []sr.StateReplica{}, err
-		}
-
-		// Now we have all the state settings, we can set the replicas for the deploymentItem accordingly
-		if !optIn {
-			// the deploymentItem opted out. We need to set back to default.
-			log.Info("The deploymentItem opted out. Will scale back to default")
-			state.Name = c.DefaultReplicaAnnotation
+			continue
 		}
 
 		stateReplica, err := stateReplicas.GetState(state.Name)
@@ -145,20 +156,19 @@ func StateReplicasList(state states.State, deployments []g.ScalingInfo) ([]sr.St
 			// We will ignore any that are not set
 			log.WithValues("set states", stateReplicas).
 				WithValues("namespace state", state.Name).
-				Info("State could not be found")
-			return []sr.StateReplica{}, err
+				Info(fmt.Sprintf("State could not be found on scalingItem %s in namespace %s", deploymentItem.Name, deploymentItem.Namespace))
+			continue
 		}
-
-		stateReplicaList = append(stateReplicaList, stateReplica)
+		deployments[i].DesiredReplicas = stateReplica.Replicas
+		deployments[i].State = stateReplica.Name
 
 	}
 
-	return stateReplicaList, err
+	return deployments, err
 }
 
 // Main function to make scaling decisions. The step scaler scales 1 by 1 towards the desired replica count.
-func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem g.ScalingInfo, stateReplica sr.StateReplica, whereFrom string, recorder record.EventRecorder) error {
-
+func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem g.ScalingInfo, whereFrom string, recorder record.EventRecorder) error {
 	log := ctrl.Log.
 		WithValues("deploymentItem", deploymentItem.Name).
 		WithValues("namespace", deploymentItem.Namespace)
@@ -166,10 +176,10 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 
 	var oldReplicaCount int32
 	oldReplicaCount = deploymentItem.SpecReplica
-	desiredReplicaCount := stateReplica.Replicas
-
+	desiredReplicaCount := deploymentItem.DesiredReplicas
+	initialDesiredReplicaCount := deploymentItem.DesiredReplicas
 	// We need to skip this check in case of failure in order to get a new object from DoScaling() to check on the state on the cluster.
-	if oldReplicaCount == stateReplica.Replicas && !deploymentItem.Failure {
+	if oldReplicaCount == desiredReplicaCount && !deploymentItem.Failure {
 		log.Info("No Update on deploymentItem. Desired replica count already matches current.")
 		return nil
 	}
@@ -193,10 +203,6 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 
 			deploymentItem, _ = g.GetDenyList().GetDeploymentInfoFromList(deploymentItem)
 			desiredReplicaCount = deploymentItem.DesiredReplicas
-
-			if desiredReplicaCount == -1 {
-				desiredReplicaCount = stateReplica.Replicas
-			}
 
 			// Wait until deploymentItem is ready for the next step and check if it's failing for some reason
 			waitTime := time.Duration(time.Duration(deploymentItem.ProgressDeadline))*time.Second + time.Second
@@ -238,6 +244,10 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 
 			}
 
+			if desiredReplicaCount == -1 {
+				desiredReplicaCount = initialDesiredReplicaCount
+			}
+
 			oldReplicaCount = deploymentItem.SpecReplica
 
 			// decide if we need to step up or down
@@ -266,7 +276,7 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 			if retryErr != nil {
 				//log.Error(retryErr, "Unable to scale the deploymentItem, err: %v")
 				deploymentItem.IsBeingScaled = false
-				g.GetDenyList().SetScalingItemOnList(deploymentItem, true, retryErr.Error(), stateReplica.Replicas)
+				g.GetDenyList().SetScalingItemOnList(deploymentItem, true, retryErr.Error(), desiredReplicaCount)
 				RegisterEvents(ctx, _client, recorder, retryErr, deploymentItem)
 				return retryErr
 			}
@@ -279,7 +289,7 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 		if retryErr != nil {
 			//log.Error(retryErr, "Unable to scale the deploymentItem, err: %v")
 			deploymentItem.IsBeingScaled = false
-			g.GetDenyList().SetScalingItemOnList(deploymentItem, true, retryErr.Error(), stateReplica.Replicas)
+			g.GetDenyList().SetScalingItemOnList(deploymentItem, true, retryErr.Error(), desiredReplicaCount)
 			RegisterEvents(ctx, _client, recorder, retryErr, deploymentItem)
 			return retryErr
 		}
@@ -301,11 +311,11 @@ func LimitsNeeded(deploymentItem g.ScalingInfo, replicas int32) corev1.ResourceL
 	return math.Mul(math.ReplicaCalc(replicas, deploymentItem.SpecReplica), deploymentItem.ResourceList)
 }
 
-func LimitsNeededList(deployments []g.ScalingInfo, scaleReplicalist []sr.StateReplica) corev1.ResourceList {
+func LimitsNeededList(deployments []g.ScalingInfo) corev1.ResourceList {
 
 	var limitsneeded corev1.ResourceList
-	for i, deploymentItem := range deployments {
-		limitsneeded = math.Add(limitsneeded, math.Mul(math.ReplicaCalc(scaleReplicalist[i].Replicas, deploymentItem.SpecReplica), deploymentItem.ResourceList))
+	for _, deploymentItem := range deployments {
+		limitsneeded = math.Add(limitsneeded, math.Mul(math.ReplicaCalc(deploymentItem.DesiredReplicas, deploymentItem.SpecReplica), deploymentItem.ResourceList))
 	}
 	return limitsneeded
 }
@@ -348,20 +358,38 @@ func GetRefreshedScalingItem(ctx context.Context, _client client.Client, deploym
 }
 
 //DeploymentLister lists all deployments in a namespace
-func ScalingItemLister(ctx context.Context, _client client.Client, namespace string, OptInLabel map[string]string) ([]g.ScalingInfo, error) {
+func ScalingItemNamespaceLister(ctx context.Context, _client client.Client, namespace string, OptInLabel map[string]string) ([]g.ScalingInfo, error) {
 
 	returnList := []g.ScalingInfo{}
 	deployments := v1.DeploymentList{}
 	deploymentconfigs := ocv1.DeploymentConfigList{}
-	err := _client.List(ctx, &deployments, client.MatchingLabels(OptInLabel), client.InNamespace(namespace))
-	if err != nil {
-		return []g.ScalingInfo{}, err
-	}
 
-	if c.OpenshiftCluster {
-		err := _client.List(ctx, &deploymentconfigs, client.MatchingLabels(OptInLabel), client.InNamespace(namespace))
+	if namespace != "" {
+		err := _client.List(ctx, &deployments, client.MatchingLabels(OptInLabel), client.InNamespace(namespace))
 		if err != nil {
 			return []g.ScalingInfo{}, err
+		}
+	} else {
+		// List all deployments, clusterwide.
+		err := _client.List(ctx, &deployments, client.MatchingLabels(OptInLabel))
+		if err != nil {
+			return []g.ScalingInfo{}, err
+		}
+	}
+
+	if constants.OpenshiftCluster {
+
+		if namespace != "" {
+			err := _client.List(ctx, &deploymentconfigs, client.MatchingLabels(OptInLabel), client.InNamespace(namespace))
+			if err != nil {
+				return []g.ScalingInfo{}, err
+			}
+		} else {
+			// List all deploymentconfigs, clusterwide.
+			err := _client.List(ctx, &deploymentconfigs, client.MatchingLabels(OptInLabel))
+			if err != nil {
+				return []g.ScalingInfo{}, err
+			}
 		}
 	}
 
@@ -432,4 +460,191 @@ func RegisterEvents(ctx context.Context, _client client.Client, recorder record.
 
 	}
 
+}
+
+// Determines if the given namespaces need to be scaled or not. Determining factors are: final state, Resource quota checks, MaxConcurrentReconciles, and if they're already being scaled
+func MakeNamespacesScaleDecisions(ctx context.Context, _client client.Client, groupedNamespaces map[string][]g.ScalingInfo, stateDefinitions states.States, clusterState states.State, dryRun bool) (OverallNsInfo, error) {
+	log := ctrl.Log
+	nsInfoMap := make(map[string]NamespaceScaleInfo)
+	numberNsbeingScaled := 0
+	numberNsToScale := 0
+	var limitsneeded corev1.ResourceList
+
+	maxConcurrentNsReconcile, _ := strconv.Atoi(os.Getenv(constants.EnvMaxConcurrentNamespaceReconciles))
+
+	if maxConcurrentNsReconcile == 0 {
+		maxConcurrentNsReconcile = 1
+	}
+
+	for namespaceKey, scalingInfoList := range groupedNamespaces {
+		finalState, staterr := states.GetAppliedState(ctx, _client, namespaceKey, stateDefinitions, clusterState)
+		var finalLimitsCPU, finalLimitsMemory string
+		var nsEvents NamespaceEvents
+
+		if staterr != nil {
+			nsInfoMap[namespaceKey] = NamespaceScaleInfo{
+				ScalingItems:        scalingInfoList,
+				FinalNamespaceState: finalState,
+				ScaleNameSpace:      false,
+				StateError:          staterr,
+				ReplicaListError:    nil,
+			}
+			// Continue with this error instead of the potentially next one.
+			continue
+		}
+
+		scalingInfoList, replicalisterr := DetermineDesiredReplicas(finalState, scalingInfoList)
+
+		// Resource Quota Check //
+		//Here we calculate the resource limits we need from all deployments combined
+		limitsneeded = LimitsNeededList(scalingInfoList)
+
+		// After we have calculated the resources needed from all workloads in a given namespace, we can determine if the scaling should be allowed to go through
+		finalLimitsCPU, finalLimitsMemory, allowed, rqCheckErr := quotas.ResourceQuotaCheck(ctx, namespaceKey, limitsneeded)
+		if rqCheckErr != nil {
+			log.Error(rqCheckErr, "Cannot calculate the resource quotas")
+			putOnMap := NamespaceScaleInfo{
+				ScalingItems:            scalingInfoList,
+				FinalNamespaceState:     finalState,
+				ScaleNameSpace:          false,
+				StateError:              staterr,
+				ReplicaListError:        replicalisterr,
+				ResourceQuotaCheckError: rqCheckErr,
+				NamespaceEvents:         nsEvents,
+			}
+			nsInfoMap[namespaceKey] = putOnMap
+		}
+
+		if !allowed {
+			nsEvents.QuotaExceeded = namespaceKey
+		}
+
+		// Accumulate the dryrun information
+		if dryRun {
+			tableString := &strings.Builder{}
+			table := tablewriter.NewWriter(tableString)
+			table.SetHeader([]string{"Namespace", "Quotas enough", "Cpu left after scaling", "Memory left after scaling"})
+			table.Append([]string{namespaceKey, strconv.FormatBool(allowed), finalLimitsCPU, finalLimitsMemory})
+			table.Render()
+
+			nsEvents.DryRunInfo = tableString.String()
+
+			var applicationData [][]string
+			tableString = &strings.Builder{}
+			table = tablewriter.NewWriter(tableString)
+			table.SetHeader([]string{"Application", "Current replicas", "New state", "New replicas", "Rapid Scaling"})
+
+			for _, deployment := range scalingInfoList {
+
+				applicationData = append(applicationData, []string{deployment.Name, fmt.Sprint(deployment.ReadyReplicas), deployment.State, fmt.Sprint(deployment.DesiredReplicas), strconv.FormatBool(states.GetRapidScalingSetting(deployment))})
+
+			}
+
+			for _, v := range applicationData {
+				table.Append(v)
+			}
+
+			table.Render()
+
+			nsEvents.DryRunInfo = nsEvents.DryRunInfo + tableString.String()
+			putOnMap := NamespaceScaleInfo{
+				ScalingItems:            scalingInfoList,
+				FinalNamespaceState:     finalState,
+				ScaleNameSpace:          false,
+				StateError:              staterr,
+				ReplicaListError:        replicalisterr,
+				ResourceQuotaCheckError: rqCheckErr,
+				NamespaceEvents:         nsEvents,
+			}
+			nsInfoMap[namespaceKey] = putOnMap
+
+		} else if allowed {
+			scaleNameSpace := false
+			// Find out if we need to scale the namespace at all. (Desired != Current)
+			for _, item := range scalingInfoList {
+
+				itemFromList, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(item)
+				if notFoundErr == nil {
+					if itemFromList.DesiredReplicas != item.DesiredReplicas && g.GetDenyList().IsBeingScaled(itemFromList) {
+						// Intercept the (step)scaler here with the new DesiredReplicas
+						g.GetDenyList().SetScalingItemOnList(itemFromList, itemFromList.Failure, itemFromList.FailureMessage, item.DesiredReplicas)
+						log.WithValues("Name: ", itemFromList.Name).
+							WithValues("Namespace: ", itemFromList.Namespace).
+							WithValues("Object: ", itemFromList.ScalingItemType.ItemTypeName).
+							WithValues("DesiredReplica count on item: ", itemFromList.DesiredReplicas).
+							WithValues("New replica count:", item.DesiredReplicas).
+							WithValues("Failure: ", itemFromList.Failure).
+							WithValues("Failure message: ", itemFromList.FailureMessage).
+							Info("(From NSScaleDecision): Deployment is already being scaled at the moment. Updated desired replica count with new replica count")
+						continue
+					}
+				}
+				if item.SpecReplica != item.DesiredReplicas {
+					scaleNameSpace = true
+				}
+			}
+
+			if g.IsAnyBeingScaled(scalingInfoList) {
+				numberNsbeingScaled++
+			}
+
+			putOnMap := NamespaceScaleInfo{
+				ScalingItems:        scalingInfoList,
+				FinalNamespaceState: finalState,
+				ScaleNameSpace:      scaleNameSpace,
+				StateError:          staterr,
+				ReplicaListError:    replicalisterr,
+			}
+			nsInfoMap[namespaceKey] = putOnMap
+		}
+
+		// Figure out if we need to limit the number of namespaces to scale concurrently based on env var "MaxConcurrentNamespaceReconciles"
+		nsScaleBudget := maxConcurrentNsReconcile - numberNsbeingScaled
+		for namespaceKey, item := range nsInfoMap {
+			if item.ScaleNameSpace {
+				numberNsToScale++
+				nsScaleBudget--
+			}
+			if nsScaleBudget < 0 {
+				item.ScaleNameSpace = false
+				nsInfoMap[namespaceKey] = item
+			}
+		}
+	}
+
+	return OverallNsInfo{
+		NSScaleInfo:           nsInfoMap,
+		NumberofNsBeingScaled: numberNsbeingScaled,
+		NumberofNsToScale:     numberNsToScale,
+	}, nil
+}
+
+// Groups the given objects by their namespaces in a map. Returns the namespaces alphabetically
+func GroupScalingItemByNamespace(items []g.ScalingInfo) map[string][]g.ScalingInfo {
+	if len(items) == 0 {
+		return nil
+	}
+	sort.Slice(items[:], func(i, j int) bool {
+		return items[i].Namespace < items[j].Namespace
+	})
+
+	scalingObjectGrouped := make(map[string][]g.ScalingInfo)
+
+	var tempSclice []g.ScalingInfo
+	for i, item := range items {
+		namespace := item.Namespace
+		tempSclice = append(tempSclice, item)
+		if i != len(items)-1 {
+			if items[i+1].Namespace != namespace {
+				scalingObjectGrouped[namespace] = tempSclice
+				tempSclice = nil
+			}
+		} else {
+			// Put the last ns on
+			scalingObjectGrouped[namespace] = tempSclice
+		}
+
+	}
+
+	return scalingObjectGrouped
 }

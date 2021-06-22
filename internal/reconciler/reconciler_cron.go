@@ -30,7 +30,7 @@ func RectifyScaleItemsInFailureState(client client.Client, recorder record.Event
 		}
 
 		// We need to calculate the desired state before we try to reconcile the deployment
-		finalState, stateErr := GetAppliedState(context.TODO(), client, item.Namespace, stateDefinitions, states.State{})
+		finalState, stateErr := states.GetAppliedState(context.TODO(), client, item.Namespace, stateDefinitions, states.State{})
 		if stateErr != nil {
 			return stateErr
 		}

@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/containersol/prescale-operator/internal/reconciler"
-	"github.com/containersol/prescale-operator/internal/states"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -31,6 +29,8 @@ import (
 
 	"github.com/containersol/prescale-operator/api/v1alpha1"
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
+	"github.com/containersol/prescale-operator/internal/reconciler"
+	"github.com/containersol/prescale-operator/internal/states"
 )
 
 // ScalingStateReconciler reconciles a ScalingState object
@@ -78,25 +78,28 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	log.WithValues("Namespace", req.Namespace).
 		Info("Scalingstate Controller: Reconciling namespace")
-	events, state, err := reconciler.ReconcileNamespace(ctx, r.Client, req.Namespace, clusterStateDefinitions, states.State{}, r.Recorder, ss.Config.DryRun)
+
+	nsInfos, _, err := reconciler.PrepareForNamespaceReconcile(ctx, r.Client, req.Namespace, clusterStateDefinitions, states.State{}, r.Recorder, ss.Config.DryRun)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if !ss.Config.DryRun {
+	for _, nsInfo := range nsInfos {
+		if !ss.Config.DryRun {
 
-		if events.QuotaExceeded != "" {
-			r.Recorder.Event(ss, "Warning", "QuotaExceeded", fmt.Sprintf("Not enough available resources for namespace %s", events.QuotaExceeded))
+			if nsInfo.NSEvents.QuotaExceeded != "" {
+				r.Recorder.Event(ss, "Warning", "QuotaExceeded", fmt.Sprintf("Not enough available resources for namespace %s", nsInfo.NSEvents.QuotaExceeded))
+			}
+
+			r.Recorder.Event(ss, "Normal", "AppliedState", fmt.Sprintf("The applied state for this namespace is %s", nsInfo.AppliedState))
+
+			log.Info("Scalingstate Reconciliation loop completed successfully")
+
+		} else {
+
+			r.Recorder.Event(ss, "Normal", "DryRun", fmt.Sprintf("DryRun: %s", nsInfo.NSEvents.DryRunInfo))
+
 		}
-
-		r.Recorder.Event(ss, "Normal", "AppliedState", fmt.Sprintf("The applied state for this namespace is %s", state))
-
-		log.Info("Scalingstate Reconciliation loop completed successfully")
-
-	} else {
-
-		r.Recorder.Event(ss, "Normal", "DryRun", fmt.Sprintf("DryRun: %s", events.DryRunInfo))
-
 	}
 
 	return ctrl.Result{}, nil

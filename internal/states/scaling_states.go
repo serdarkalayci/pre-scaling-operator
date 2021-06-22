@@ -2,12 +2,14 @@ package states
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
 	"github.com/containersol/prescale-operator/pkg/utils/annotations"
 	g "github.com/containersol/prescale-operator/pkg/utils/global"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -136,4 +138,78 @@ func GetClusterScalingState(ctx context.Context, _client client.Client) (string,
 	}
 
 	return clusterScalingStates.Items[0].Spec.State, nil
+}
+
+func fetchClusterState(ctx context.Context, _client client.Client, stateDefinitions States) (State, error) {
+	clusterStateName, err := GetClusterScalingState(ctx, _client)
+	if err != nil {
+		switch err.(type) {
+		case NotFound:
+		case TooMany:
+			ctrl.Log.V(3).Info("Could not process cluster state, but continuing safely.")
+		default:
+			// For the moment, we cannot deal with any other error.
+			return State{}, errors.New("could not retrieve cluster states")
+		}
+	}
+	clusterState := State{}
+	if clusterStateName != "" {
+		err = stateDefinitions.FindState(clusterStateName, &clusterState)
+		if err != nil {
+			ctrl.Log.
+				V(3).
+				WithValues("state name", clusterStateName).
+				Error(err, "Could not find ClusterScalingState within ClusterStateDefinitions. Continuing without considering ClusterScalingState.")
+		}
+	}
+	return clusterState, nil
+}
+
+func fetchNameSpaceState(ctx context.Context, _client client.Client, stateDefinitions States, namespace string) (State, error) {
+	namespaceStateName, err := GetNamespaceScalingStateName(ctx, _client, namespace)
+	if err != nil {
+		switch err.(type) {
+		case NotFound:
+		case TooMany:
+			ctrl.Log.V(3).Info("Could not process namespaced state, but continuing safely.")
+		default:
+			return State{}, err
+		}
+	}
+	namespaceState := State{}
+	if namespaceStateName != "" {
+		err = stateDefinitions.FindState(namespaceStateName, &namespaceState)
+		if err != nil {
+			ctrl.Log.
+				V(3).
+				WithValues("state name", namespaceStateName).
+				Error(err, "Could not find ScalingState within ClusterStateDefinitions. Continuing without considering ScalingState.")
+		}
+	}
+	return namespaceState, nil
+}
+
+func GetAppliedState(ctx context.Context, _client client.Client, namespace string, stateDefinitions States, clusterState State) (State, error) {
+	// Here we allow overriding the cluster state by passing it in.
+	// This allows us to not recall the client when looping namespaces
+	if clusterState == (State{}) {
+		var err error
+		clusterState, err = fetchClusterState(ctx, _client, stateDefinitions)
+		if err != nil {
+			return State{}, err
+		}
+	}
+
+	// If we receive an error here, we cannot handle it and should return
+	namespaceState, err := fetchNameSpaceState(ctx, _client, stateDefinitions, namespace)
+	if err != nil {
+		return State{}, err
+	}
+
+	if namespaceState == (State{}) && clusterState == (State{}) {
+		return State{}, errors.New("no clusterstate or namespace state found!")
+	}
+
+	finalState := stateDefinitions.FindPriorityState(namespaceState, clusterState)
+	return finalState, nil
 }

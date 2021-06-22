@@ -3,7 +3,7 @@ package validations
 import (
 	"strings"
 
-	c "github.com/containersol/prescale-operator/internal"
+	constants "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/pkg/utils/client"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -17,9 +17,9 @@ func ClusterCheck() (bool, error) {
 	}
 
 	//We use the discovery client to identify the API resources of a given group and version
-	openshiftObjects, err := kubernetesclient.DiscoveryClient.ServerResourcesForGroupVersion(c.OpenshiftObjectGroup)
+	openshiftObjects, err := kubernetesclient.DiscoveryClient.ServerResourcesForGroupVersion(constants.OpenshiftObjectGroup)
 	if err != nil {
-		if strings.Contains(err.Error(), c.ResourceNotFound) {
+		if strings.Contains(err.Error(), constants.ResourceNotFound) {
 			return false, nil
 		}
 		return false, err
@@ -27,7 +27,7 @@ func ClusterCheck() (bool, error) {
 
 	// We enable the deploymentconfig watcher only if we verify that the deploymentconfig API resource exists in the API server
 	for resource := range openshiftObjects.APIResources {
-		if openshiftObjects.APIResources[resource].Kind == c.OpenshiftResources {
+		if openshiftObjects.APIResources[resource].Kind == constants.OpenshiftResources {
 			ctrl.Log.
 				WithValues("kind", openshiftObjects.APIResources[resource].Kind).
 				Info("Openshift resources found. Activating the Openshift objects watcher")

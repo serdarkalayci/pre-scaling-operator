@@ -25,6 +25,7 @@ type ScalingInfo struct {
 	SpecReplica      int32
 	ReadyReplicas    int32
 	DesiredReplicas  int32
+	State            string
 	ProgressDeadline int32
 	ResourceList     corev1.ResourceList
 	ConditionReason  string
@@ -188,6 +189,16 @@ func (cs *ConcurrentSlice) IsBeingScaled(item ScalingInfo) bool {
 		}
 	}
 	return result
+}
+
+func IsAnyBeingScaled(items []ScalingInfo) bool {
+
+	for _, item := range items {
+		if GetDenyList().IsBeingScaled(item) {
+			return true
+		}
+	}
+	return false
 }
 
 func (cs *ConcurrentSlice) SetScalingItemOnList(item ScalingInfo, failure bool, failureMessage string, desiredReplicas int32) ScalingInfo {

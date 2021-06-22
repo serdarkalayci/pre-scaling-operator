@@ -163,7 +163,6 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 						k8sClient.Get(context.Background(), key, &fetchedDeployment)
 						return fetchedDeployment.Status.ReadyReplicas
 					}, timeout, interval).Should(Equal(int32(expectedReplicas)))
-
 				}
 
 			},

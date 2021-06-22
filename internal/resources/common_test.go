@@ -43,7 +43,7 @@ func TestLister(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ScalingItemLister(tt.args.ctx, tt.args._client, tt.args.namespace, tt.args.OptInLabel)
+			got, err := ScalingItemNamespaceLister(tt.args.ctx, tt.args._client, tt.args.namespace, tt.args.OptInLabel)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DeploymentLister() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -405,14 +405,14 @@ func TestStateReplicasList(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    []sr.StateReplica
+		want    []g.ScalingInfo
 		wantErr bool
 	}{
 		{
 			name: "TestOptedOutDeployment",
 			args: args{
 				state: states.State{
-					Name: "foo",
+					Name: "default",
 				},
 				deploymentItems: []g.ScalingInfo{
 					{
@@ -445,14 +445,14 @@ func TestStateReplicasList(t *testing.T) {
 					},
 				},
 			},
-			want: []sr.StateReplica{
+			want: []g.ScalingInfo{
 				{
-					Name:     "default",
-					Replicas: 1,
+					State:           "default",
+					DesiredReplicas: 1,
 				},
 				{
-					Name:     "default",
-					Replicas: 3,
+					State:           "default",
+					DesiredReplicas: 3,
 				},
 			},
 			wantErr: false,
@@ -473,7 +473,7 @@ func TestStateReplicasList(t *testing.T) {
 						Failure:         false,
 						FailureMessage:  "",
 						ReadyReplicas:   1,
-						DesiredReplicas: 2,
+						DesiredReplicas: 1,
 					},
 					{
 						Name:            "foo2",
@@ -484,24 +484,39 @@ func TestStateReplicasList(t *testing.T) {
 						Failure:         false,
 						FailureMessage:  "",
 						ReadyReplicas:   1,
-						DesiredReplicas: 2,
+						DesiredReplicas: 1,
 					},
 				},
 			},
-			want:    []sr.StateReplica{},
-			wantErr: true,
+			want: []g.ScalingInfo{
+				{
+					State:           "",
+					DesiredReplicas: 1,
+				},
+				{
+					State:           "",
+					DesiredReplicas: 1,
+				},
+			},
+			wantErr: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := StateReplicasList(tt.args.state, tt.args.deploymentItems)
+			got, err := DetermineDesiredReplicas(tt.args.state, tt.args.deploymentItems)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("StateReplicasList() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DeploymentStateReplicasList() = %v, want %v", got, tt.want)
+			for i, itemGot := range got {
+				if itemGot.DesiredReplicas != tt.want[i].DesiredReplicas {
+					t.Errorf("DesiredReplicas not correct = %d, want %d", itemGot.DesiredReplicas, tt.want[i].DesiredReplicas)
+				}
+				if itemGot.State != tt.want[i].State {
+					t.Errorf("State is not correct = %s, want %s", itemGot.State, tt.want[i].State)
+				}
+
 			}
 		})
 	}
@@ -595,9 +610,113 @@ func TestLimitsNeededList(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := LimitsNeededList(tt.args.deploymentItems, tt.args.scaleReplicalist); !reflect.DeepEqual(got, tt.want) {
+			if got := LimitsNeededList(tt.args.deploymentItems); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("LimitsNeededDeploymentList() = %v, want %v", got, tt.want)
 			}
+		})
+	}
+}
+
+func TestNamespaceGrouping(t *testing.T) {
+	type args struct {
+		deploymentItems []g.ScalingInfo
+	}
+	tests := []struct {
+		name string
+		args args
+		want map[string]int
+	}{
+		{
+			name: "TestThreeNamespaces",
+			args: args{
+				deploymentItems: []g.ScalingInfo{
+					{
+						Name:         "foons2",
+						Namespace:    "ns2",
+						ResourceList: map[corev1.ResourceName]resource.Quantity{},
+						SpecReplica:  3,
+					},
+					{
+						Name:         "foons1",
+						Namespace:    "ns1",
+						ResourceList: map[corev1.ResourceName]resource.Quantity{},
+						SpecReplica:  3,
+					}, {
+						Name:         "barns3",
+						Namespace:    "ns3",
+						ResourceList: map[corev1.ResourceName]resource.Quantity{},
+						SpecReplica:  3,
+					},
+					{
+						Name:         "barns1",
+						Namespace:    "ns1",
+						ResourceList: map[corev1.ResourceName]resource.Quantity{},
+						SpecReplica:  3,
+					}, {
+						Name:         "bazns2",
+						Namespace:    "ns2",
+						ResourceList: map[corev1.ResourceName]resource.Quantity{},
+						SpecReplica:  3,
+					},
+					{
+						Name:         "barns2",
+						Namespace:    "ns2",
+						ResourceList: map[corev1.ResourceName]resource.Quantity{},
+						SpecReplica:  3,
+					},
+					{
+						Name:         "foons3",
+						Namespace:    "ns3",
+						ResourceList: map[corev1.ResourceName]resource.Quantity{},
+						SpecReplica:  3,
+					},
+				},
+			},
+			want: map[string]int{
+				"ns1": 2,
+				"ns2": 3,
+				"ns3": 2,
+			},
+		},
+		{
+			name: "TestOneNamespace",
+			args: args{
+				deploymentItems: []g.ScalingInfo{
+					{
+						Name:         "foons2",
+						Namespace:    "ns2",
+						ResourceList: map[corev1.ResourceName]resource.Quantity{},
+						SpecReplica:  3,
+					},
+				},
+			},
+			want: map[string]int{
+				"ns2": 1,
+			},
+		},
+		{
+			name: "TestNoItems",
+			args: args{
+				deploymentItems: []g.ScalingInfo{},
+			},
+			want: map[string]int{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := GroupScalingItemByNamespace(tt.args.deploymentItems)
+			for key := range got {
+				expectedCount := tt.want[key]
+				length := len(got[key])
+				if length == 0 {
+					t.Errorf("Couldn't find key %s", key)
+				}
+
+				if length != expectedCount {
+					t.Errorf("Not correct count of objects in the map for key %s", key)
+				}
+			}
+
 		})
 	}
 }
