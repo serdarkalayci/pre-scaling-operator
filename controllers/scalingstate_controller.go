@@ -31,6 +31,7 @@ import (
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
 	"github.com/containersol/prescale-operator/internal/reconciler"
 	"github.com/containersol/prescale-operator/internal/states"
+	"github.com/containersol/prescale-operator/internal/validations"
 )
 
 // ScalingStateReconciler reconciles a ScalingState object
@@ -109,6 +110,7 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 func (r *ScalingStateReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&scalingv1alpha1.ScalingState{}).
+		WithEventFilter(validations.StartupFilter()).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 1}).
 		Owns(&scalingv1alpha1.ClusterScalingState{}).
 		Complete(r)

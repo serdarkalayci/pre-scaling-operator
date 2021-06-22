@@ -88,6 +88,7 @@ func (r *DeploymentConfigWatcher) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&ocv1.DeploymentConfig{}).
 		WithEventFilter(validations.PreFilter(r.Recorder)).
+		WithEventFilter(validations.StartupFilter()).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 1}).
 		Complete(r)
 }
