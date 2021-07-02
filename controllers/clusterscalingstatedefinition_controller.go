@@ -32,6 +32,7 @@ import (
 	"github.com/containersol/prescale-operator/api/v1alpha1"
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
 	c "github.com/containersol/prescale-operator/internal"
+	constants "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/reconciler"
 	"github.com/containersol/prescale-operator/internal/states"
 )
@@ -122,7 +123,7 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 			r.Recorder.Event(cssd, "Warning", "QuotaExceeded", fmt.Sprintf("Not enough available resources for the following %d namespaces: %s", len(eventsList), eventsList))
 		}
 
-		r.Recorder.Event(cssd, "Normal", "AppliedStates", fmt.Sprintf("The applied state for each of the %s namespaces is %s seconds", appliedStateNamespaceList, appliedStates))
+		r.Recorder.Event(cssd, "Normal", "AppliedStates", fmt.Sprintf("The applied state for each of the %s namespaces is %s ", appliedStateNamespaceList, appliedStates))
 		log.Info("Clusterscalingstatedefinition Reconciliation loop completed")
 
 	} else {
@@ -132,6 +133,12 @@ func (r *ClusterScalingStateDefinitionReconciler) Reconcile(ctx context.Context,
 	}
 	if retrigger {
 		log.Info(fmt.Sprintf("Not all namespaces reconciled. Retriggering ClusterScalingStateDefinitionController in %d", c.RetriggerControllerSeconds))
+		return ctrl.Result{RequeueAfter: time.Second * c.RetriggerControllerSeconds}, nil
+	}
+
+	// Trigger again in order to catch resources which have been created or updated within the first 10 seconds of startup
+	if time.Since(constants.StartTime).Seconds() < 12 {
+		log.Info("Startup complete. Retriggering ClusterScalingStateDefinitionController one more time")
 		return ctrl.Result{RequeueAfter: time.Second * c.RetriggerControllerSeconds}, nil
 	}
 

@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"os"
+	"time"
 
 	"github.com/containersol/prescale-operator/internal/validations"
 	"github.com/joho/godotenv"
@@ -154,6 +155,8 @@ func main() {
 	z.Start()
 
 	godotenv.Load("./.env")
+
+	constants.StartTime = time.Now()
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

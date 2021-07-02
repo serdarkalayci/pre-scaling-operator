@@ -3,7 +3,9 @@ package validations
 import (
 	"fmt"
 	"reflect"
+	"time"
 
+	constants "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/pkg/utils/annotations"
 	g "github.com/containersol/prescale-operator/pkg/utils/global"
 	"github.com/containersol/prescale-operator/pkg/utils/labels"
@@ -81,6 +83,12 @@ func PreFilter(r record.EventRecorder) predicate.Predicate {
 
 		},
 		CreateFunc: func(e event.CreateEvent) bool {
+
+			uptime := time.Since(constants.StartTime)
+			if uptime.Seconds() < 5 {
+				return false
+			}
+
 			newlabels := e.Object.GetLabels()
 
 			newoptin := labels.GetLabelValue(newlabels, "scaler/opt-in")

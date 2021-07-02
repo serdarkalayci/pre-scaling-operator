@@ -1,8 +1,10 @@
 package internal
 
+import "time"
+
 const (
 	//LabelNotFound is the message for when the label doesn't exist in the application manifest
-	LabelNotFound = "Opt-in label was not found"
+	LabelNotFound = "opt-in label was not found"
 
 	RQNotFound = "No resource quotas found"
 
@@ -29,4 +31,6 @@ var (
 
 	//OpenshiftCluster is used to identify if the operator is running in an Openshift cluster
 	OpenshiftCluster bool
+
+	StartTime time.Time
 )
