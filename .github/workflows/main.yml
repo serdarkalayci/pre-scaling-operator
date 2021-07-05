@@ -15,7 +15,7 @@ env:
   DH_USER: ${{ secrets.DOCKERHUB_USER }}
   DH_TOKEN: ${{ secrets.DOCKERHUB_PASS }}
   OKD_GITHUB_TOKEN: ${{ secrets.OKD_GITHUB_TOKEN }}
-  CR_GCP: ${{ secrets.GCP_CREDENTIALS }}
+  CR_GCP: ${{ secrets.CR_GCP }}
   GKE_CLUSTER: ${{ secrets.GKE_CLUSTER }}
   GKE_LOCATION: ${{ secrets.GKE_LOCATION }}
   
