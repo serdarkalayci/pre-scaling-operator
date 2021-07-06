@@ -15,6 +15,10 @@ env:
   DH_USER: ${{ secrets.DOCKERHUB_USER }}
   DH_TOKEN: ${{ secrets.DOCKERHUB_PASS }}
   OKD_GITHUB_TOKEN: ${{ secrets.OKD_GITHUB_TOKEN }}
+  CR_GCP: ${{ secrets.CR_GCP }}
+  GKE_CLUSTER: ${{ secrets.GKE_CLUSTER }}
+  GKE_LOCATION: ${{ secrets.GKE_LOCATION }}
+  
 
 jobs:
   tests-and-build:
@@ -45,25 +49,21 @@ jobs:
           sudo mv /tmp/kubebuilder_2.3.1_${os}_${arch} /usr/local/kubebuilder
           export PATH=$PATH:/usr/local/kubebuilder/bin
 
-      - name: Installing Prerequisites (KinD Cluster)
-        uses: engineerd/setup-kind@v0.5.0
-        with:
-            version: "v0.7.0"
 
-      - name: Configuring and testing kind Installation
+      - id: get-credentials
+        uses: google-github-actions/get-gke-credentials@main
+        with:
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          location: ${{ env.GKE_LOCATION }}
+          credentials: ${{ env.CR_GCP }}
+
+      - name: Configuring and testing k8s
         run: |
-          kubectl cluster-info --context kind-kind
-          kind get kubeconfig --internal >$HOME/.kube/config
           kubectl get nodes
-          kubectl create ns e2e-tests
  
       - name: Run tests for Kubernetes
         run: |
           make test
-
-      - name: Deleting KinD cluster
-        if: ${{ always() }}
-        run: kind delete cluster
 
       - name: OKD Cluster login
         run: |

@@ -127,7 +127,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 					deployment = createDeployment(key, optinOld, casenumber)
 					Expect(k8sClient.Create(context.Background(), &deployment)).Should(Succeed())
 
-					time.Sleep(time.Second * 2)
+					time.Sleep(time.Second * 5)
 
 					Eventually(func() v1.Deployment {
 						k8sClient.Get(context.Background(), key, &fetchedDeployment)
