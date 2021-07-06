@@ -69,7 +69,7 @@ func isAllowed(rql *corev1.ResourceQuotaList, limitsneeded corev1.ResourceList) 
 
 	for _, rq := range rql.Items {
 		// we don't care about ResourceQuotas that contain persistentvolumeclaims or storageRequests
-		rq = sanitizeRQFromStorageAndPVC(rq)
+		rq = sanitizeRQ(rq)
 		if len(rq.Status.Hard) == 0 && len(rq.Status.Used) == 0 {
 			continue
 		}
@@ -111,18 +111,29 @@ func specificResourceQuotas(limits corev1.ResourceList) (string, string) {
 	return finalLimitsCPU.String(), finalLimitsMemory.String()
 }
 
-func sanitizeRQFromStorageAndPVC(rq corev1.ResourceQuota) corev1.ResourceQuota {
+func sanitizeRQ(rq corev1.ResourceQuota) corev1.ResourceQuota {
 	listHard := rq.Status.Hard
+	listUsed := rq.Status.Used
+
 	for key, _ := range listHard {
-		if key == "persistentvolumeclaims" || key == "requests.storage" {
+		switch key {
+		case "limits.cpu":
+		case "limits.memory":
+		case "requests.cpu":
+		case "requests.memory":
+		default:
 			delete(listHard, key)
 		}
 	}
 	rq.Status.Hard = listHard
 
-	listUsed := rq.Status.Used
 	for key, _ := range listUsed {
-		if key == "persistentvolumeclaims" || key == "requests.storage" {
+		switch key {
+		case "limits.cpu":
+		case "limits.memory":
+		case "requests.cpu":
+		case "requests.memory":
+		default:
 			delete(listUsed, key)
 		}
 	}
