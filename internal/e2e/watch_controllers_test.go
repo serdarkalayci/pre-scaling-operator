@@ -143,7 +143,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 					}
 
 					fetchedDeployment = changeOptIn(fetchedDeployment, optinNew)
-
+					time.Sleep(time.Second * 2)
 					// Update with the new changes
 					By("Then a deployment is updated")
 					Expect(k8sClient.Update(context.Background(), &fetchedDeployment)).Should(Succeed())
