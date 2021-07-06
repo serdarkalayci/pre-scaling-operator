@@ -60,7 +60,6 @@ jobs:
       - name: Configuring and testing k8s
         run: |
           kubectl get nodes
-          kubectl create ns e2e-tests
  
       - name: Run tests for Kubernetes
         run: |
