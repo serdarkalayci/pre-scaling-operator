@@ -55,7 +55,7 @@ jobs:
         with:
           cluster_name: ${{ env.GKE_CLUSTER }}
           location: ${{ env.GKE_LOCATION }}
-          credentials: ${{ env.CR_GCP }}
+          credentials: ${{ secrets.CR_GCP }}
 
       - name: Configuring and testing k8s
         run: |
