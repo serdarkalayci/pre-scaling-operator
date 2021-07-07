@@ -27,7 +27,7 @@ spec:
         - /manager
         args:
         - --leader-elect
-        image: andreas131989/pre-scaling-operator:2.0.1
+        image: containersol/pre-scaling-operator:ci
         name: manager
         securityContext:
           allowPrivilegeEscalation: false
