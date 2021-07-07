@@ -1,0 +1,273 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+    operators.operatorframework.io/builder: operator-sdk-v1.4.0
+    operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+  name: pre-scaling-operator.v0.0.1
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: ClusterScalingStateDefinition is the Schema for the clusterscalingstatedefinitions API
+      displayName: Cluster Scaling State Definition
+      kind: ClusterScalingStateDefinition
+      name: clusterscalingstatedefinitions.scaling.prescale.com
+      version: v1alpha1
+    - description: ClusterScalingState is the Schema for the clusterscalingstates API
+      displayName: Cluster Scaling State
+      kind: ClusterScalingState
+      name: clusterscalingstates.scaling.prescale.com
+      version: v1alpha1
+    - description: ScalingState is the Schema for the scalingstates API
+      displayName: Scaling State
+      kind: ScalingState
+      name: scalingstates.scaling.prescale.com
+      version: v1alpha1
+  description: An operator for significant scaling needs
+  displayName: containersol/pre-scaling-operator
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      clusterPermissions:
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - events
+          verbs:
+          - create
+          - patch
+        - apiGroups:
+          - ""
+          resources:
+          - namespaces
+          verbs:
+          - list
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - resourcequotas
+          verbs:
+          - list
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          verbs:
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps.openshift.io
+          resources:
+          - deploymentconfigs
+          verbs:
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - scaling.prescale.com
+          resources:
+          - clusterscalingstatedefinitions
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - scaling.prescale.com
+          resources:
+          - clusterscalingstatedefinitions/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - scaling.prescale.com
+          resources:
+          - clusterscalingstatedefinitions/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - scaling.prescale.com
+          resources:
+          - clusterscalingstates
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - scaling.prescale.com
+          resources:
+          - clusterscalingstates/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - scaling.prescale.com
+          resources:
+          - clusterscalingstates/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - scaling.prescale.com
+          resources:
+          - scalingstates
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - scaling.prescale.com
+          resources:
+          - scalingstates/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - scaling.prescale.com
+          resources:
+          - scalingstates/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - authentication.k8s.io
+          resources:
+          - tokenreviews
+          verbs:
+          - create
+        - apiGroups:
+          - authorization.k8s.io
+          resources:
+          - subjectaccessreviews
+          verbs:
+          - create
+        serviceAccountName: default
+      deployments:
+      - name: pre-scaling-operator-controller-manager
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              control-plane: controller-manager
+          strategy: {}
+          template:
+            metadata:
+              labels:
+                control-plane: controller-manager
+            spec:
+              containers:
+              - args:
+                - --secure-listen-address=0.0.0.0:8443
+                - --upstream=http://127.0.0.1:8080/
+                - --logtostderr=true
+                - --v=10
+                image: gcr.io/kubebuilder/kube-rbac-proxy:v0.5.0
+                name: kube-rbac-proxy
+                ports:
+                - containerPort: 8443
+                  name: https
+                resources: {}
+              - args:
+                - --health-probe-bind-address=:8081
+                - --metrics-bind-address=127.0.0.1:8080
+                - --leader-elect
+                command:
+                - /manager
+                env:
+                - name: MaxConcurrentNamespaceReconciles
+                  value: "2"
+                image: andreas131989/pre-scaling-operator:2.0.1
+                livenessProbe:
+                  httpGet:
+                    path: /healthz
+                    port: 8081
+                  initialDelaySeconds: 15
+                  periodSeconds: 20
+                name: manager
+                readinessProbe:
+                  httpGet:
+                    path: /readyz
+                    port: 8081
+                  initialDelaySeconds: 5
+                  periodSeconds: 10
+                resources:
+                  limits:
+                    cpu: 100m
+                    memory: 30Mi
+                  requests:
+                    cpu: 100m
+                    memory: 20Mi
+                securityContext:
+                  allowPrivilegeEscalation: false
+              terminationGracePeriodSeconds: 10
+      permissions:
+      - rules:
+        - apiGroups:
+          - ""
+          - coordination.k8s.io
+          resources:
+          - configmaps
+          - leases
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - ""
+          resources:
+          - events
+          verbs:
+          - create
+          - patch
+        serviceAccountName: default
+    strategy: deployment
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - kubernetes
+  links:
+  - name: Pre Scaling Operator
+    url: https://pre-scaling-operator.domain
+  maintainers:
+  - email: andreas131313@gmail.com
+    name: Andreas Krivas
+  maturity: alpha
+  provider:
+    name: Container Solutions
+  version: 0.0.1

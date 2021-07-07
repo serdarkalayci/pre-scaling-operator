@@ -1,0 +1,57 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+  name: pre-scaling-operator.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: ClusterScalingStateDefinition is the Schema for the clusterscalingstatedefinitions API
+      displayName: Cluster Scaling State Definition
+      kind: ClusterScalingStateDefinition
+      name: clusterscalingstatedefinitions.scaling.prescale.com
+      version: v1alpha1
+    - description: ClusterScalingState is the Schema for the clusterscalingstates API
+      displayName: Cluster Scaling State
+      kind: ClusterScalingState
+      name: clusterscalingstates.scaling.prescale.com
+      version: v1alpha1
+    - description: ScalingState is the Schema for the scalingstates API
+      displayName: Scaling State
+      kind: ScalingState
+      name: scalingstates.scaling.prescale.com
+      version: v1alpha1
+  description: An operator for significant scaling needs
+  displayName: containersol/pre-scaling-operator
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - kubernetes
+  links:
+  - name: Pre Scaling Operator
+    url: https://pre-scaling-operator.domain
+  maintainers:
+  - email: andreas131313@gmail.com
+    name: Andreas Krivas
+  maturity: alpha
+  provider:
+    name: Container Solutions
+  version: 0.0.0
