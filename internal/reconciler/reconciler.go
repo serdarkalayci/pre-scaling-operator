@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/containersol/prescale-operator/api/v1alpha1"
 	constants "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/quotas"
 	"github.com/containersol/prescale-operator/internal/resources"
@@ -123,13 +124,38 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 		WithValues("deploymentItem", scalingItem.Name).
 		WithValues("namespace", scalingItem.Namespace)
 
-	// Don't scale if we don't need to
-	if scalingItem.ReadyReplicas == scalingItem.DesiredReplicas && scalingItem.SpecReplica == scalingItem.DesiredReplicas {
-		return nil
+		// Get all necessary information
+	stateDefinitions, err := states.GetClusterScalingStates(ctx, _client)
+	if err != nil {
+		log.Error(err, "Failed to get ClusterStateDefinitions")
+		return err
 	}
+	namespaceState, nsStateErr := states.FetchNameSpaceState(ctx, _client, stateDefinitions, scalingItem.Namespace)
+	if err != nsStateErr {
+		return nsStateErr
+	}
+	// get all css
+	clusterScalingStates := v1alpha1.ClusterScalingStateList{}
+	cssErr := _client.List(ctx, &clusterScalingStates, &client.ListOptions{})
+	if cssErr != nil {
+		return cssErr
+	}
+
+	// The state and replica determination functions are using lists.
+	deploymentItems := []g.ScalingInfo{}
+	deploymentItems = append(deploymentItems, scalingItem)
+	deploymentItems = states.GetAppliedStatesOnItems(scalingItem.Namespace, namespaceState, clusterScalingStates, stateDefinitions, deploymentItems)
+	deploymentItems, _ = resources.DetermineDesiredReplicas(deploymentItems)
+
+	scalingItem = deploymentItems[0]
 
 	if scalingItem.DesiredReplicas == -1 {
 		return errors.New(fmt.Sprintf("Desired replica count could not be determined! State: %s | Class: %s ", scalingItem.State, scalingItem.ScalingClass))
+	}
+
+	// Don't scale if we don't need to
+	if scalingItem.ReadyReplicas == scalingItem.DesiredReplicas && scalingItem.SpecReplica == scalingItem.DesiredReplicas {
+		return nil
 	}
 
 	_, _, allowed, err := quotas.ResourceQuotaCheck(ctx, scalingItem.Namespace, resources.LimitsNeeded(scalingItem, scalingItem.DesiredReplicas))
