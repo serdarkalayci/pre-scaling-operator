@@ -26,8 +26,15 @@ func PreFilter(r record.EventRecorder) predicate.Predicate {
 			nameSpace := e.ObjectNew.GetNamespace()
 			var oldoptin, newoptin, replicaChange, annotationchange bool
 
-			oldoptin = labels.GetLabelValue(e.ObjectOld.GetLabels(), "scaler/opt-in")
-			newoptin = labels.GetLabelValue(e.ObjectNew.GetLabels(), "scaler/opt-in")
+			oldoptin = labels.GetLabelValueBool(e.ObjectOld.GetLabels(), "scaler/opt-in")
+			newoptin = labels.GetLabelValueBool(e.ObjectNew.GetLabels(), "scaler/opt-in")
+
+			// check if scalingclass has changed
+			oldclass := labels.GetLabelValueString(e.ObjectOld.GetLabels(), "scaler/scaling-class")
+			newclass := labels.GetLabelValueString(e.ObjectNew.GetLabels(), "scaler/scaling-class")
+			if !reflect.DeepEqual(oldclass, newclass) && newoptin {
+				return true
+			}
 
 			generateOptInLabelUpdateEvent(e, r, newoptin, oldoptin)
 
@@ -91,7 +98,7 @@ func PreFilter(r record.EventRecorder) predicate.Predicate {
 
 			newlabels := e.Object.GetLabels()
 
-			newoptin := labels.GetLabelValue(newlabels, "scaler/opt-in")
+			newoptin := labels.GetLabelValueBool(newlabels, "scaler/opt-in")
 			deploymentName := e.Object.GetName()
 
 			if newoptin {

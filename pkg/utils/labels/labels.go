@@ -4,7 +4,7 @@ import (
 	"strconv"
 )
 
-func GetLabelValue(labels map[string]string, optin string) bool {
+func GetLabelValueBool(labels map[string]string, optin string) bool {
 	var detect bool
 	if v, found := labels[optin]; found {
 
@@ -14,4 +14,11 @@ func GetLabelValue(labels map[string]string, optin string) bool {
 		}
 	}
 	return false
+}
+
+func GetLabelValueString(labels map[string]string, key string) string {
+	if v, found := labels[key]; found {
+		return v
+	}
+	return ""
 }

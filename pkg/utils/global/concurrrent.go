@@ -13,22 +13,29 @@ type ScalingItemType struct {
 	ItemTypeName string
 }
 
+type State struct {
+	Name     string
+	Priority int32
+}
+
 type ScalingInfo struct {
 	Namespace   string
 	Name        string
 	Annotations map[string]string
 	Labels      map[string]string
 	ScalingItemType
-	IsBeingScaled    bool
-	Failure          bool
-	FailureMessage   string
-	SpecReplica      int32
-	ReadyReplicas    int32
-	DesiredReplicas  int32
-	State            string
-	ProgressDeadline int32
-	ResourceList     corev1.ResourceList
-	ConditionReason  string
+	IsBeingScaled     bool
+	Failure           bool
+	FailureMessage    string
+	SpecReplica       int32
+	ReadyReplicas     int32
+	DesiredReplicas   int32
+	State             string
+	ClusterClassState State
+	ScalingClass      string
+	ProgressDeadline  int32
+	ResourceList      corev1.ResourceList
+	ConditionReason   string
 }
 
 // Global DenyList to check if the deployment is currently reconciles/step scaled

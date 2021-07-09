@@ -44,6 +44,8 @@ spec:
           spec:
             description: ClusterScalingStateSpec defines the desired state of ClusterScalingState
             properties:
+              scalingClass:
+                type: string
               state:
                 description: The State field represents the desired state for the
                   cluster

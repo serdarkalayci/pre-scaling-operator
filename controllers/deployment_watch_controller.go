@@ -15,6 +15,7 @@ package controllers
 import (
 	"context"
 
+	"github.com/containersol/prescale-operator/api/v1alpha1"
 	"github.com/containersol/prescale-operator/internal/reconciler"
 	"github.com/containersol/prescale-operator/internal/resources"
 	"github.com/containersol/prescale-operator/internal/states"
@@ -64,17 +65,27 @@ func (r *DeploymentWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "Failed to get ClusterStateDefinitions")
 		return ctrl.Result{}, err
 	}
-
-	// We need to calculate the desired state before we try to reconcile the deployment
-	finalState, err := states.GetAppliedState(ctx, r.Client, req.Namespace, stateDefinitions, states.State{})
-	if err != nil {
-		return ctrl.Result{}, err
+	namespaceState, nsStateErr := states.FetchNameSpaceState(ctx, r.Client, stateDefinitions, req.Namespace)
+	if err != nsStateErr {
+		return ctrl.Result{}, nsStateErr
 	}
+	// get all css
+	clusterScalingStates := v1alpha1.ClusterScalingStateList{}
+	cssErr := r.Client.List(ctx, &clusterScalingStates, &client.ListOptions{})
+	if cssErr != nil {
+		return ctrl.Result{}, cssErr
+	}
+
+	// The state and replica determination functions are using lists.
+	deploymentItems := []g.ScalingInfo{}
+	deploymentItems = append(deploymentItems, deploymentItem)
+	deploymentItems = states.GetAppliedStatesOnItems(deploymentItem.Namespace, namespaceState, clusterScalingStates, stateDefinitions, deploymentItems)
+	deploymentItems, _ = resources.DetermineDesiredReplicas(deploymentItems)
 
 	// After we have the deployment and state data, we are ready to reconcile the deployment
 	// Only reconcile if the item is not in a failure state. Failure states are only handled by RectifyScaleItemsInFailureState() in reconciler_cron.go
 	if !g.GetDenyList().IsDeploymentInFailureState(deploymentItem) {
-		go reconciler.ReconcileScalingItem(ctx, r.Client, deploymentItem, finalState, false, r.Recorder, "DEPLOYMENTWATCHCONTROLLER")
+		go reconciler.ReconcileScalingItem(ctx, r.Client, deploymentItems[0], false, r.Recorder, "DEPLOYMENTWATCHCONTROLLER")
 	}
 
 	log.Info("Deployment Reconciliation loop completed")

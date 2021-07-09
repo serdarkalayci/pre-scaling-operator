@@ -15,6 +15,7 @@ package controllers
 import (
 	"context"
 
+	"github.com/containersol/prescale-operator/api/v1alpha1"
 	"github.com/containersol/prescale-operator/internal/reconciler"
 	"github.com/containersol/prescale-operator/internal/states"
 	"github.com/containersol/prescale-operator/internal/validations"
@@ -65,17 +66,24 @@ func (r *DeploymentConfigWatcher) Reconcile(ctx context.Context, req ctrl.Reques
 		log.Error(err, "Failed to get ClusterStateDefinitions")
 		return ctrl.Result{}, err
 	}
-
-	// We need to calculate the desired state before we try to reconcile the deploymentconfig
-	finalState, err := states.GetAppliedState(ctx, r.Client, req.Namespace, stateDefinitions, states.State{})
-	if err != nil {
-		return ctrl.Result{}, err
+	namespaceState, nsStateErr := states.FetchNameSpaceState(ctx, r.Client, stateDefinitions, req.Namespace)
+	if err != nsStateErr {
+		return ctrl.Result{}, nsStateErr
 	}
+
+	// get all css
+	clusterScalingStates := v1alpha1.ClusterScalingStateList{}
+	cssErr := r.Client.List(ctx, &clusterScalingStates, &client.ListOptions{})
+	if cssErr != nil {
+		return ctrl.Result{}, cssErr
+	}
+
+	deploymentItem = states.GetAppliedStateAndClassOnItem(deploymentItem, namespaceState, clusterScalingStates, stateDefinitions)
 
 	// After we have the deploymentconfig and state data, we are ready to reconcile the deploymentconfig
 	// Only reconcile if the item is not in a failure state. Failure states are only handled by RectifyScaleItemsInFailureState() in reconciler_cron.go
 	if !g.GetDenyList().IsDeploymentInFailureState(deploymentItem) {
-		go reconciler.ReconcileScalingItem(ctx, r.Client, deploymentItem, finalState, false, r.Recorder, "DEPLOYMENTCONFIGCONTROLLLER")
+		go reconciler.ReconcileScalingItem(ctx, r.Client, deploymentItem, false, r.Recorder, "DEPLOYMENTCONFIGCONTROLLLER")
 	}
 
 	log.Info("Deploymentconfig Reconciliation loop completed")
