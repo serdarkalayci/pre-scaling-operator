@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/containersol/prescale-operator/api/v1alpha1"
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
 	constants "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/states"
@@ -191,6 +192,33 @@ func TestPrepareNamespaces(t *testing.T) {
 							ObjectMeta: metav1.ObjectMeta{
 								Name: "ns2",
 							},
+						},
+						&v1alpha1.ClusterScalingState{
+							TypeMeta: metav1.TypeMeta{
+								Kind:       "ClusterScalingState",
+								APIVersion: "scaling.prescale.com/v1alpha1",
+							},
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "clusterscalingstate-sample-bau",
+							},
+							Spec: v1alpha1.ClusterScalingStateSpec{
+								State: "bau",
+							},
+							Config: v1alpha1.ClusterScalingStateConfiguration{
+								DryRun: false,
+							},
+						}, &v1alpha1.ScalingState{
+							TypeMeta: metav1.TypeMeta{
+								Kind:       "ScalingState",
+								APIVersion: "scaling.prescale.com/v1alpha1",
+							},
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "product-scaling-state",
+								Namespace: "ns1",
+							},
+							Spec: scalingv1alpha1.ScalingStateSpec{
+								State: "peak",
+							},
 						}).
 					Build(),
 				namespace: "",
@@ -210,8 +238,8 @@ func TestPrepareNamespaces(t *testing.T) {
 				dryRun: false,
 			},
 			want: map[string]string{
-				"ns1": "bau",
-				"ns2": "bau",
+				"ns1": "peak",
+				"ns2": "",
 			},
 		},
 		{
@@ -260,7 +288,21 @@ func TestPrepareNamespaces(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "ns1",
 						}},
-					).
+						&v1alpha1.ClusterScalingState{
+							TypeMeta: metav1.TypeMeta{
+								Kind:       "ClusterScalingState",
+								APIVersion: "scaling.prescale.com/v1alpha1",
+							},
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "clusterscalingstate-sample-bau",
+							},
+							Spec: v1alpha1.ClusterScalingStateSpec{
+								State: "bau",
+							},
+							Config: v1alpha1.ClusterScalingStateConfiguration{
+								DryRun: false,
+							},
+						}).
 					Build(),
 				namespace: "",
 				stateDefinitions: states.States{
@@ -279,7 +321,83 @@ func TestPrepareNamespaces(t *testing.T) {
 				dryRun: false,
 			},
 			want: map[string]string{
-				"ns1": "bau",
+				"ns1": "",
+			},
+		},
+		{
+			name: "TestOneNameSpaceWithScalingStateOneDeployment",
+			args: args{
+				ctx: context.TODO(),
+				_client: fake.NewClientBuilder().
+					WithScheme(scheme.Scheme).
+					WithObjects(&v1.Deployment{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       "Deployment",
+							APIVersion: "apps/v1",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "test1",
+							Namespace: "ns1",
+							Annotations: map[string]string{
+								"scaler/state-bau-replicas":  "2",
+								"scaler/state-peak-replicas": "5"},
+							Labels: map[string]string{"scaler/opt-in": "true"},
+						},
+						Spec: v1.DeploymentSpec{
+							Replicas:                new(int32),
+							ProgressDeadlineSeconds: new(int32),
+						},
+						Status: v1.DeploymentStatus{},
+					}, &corev1.Namespace{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "ns1",
+						}},
+						&v1alpha1.ClusterScalingState{
+							TypeMeta: metav1.TypeMeta{
+								Kind:       "ClusterScalingState",
+								APIVersion: "scaling.prescale.com/v1alpha1",
+							},
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "clusterscalingstate-sample-bau",
+							},
+							Spec: v1alpha1.ClusterScalingStateSpec{
+								State: "bau",
+							},
+							Config: v1alpha1.ClusterScalingStateConfiguration{
+								DryRun: false,
+							},
+						}, &v1alpha1.ScalingState{
+							TypeMeta: metav1.TypeMeta{
+								Kind:       "ScalingState",
+								APIVersion: "scaling.prescale.com/v1alpha1",
+							},
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "product-scaling-state",
+								Namespace: "ns1",
+							},
+							Spec: scalingv1alpha1.ScalingStateSpec{
+								State: "peak",
+							},
+						}).
+					Build(),
+				namespace: "",
+				stateDefinitions: states.States{
+					states.State{
+						Name:     "peak",
+						Priority: 1,
+					}, {
+						Name:     "bau",
+						Priority: 5,
+					},
+				},
+				clusterState: states.State{
+					Name:     "bau",
+					Priority: 5,
+				},
+				dryRun: false,
+			},
+			want: map[string]string{
+				"ns1": "peak",
 			},
 		},
 		{
@@ -310,7 +428,21 @@ func TestPrepareNamespaces(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "ns1",
 						}},
-					).
+						&v1alpha1.ClusterScalingState{
+							TypeMeta: metav1.TypeMeta{
+								Kind:       "ClusterScalingState",
+								APIVersion: "scaling.prescale.com/v1alpha1",
+							},
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "clusterscalingstate-sample-bau",
+							},
+							Spec: v1alpha1.ClusterScalingStateSpec{
+								State: "bau",
+							},
+							Config: v1alpha1.ClusterScalingStateConfiguration{
+								DryRun: false,
+							},
+						}).
 					Build(),
 				namespace: "",
 				stateDefinitions: states.States{
@@ -329,7 +461,7 @@ func TestPrepareNamespaces(t *testing.T) {
 				dryRun: true,
 			},
 			want: map[string]string{
-				"ns1": "bau",
+				"ns1": "",
 			},
 		},
 	}
