@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -162,7 +163,16 @@ var _ = BeforeSuite(func() {
 
 }, 60)
 
-func CreateClusterScalingState(state string) v1alpha1.ClusterScalingState {
+func CreateClusterScalingState(casenumber int, state string, class string) v1alpha1.ClusterScalingState {
+
+	spec := v1alpha1.ClusterScalingStateSpec{}
+	if class != "" {
+		spec.State = state
+		spec.ScalingClass = class
+	} else {
+		spec.State = state
+	}
+	name := "clusterscalingstate-e2e-case-" + strconv.Itoa(casenumber) + "-" + state + "-" + class
 
 	scalingState := &v1alpha1.ClusterScalingState{
 		TypeMeta: metav1.TypeMeta{
@@ -170,11 +180,9 @@ func CreateClusterScalingState(state string) v1alpha1.ClusterScalingState {
 			APIVersion: "scaling.prescale.com/v1alpha1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "clusterscalingstate-sample",
+			Name: name,
 		},
-		Spec: v1alpha1.ClusterScalingStateSpec{
-			State: state,
-		},
+		Spec: spec,
 		Config: v1alpha1.ClusterScalingStateConfiguration{
 			DryRun: false,
 		},

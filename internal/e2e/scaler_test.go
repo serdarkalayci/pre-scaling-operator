@@ -39,7 +39,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 	BeforeEach(func() {
 
-		css = CreateClusterScalingState("bau")
+		css = CreateClusterScalingState(casenumber, "bau", "")
 
 		Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
 
