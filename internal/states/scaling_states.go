@@ -224,13 +224,19 @@ func GetAppliedStateOld(ctx context.Context, _client client.Client, namespace st
 func GetAppliedStatesOnItems(namespace string, namespaceState State, clusterScalingStates v1alpha1.ClusterScalingStateList, stateDefinitions States, items []g.ScalingInfo) []g.ScalingInfo {
 
 	for i, item := range items {
-		items[i] = GetAppliedStateAndClassOnItem(item, namespaceState, clusterScalingStates, stateDefinitions)
+		if (len(clusterScalingStates.Items) == 0 && namespaceState != State{}) {
+			items[i].State = namespaceState.Name
+		} else {
+			items[i] = GetAppliedStateAndClassOnItem(item, namespaceState, clusterScalingStates, stateDefinitions)
+
+		}
 	}
 
 	return items
 }
 
 func GetAppliedStateAndClassOnItem(item g.ScalingInfo, namespaceState State, clusterScalingStates v1alpha1.ClusterScalingStateList, stateDefinitions States) g.ScalingInfo {
+
 	item = GetAppliedClass(clusterScalingStates, stateDefinitions, item)
 	if !item.Failure {
 		item.State = stateDefinitions.FindPriorityState(namespaceState, State(item.ClusterClassState)).Name
@@ -288,6 +294,7 @@ func GetAppliedClass(clusterScalingStates v1alpha1.ClusterScalingStateList, stat
 }
 
 func FindScalingClassOnClusterScalingState(itemClass ScalingClass, clusterScalingStates v1alpha1.ClusterScalingStateList, stateDefinitions States) (ScalingClass, State, error) {
+
 	for _, css := range clusterScalingStates.Items {
 		cssClass := GetAppliedScalingClassFromClusterScalingState(css)
 
