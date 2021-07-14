@@ -172,6 +172,9 @@ func CreateClusterScalingState(casenumber int, state string, class string) v1alp
 	} else {
 		spec.State = state
 	}
+	if class == "" {
+		class = "default"
+	}
 	name := "clusterscalingstate-e2e-case-" + strconv.Itoa(casenumber) + "-" + state + "-" + class
 
 	scalingState := &v1alpha1.ClusterScalingState{
