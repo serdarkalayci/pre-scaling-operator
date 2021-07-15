@@ -84,7 +84,7 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 		// Wait until all potential wait-loops in the step scaler are finished.
 		time.Sleep(time.Second * 5)
 
-		if casenumber == 1 || casenumber == 6 {
+		if casenumber == 1 {
 			Expect(k8sClient.Delete(context.Background(), &css)).Should(Succeed())
 		} else if casenumber == 2 {
 			Expect(k8sClient.Delete(context.Background(), &ss)).Should(Succeed())
