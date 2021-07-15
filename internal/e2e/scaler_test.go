@@ -167,10 +167,10 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 			},
 
-			// table.Entry("CASE 1  | Should step scale from 0 up to 8 |  ", "UP", 8, false),
-			// table.Entry("CASE 2  | Should step scale from 8 down to 1 |  ", "DOWN", 1, false),
-			// table.Entry("CASE 3  | Should rapid scale from 0 up to 8 |  ", "UP", 8, true),
-			// table.Entry("CASE 4  | Should rapid scale from 8 down to 1 |  ", "DOWN", 1, true),
+				table.Entry("CASE 1  | Should step scale from 0 up to 8 |  ", "UP", 8, false),
+				table.Entry("CASE 2  | Should step scale from 8 down to 1 |  ", "DOWN", 1, false),
+				table.Entry("CASE 3  | Should rapid scale from 0 up to 8 |  ", "UP", 8, true),
+				table.Entry("CASE 4  | Should rapid scale from 8 down to 1 |  ", "DOWN", 1, true),
 			)
 		})
 	})
