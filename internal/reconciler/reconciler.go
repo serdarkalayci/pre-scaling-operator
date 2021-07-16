@@ -149,7 +149,11 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 	deploymentItems = states.GetAppliedStatesOnItems(scalingItem.Namespace, namespaceState, clusterScalingStates, stateDefinitions, deploymentItems)
 	deploymentItems, _ = resources.DetermineDesiredReplicas(deploymentItems)
 
-	scalingItem = deploymentItems[0]
+	if len(deploymentItems) == 0 {
+		return nil
+	} else {
+		scalingItem = deploymentItems[0]
+	}
 
 	if scalingItem.DesiredReplicas == -1 {
 		return errors.New(fmt.Sprintf("Desired replica count could not be determined! State: %s | Class: %s ", scalingItem.State, scalingItem.ScalingClass))
