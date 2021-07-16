@@ -136,7 +136,8 @@ func StateReplicas(state states.State, deploymentItem g.ScalingInfo) (sr.StateRe
 }
 
 func DetermineDesiredReplicas(items []g.ScalingInfo) ([]g.ScalingInfo, error) {
-
+	// only return the ones we need to scale.
+	returnList := []g.ScalingInfo{}
 	var err error
 
 	for i, item := range items {
@@ -157,19 +158,20 @@ func DetermineDesiredReplicas(items []g.ScalingInfo) ([]g.ScalingInfo, error) {
 			// We will ignore any that are not set
 			log.WithValues("set states", stateReplicas).
 				WithValues("state", item.State).
-				Info(fmt.Sprintf("State could not be found on scalingItem %s in namespace %s", item.Name, item.Namespace))
+				Info(fmt.Sprintf("State %s could not be found on scalingItem %s in namespace %s", item.State, item.Name, item.Namespace))
 			continue
 		}
+		items[i].State = stateReplica.Name
 		if items[i].Failure {
 			items[i].DesiredReplicas = items[i].SpecReplica
-		} else {
+		} else if items[i].SpecReplica != stateReplica.Replicas {
 			items[i].DesiredReplicas = stateReplica.Replicas
+			returnList = append(returnList, items[i])
 		}
-		items[i].State = stateReplica.Name
 
 	}
 
-	return items, err
+	return returnList, err
 }
 
 // Main function to make scaling decisions. The step scaler scales 1 by 1 towards the desired replica count.
@@ -507,6 +509,10 @@ func MakeNamespacesScaleDecisions(ctx context.Context, _client client.Client, gr
 
 		scalingInfoList, replicalisterr := DetermineDesiredReplicas(scalingInfoList)
 
+		// Nothing to reconcile in that namespace. continue with next one.
+		if len(scalingInfoList) == 0 {
+			continue
+		}
 		// Resource Quota Check //
 		//Here we calculate the resource limits we need from all deployments combined
 		limitsneeded = LimitsNeededList(scalingInfoList)

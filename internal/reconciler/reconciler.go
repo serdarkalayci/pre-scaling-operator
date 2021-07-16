@@ -71,11 +71,13 @@ func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, na
 			overallNsInformation.NumberofNsToScale--
 			ReconcileNamespace(ctx, _client, namespaceKey, overallNsInformation.NSScaleInfo[namespaceKey].ScalingItems, overallNsInformation.NSScaleInfo[namespaceKey].FinalNamespaceState, recorder, dryRun)
 		}
-		// Accumulate the information to return to the controller
+
 		nsInfoMap[namespaceKey] = NamespaceInfo{
 			NSEvents:     value.NamespaceEvents,
 			AppliedState: value.FinalNamespaceState.Name,
 		}
+
+		// Accumulate the information to return to the controller
 	}
 	if overallNsInformation.NumberofNsToScale > 0 {
 		reTrigger = true

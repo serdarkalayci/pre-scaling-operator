@@ -85,14 +85,16 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
+	if len(nsInfos) == 0 && ss.Config.DryRun {
+		r.Recorder.Event(ss, "Normal", "DryRun", "DryRun: No changes in any namespace would be made!")
+	}
+
 	for _, nsInfo := range nsInfos {
 		if !ss.Config.DryRun {
 
 			if nsInfo.NSEvents.QuotaExceeded != "" {
 				r.Recorder.Event(ss, "Warning", "QuotaExceeded", fmt.Sprintf("Not enough available resources for namespace %s", nsInfo.NSEvents.QuotaExceeded))
 			}
-
-			r.Recorder.Event(ss, "Normal", "AppliedState", fmt.Sprintf("The applied state for this namespace is %s", nsInfo.AppliedState))
 
 			log.Info("Scalingstate Reconciliation loop completed successfully")
 

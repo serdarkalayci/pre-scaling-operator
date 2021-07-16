@@ -119,13 +119,15 @@ func (r *ClusterScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.
 			r.Recorder.Event(css, "Warning", "QuotaExceeded", fmt.Sprintf("Not enough available resources for the following %d namespaces: %s", len(eventsList), eventsList))
 		}
 
-		r.Recorder.Event(css, "Normal", "AppliedStates", fmt.Sprintf("The applied state for each of the %s namespaces is %s", appliedStateNamespaceList, appliedStates))
-
 		log.Info("Clusterscalingstate Reconciliation loop completed successfully")
 
 	} else {
+		if dryRunCluster == "" {
+			r.Recorder.Event(css, "Normal", "DryRun", "DryRun: No changes in any namespace would be made!")
 
-		r.Recorder.Event(css, "Normal", "DryRun", fmt.Sprintf("DryRun: %s", dryRunCluster))
+		} else {
+			r.Recorder.Event(css, "Normal", "DryRun", fmt.Sprintf("DryRun: %s", dryRunCluster))
+		}
 
 	}
 	if retrigger {
