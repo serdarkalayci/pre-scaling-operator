@@ -164,7 +164,7 @@ func DetermineDesiredReplicas(items []g.ScalingInfo) ([]g.ScalingInfo, error) {
 		items[i].State = stateReplica.Name
 		if items[i].Failure {
 			items[i].DesiredReplicas = items[i].SpecReplica
-		} else if items[i].SpecReplica != stateReplica.Replicas {
+		} else if items[i].SpecReplica != stateReplica.Replicas || items[i].DesiredReplicas != stateReplica.Replicas {
 			items[i].DesiredReplicas = stateReplica.Replicas
 			returnList = append(returnList, items[i])
 		}
