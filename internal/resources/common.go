@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containersol/prescale-operator/api/v1alpha1"
 	constants "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/quotas"
 	sr "github.com/containersol/prescale-operator/internal/state_replicas"
@@ -134,37 +135,43 @@ func StateReplicas(state states.State, deploymentItem g.ScalingInfo) (sr.StateRe
 	return stateReplica, nil
 }
 
-func DetermineDesiredReplicas(state states.State, deployments []g.ScalingInfo) ([]g.ScalingInfo, error) {
-
+func DetermineDesiredReplicas(items []g.ScalingInfo) ([]g.ScalingInfo, error) {
+	// only return the ones we need to scale.
+	returnList := []g.ScalingInfo{}
 	var err error
 
-	for i, deploymentItem := range deployments {
+	for i, item := range items {
 		log := ctrl.Log.
-			WithValues("deploymentItem", deploymentItem.Name).
-			WithValues("namespace", deploymentItem.Namespace)
-		stateReplicas, err := sr.NewStateReplicasFromAnnotations(deploymentItem.Annotations)
+			WithValues("deploymentItem", item.Name).
+			WithValues("namespace", item.Namespace)
+		stateReplicas, err := sr.NewStateReplicasFromAnnotations(item.Annotations)
 		if err != nil {
-			log.WithValues("deploymentItem", deploymentItem.Name).
-				WithValues("namespace", deploymentItem.Namespace).
-				Error(err, "Cannot calculate state replicas. Please check deploymentItem annotations. Continuing.")
+			log.WithValues("item", item.Name).
+				WithValues("namespace", item.Namespace).
+				Error(err, "Cannot calculate state replicas. Please check item annotations. Continuing.")
 			continue
 		}
 
-		stateReplica, err := stateReplicas.GetState(state.Name)
+		stateReplica, err := stateReplicas.GetState(item.State)
 		if err != nil {
 			// TODO here we should do priority filtering, and go down one level of priority to find the lowest set one.
 			// We will ignore any that are not set
 			log.WithValues("set states", stateReplicas).
-				WithValues("namespace state", state.Name).
-				Info(fmt.Sprintf("State could not be found on scalingItem %s in namespace %s", deploymentItem.Name, deploymentItem.Namespace))
+				WithValues("state", item.State).
+				Info(fmt.Sprintf("State %s could not be found on scalingItem %s in namespace %s", item.State, item.Name, item.Namespace))
 			continue
 		}
-		deployments[i].DesiredReplicas = stateReplica.Replicas
-		deployments[i].State = stateReplica.Name
+		items[i].State = stateReplica.Name
+		if items[i].Failure {
+			items[i].DesiredReplicas = items[i].SpecReplica
+		} else if items[i].SpecReplica != stateReplica.Replicas || items[i].DesiredReplicas != stateReplica.Replicas {
+			items[i].DesiredReplicas = stateReplica.Replicas
+			returnList = append(returnList, items[i])
+		}
 
 	}
 
-	return deployments, err
+	return returnList, err
 }
 
 // Main function to make scaling decisions. The step scaler scales 1 by 1 towards the desired replica count.
@@ -475,26 +482,37 @@ func MakeNamespacesScaleDecisions(ctx context.Context, _client client.Client, gr
 	if maxConcurrentNsReconcile == 0 {
 		maxConcurrentNsReconcile = 1
 	}
+	// get all css
+	clusterScalingStates := v1alpha1.ClusterScalingStateList{}
+	err := _client.List(context.Background(), &clusterScalingStates, &client.ListOptions{})
+	if err != nil {
+		return OverallNsInfo{}, err
+	}
 
 	for namespaceKey, scalingInfoList := range groupedNamespaces {
-		finalState, staterr := states.GetAppliedState(ctx, _client, namespaceKey, stateDefinitions, clusterState)
-		var finalLimitsCPU, finalLimitsMemory string
-		var nsEvents NamespaceEvents
-
-		if staterr != nil {
+		namespaceState, nsStateErr := states.FetchNameSpaceState(ctx, _client, stateDefinitions, namespaceKey)
+		if nsStateErr != nil {
 			nsInfoMap[namespaceKey] = NamespaceScaleInfo{
 				ScalingItems:        scalingInfoList,
-				FinalNamespaceState: finalState,
+				FinalNamespaceState: namespaceState,
 				ScaleNameSpace:      false,
-				StateError:          staterr,
+				StateError:          nsStateErr,
 				ReplicaListError:    nil,
 			}
 			// Continue with this error instead of the potentially next one.
 			continue
 		}
 
-		scalingInfoList, replicalisterr := DetermineDesiredReplicas(finalState, scalingInfoList)
+		scalingInfoList := states.GetAppliedStatesOnItems(namespaceKey, namespaceState, clusterScalingStates, stateDefinitions, scalingInfoList)
+		var finalLimitsCPU, finalLimitsMemory string
+		var nsEvents NamespaceEvents
 
+		scalingInfoList, replicalisterr := DetermineDesiredReplicas(scalingInfoList)
+
+		// Nothing to reconcile in that namespace. continue with next one.
+		if len(scalingInfoList) == 0 {
+			continue
+		}
 		// Resource Quota Check //
 		//Here we calculate the resource limits we need from all deployments combined
 		limitsneeded = LimitsNeededList(scalingInfoList)
@@ -505,9 +523,9 @@ func MakeNamespacesScaleDecisions(ctx context.Context, _client client.Client, gr
 			log.Error(rqCheckErr, "Cannot calculate the resource quotas")
 			putOnMap := NamespaceScaleInfo{
 				ScalingItems:            scalingInfoList,
-				FinalNamespaceState:     finalState,
+				FinalNamespaceState:     namespaceState,
 				ScaleNameSpace:          false,
-				StateError:              staterr,
+				StateError:              nsStateErr,
 				ReplicaListError:        replicalisterr,
 				ResourceQuotaCheckError: rqCheckErr,
 				NamespaceEvents:         nsEvents,
@@ -549,9 +567,9 @@ func MakeNamespacesScaleDecisions(ctx context.Context, _client client.Client, gr
 			nsEvents.DryRunInfo = nsEvents.DryRunInfo + tableString.String()
 			putOnMap := NamespaceScaleInfo{
 				ScalingItems:            scalingInfoList,
-				FinalNamespaceState:     finalState,
+				FinalNamespaceState:     namespaceState,
 				ScaleNameSpace:          false,
-				StateError:              staterr,
+				StateError:              nsStateErr,
 				ReplicaListError:        replicalisterr,
 				ResourceQuotaCheckError: rqCheckErr,
 				NamespaceEvents:         nsEvents,
@@ -590,9 +608,9 @@ func MakeNamespacesScaleDecisions(ctx context.Context, _client client.Client, gr
 
 			putOnMap := NamespaceScaleInfo{
 				ScalingItems:        scalingInfoList,
-				FinalNamespaceState: finalState,
+				FinalNamespaceState: namespaceState,
 				ScaleNameSpace:      scaleNameSpace,
-				StateError:          staterr,
+				StateError:          nsStateErr,
 				ReplicaListError:    replicalisterr,
 			}
 			nsInfoMap[namespaceKey] = putOnMap

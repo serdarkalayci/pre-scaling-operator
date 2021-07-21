@@ -1,6 +1,8 @@
 package internal
 
-import "time"
+import (
+	"time"
+)
 
 const (
 	//LabelNotFound is the message for when the label doesn't exist in the application manifest
@@ -25,6 +27,10 @@ const (
 	RetriggerControllerSeconds = 15
 )
 
+type ScalingClass struct {
+	Name string
+}
+
 var (
 	//OptInLabel represents the label key and value for the opted-in applications
 	OptInLabel = map[string]string{"scaler/opt-in": "true"}
@@ -33,4 +39,8 @@ var (
 	OpenshiftCluster bool
 
 	StartTime time.Time
+
+	DefaultScalingClass = ScalingClass{
+		Name: "default",
+	}
 )

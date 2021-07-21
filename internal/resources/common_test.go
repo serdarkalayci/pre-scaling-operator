@@ -412,20 +412,21 @@ func TestStateReplicasList(t *testing.T) {
 			name: "TestOptedOutDeployment",
 			args: args{
 				state: states.State{
-					Name: "default",
+					Name: "test",
 				},
 				deploymentItems: []g.ScalingInfo{
 					{
 						Name:      "foo",
 						Namespace: "bar",
 						Annotations: map[string]string{
-							"scaler/state-foo-replicas":     "2",
-							"scaler/state-default-replicas": "1"},
+							"scaler/state-foo-replicas":  "2",
+							"scaler/state-test-replicas": "1"},
 						Labels:          map[string]string{"scaler/opt-in": "false"},
 						SpecReplica:     1,
 						ScalingItemType: g.ScalingItemType{ItemTypeName: "Deployment"},
 						Failure:         false,
 						FailureMessage:  "",
+						State:           "test",
 						ReadyReplicas:   1,
 						DesiredReplicas: 2,
 					},
@@ -433,13 +434,14 @@ func TestStateReplicasList(t *testing.T) {
 						Name:      "foo2",
 						Namespace: "bar2",
 						Annotations: map[string]string{
-							"scaler/state-foo-replicas":     "5",
-							"scaler/state-default-replicas": "3"},
+							"scaler/state-foo-replicas":  "5",
+							"scaler/state-test-replicas": "3"},
 						Labels:          map[string]string{"scaler/opt-in": "false"},
 						SpecReplica:     1,
 						ScalingItemType: g.ScalingItemType{ItemTypeName: "Deployment"},
 						Failure:         false,
 						FailureMessage:  "",
+						State:           "test",
 						ReadyReplicas:   1,
 						DesiredReplicas: 2,
 					},
@@ -447,11 +449,11 @@ func TestStateReplicasList(t *testing.T) {
 			},
 			want: []g.ScalingInfo{
 				{
-					State:           "default",
+					State:           "test",
 					DesiredReplicas: 1,
 				},
 				{
-					State:           "default",
+					State:           "test",
 					DesiredReplicas: 3,
 				},
 			},
@@ -504,7 +506,7 @@ func TestStateReplicasList(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := DetermineDesiredReplicas(tt.args.state, tt.args.deploymentItems)
+			got, err := DetermineDesiredReplicas(tt.args.deploymentItems)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("StateReplicasList() error = %v, wantErr %v", err, tt.wantErr)
 				return

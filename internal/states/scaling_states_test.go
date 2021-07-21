@@ -5,7 +5,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/containersol/prescale-operator/api/v1alpha1"
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
+	g "github.com/containersol/prescale-operator/pkg/utils/global"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -169,7 +171,7 @@ func TestGetAppliedState(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetAppliedState(tt.args.ctx, tt.args._client, tt.args.namespace, tt.args.stateDefinitions, tt.args.clusterState)
+			got, err := GetAppliedStateOld(tt.args.ctx, tt.args._client, tt.args.namespace, tt.args.stateDefinitions, tt.args.clusterState)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetAppliedState() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -214,7 +216,7 @@ func Test_fetchNameSpaceState(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := fetchNameSpaceState(tt.args.ctx, tt.args._client, tt.args.stateDefinitions, tt.args.namespace)
+			got, err := FetchNameSpaceState(tt.args.ctx, tt.args._client, tt.args.stateDefinitions, tt.args.namespace)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("fetchNameSpaceState() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -264,6 +266,117 @@ func Test_fetchClusterState(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("fetchClusterState() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetScalingClassFromLabelScalingItem(t *testing.T) {
+	type args struct {
+		deploymentItem g.ScalingInfo
+	}
+
+	tests := []struct {
+		name      string
+		args      args
+		wantClass ScalingClass
+	}{
+		{
+			name: "TestGetClassFound",
+			args: args{
+				deploymentItem: g.ScalingInfo{
+					Name:        "foo",
+					Namespace:   "bar",
+					Annotations: map[string]string{},
+					Labels: map[string]string{
+						"scaler/opt-in":        "false",
+						"scaler/scaling-class": "test"},
+					SpecReplica:     2,
+					ScalingItemType: g.ScalingItemType{ItemTypeName: "Deployment"},
+					Failure:         false,
+					FailureMessage:  "",
+					ReadyReplicas:   2,
+					DesiredReplicas: 4,
+				},
+			},
+			wantClass: ScalingClass{
+				Name: "test",
+			},
+		},
+		{
+			name: "TestGetClassNotFound",
+			args: args{
+				deploymentItem: g.ScalingInfo{
+					Name:            "foo",
+					Namespace:       "bar",
+					Annotations:     map[string]string{},
+					Labels:          map[string]string{"scaler/opt-in": "false"},
+					SpecReplica:     2,
+					ScalingItemType: g.ScalingItemType{ItemTypeName: "Deployment"},
+					Failure:         false,
+					FailureMessage:  "",
+					ReadyReplicas:   2,
+					DesiredReplicas: 4,
+				},
+			},
+			wantClass: ScalingClass{
+				Name: "default",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			class := GetAppliedScalingClassFromScalingItem(tt.args.deploymentItem)
+			if class != tt.wantClass {
+				t.Errorf("The returned class was not correct! Wanted %s Got %s", tt.wantClass.Name, class.Name)
+			}
+		})
+	}
+}
+
+func TestGetScalingClassFromClusterscalingstate(t *testing.T) {
+	type args struct {
+		css v1alpha1.ClusterScalingState
+	}
+
+	tests := []struct {
+		name      string
+		args      args
+		wantClass ScalingClass
+	}{
+		{
+			name: "TestGetClassFound",
+			args: args{
+				css: v1alpha1.ClusterScalingState{
+					Spec: v1alpha1.ClusterScalingStateSpec{
+						State:        "peak",
+						ScalingClass: "test",
+					},
+				},
+			},
+			wantClass: ScalingClass{
+				Name: "test",
+			},
+		},
+		{
+			name: "TestGetClassNotFound",
+			args: args{
+				css: v1alpha1.ClusterScalingState{
+					Spec: v1alpha1.ClusterScalingStateSpec{
+						State: "peak",
+					},
+				},
+			},
+			wantClass: ScalingClass{
+				Name: "default",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			class := GetAppliedScalingClassFromClusterScalingState(tt.args.css)
+			if class != tt.wantClass {
+				t.Errorf("The returned class was not correct! Wanted %s Got %s", tt.wantClass.Name, class.Name)
 			}
 		})
 	}

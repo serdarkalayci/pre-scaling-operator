@@ -3,7 +3,7 @@ package reconciler
 import (
 	"context"
 
-	com "github.com/containersol/prescale-operator/internal/resources"
+	"github.com/containersol/prescale-operator/api/v1alpha1"
 	"github.com/containersol/prescale-operator/internal/states"
 	g "github.com/containersol/prescale-operator/pkg/utils/global"
 	"k8s.io/client-go/tools/record"
@@ -15,48 +15,49 @@ func RectifyScaleItemsInFailureState(client client.Client, recorder record.Event
 
 	log := ctrl.Log
 	for inList := range g.GetDenyList().IterOverItemsInFailureState() {
-		item := inList.Value
-		log.WithValues("Name", item.Name).
-			WithValues("Namespace", item.Namespace).
-			WithValues("IsDeploymentconfig", item.ScalingItemType).
-			WithValues("Failure", item.Failure).
-			WithValues("Failure Message", item.FailureMessage).
+		deploymentItem := inList.Value
+		log.WithValues("Name", deploymentItem.Name).
+			WithValues("Namespace", deploymentItem.Namespace).
+			WithValues("IsDeploymentconfig", deploymentItem.ScalingItemType).
+			WithValues("Failure", deploymentItem.Failure).
+			WithValues("Failure Message", deploymentItem.FailureMessage).
 			Info("Trying to rectify ScaleItem in failure state")
 
-		stateDefinitions, stateDefErr := states.GetClusterScalingStates(context.TODO(), client)
-		if stateDefErr != nil {
-			log.Error(stateDefErr, "Failed to get ClusterStateDefinitions")
-			return stateDefErr
-		}
-
-		// We need to calculate the desired state before we try to reconcile the deployment
-		finalState, stateErr := states.GetAppliedState(context.TODO(), client, item.Namespace, stateDefinitions, states.State{})
-		if stateErr != nil {
-			return stateErr
-		}
-		// Get a new item and put it in failure mode.
-		item, getErr := com.GetRefreshedScalingItemSetError(context.TODO(), client, item, true)
-		if getErr != nil {
-			g.GetDenyList().RemoveFromList(item)
-			log.Info("Not rectifying, the item doesn't exist anymore on the cluster!")
-			continue
-		}
-
-		err := ReconcileScalingItem(context.TODO(), client, item, finalState, true, recorder, "CRONJOB")
+		//We are certain that we have an object to reconcile, we need to get the state definitions
+		stateDefinitions, err := states.GetClusterScalingStates(context.TODO(), client)
 		if err != nil {
-			log.WithValues("Deployment", item.Name).
-				WithValues("Namespace", item.Namespace).
-				WithValues("IsDeploymentConfig", item.ScalingItemType).
-				WithValues("Failure", item.Failure).
-				WithValues("Failuremessage", item.FailureMessage).
-				Error(err, "Failed to rectify the Failure state for the ScalingItem!")
+			log.Error(err, "Failed to get ClusterStateDefinitions")
+			return err
+		}
+		namespaceState, nsStateErr := states.FetchNameSpaceState(context.TODO(), client, stateDefinitions, inList.Value.Namespace)
+		if err != nsStateErr {
+			return nsStateErr
+		}
+
+		// get all css
+		clusterScalingStates := v1alpha1.ClusterScalingStateList{}
+		cssErr := client.List(context.TODO(), &clusterScalingStates)
+		if cssErr != nil {
+			return cssErr
+		}
+
+		deploymentItem = states.GetAppliedStateAndClassOnItem(deploymentItem, namespaceState, clusterScalingStates, stateDefinitions)
+
+		reconcileErr := ReconcileScalingItem(context.TODO(), client, deploymentItem, true, recorder, "CRONJOB")
+		if reconcileErr != nil {
+			log.WithValues("Deployment", deploymentItem.Name).
+				WithValues("Namespace", deploymentItem.Namespace).
+				WithValues("IsDeploymentConfig", deploymentItem.ScalingItemType).
+				WithValues("Failure", deploymentItem.Failure).
+				WithValues("Failuremessage", deploymentItem.FailureMessage).
+				Error(reconcileErr, "Failed to rectify the Failure state for the ScalingItem!")
 		} else {
 			// Succesfully rectified. Remove from failure state
-			g.GetDenyList().RemoveFromList(item)
-			log.WithValues("Deployment", item.Name).
-				WithValues("Namespace", item.Namespace).
-				WithValues("IsDeploymentConfig", item.ScalingItemType).
-				WithValues("DesiredReplicas", item.DesiredReplicas).
+			g.GetDenyList().RemoveFromList(deploymentItem)
+			log.WithValues("Deployment", deploymentItem.Name).
+				WithValues("Namespace", deploymentItem.Namespace).
+				WithValues("IsDeploymentConfig", deploymentItem.ScalingItemType).
+				WithValues("DesiredReplicas", deploymentItem.DesiredReplicas).
 				Info("Successfully rectified the failing ScalingItem!")
 		}
 	}

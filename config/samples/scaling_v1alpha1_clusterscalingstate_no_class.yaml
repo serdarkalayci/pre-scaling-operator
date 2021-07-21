@@ -1,10 +1,9 @@
 apiVersion: scaling.prescale.com/v1alpha1
 kind: ClusterScalingState
 metadata:
-  name: clusterscalingstate-sample-test
+  name: clusterscalingstate-sample
 spec:
   # Add fields here
   state: bau
-  scalingClass: test
 config:
   dryRun: false

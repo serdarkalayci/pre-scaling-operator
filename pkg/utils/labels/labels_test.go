@@ -26,9 +26,9 @@ func TestOptInLabelRetrievalFromLabelsMap(t *testing.T) {
 		"something": "else",
 	}
 
-	gotPresentTrue := labels.GetLabelValue(labelPresentTrue, key)
-	gotPresentFalse := labels.GetLabelValue(labelPresentFalse, key)
-	gotNotPresent := labels.GetLabelValue(labelNotPresent, key)
+	gotPresentTrue := labels.GetLabelValueBool(labelPresentTrue, key)
+	gotPresentFalse := labels.GetLabelValueBool(labelPresentFalse, key)
+	gotNotPresent := labels.GetLabelValueBool(labelNotPresent, key)
 
 	if !gotPresentTrue {
 		t.Errorf("The label should be true as the label is present!")

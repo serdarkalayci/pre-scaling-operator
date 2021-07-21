@@ -17,7 +17,6 @@ import (
 
 	"github.com/containersol/prescale-operator/internal/reconciler"
 	"github.com/containersol/prescale-operator/internal/resources"
-	"github.com/containersol/prescale-operator/internal/states"
 	"github.com/containersol/prescale-operator/internal/validations"
 	g "github.com/containersol/prescale-operator/pkg/utils/global"
 
@@ -58,23 +57,10 @@ func (r *DeploymentWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	deploymentItem := g.ConvertDeploymentToItem(deployment)
 
-	// We are certain that we have an object to reconcile, we need to get the state definitions
-	stateDefinitions, err := states.GetClusterScalingStates(ctx, r.Client)
-	if err != nil {
-		log.Error(err, "Failed to get ClusterStateDefinitions")
-		return ctrl.Result{}, err
-	}
-
-	// We need to calculate the desired state before we try to reconcile the deployment
-	finalState, err := states.GetAppliedState(ctx, r.Client, req.Namespace, stateDefinitions, states.State{})
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
 	// After we have the deployment and state data, we are ready to reconcile the deployment
 	// Only reconcile if the item is not in a failure state. Failure states are only handled by RectifyScaleItemsInFailureState() in reconciler_cron.go
 	if !g.GetDenyList().IsDeploymentInFailureState(deploymentItem) {
-		go reconciler.ReconcileScalingItem(ctx, r.Client, deploymentItem, finalState, false, r.Recorder, "DEPLOYMENTWATCHCONTROLLER")
+		go reconciler.ReconcileScalingItem(ctx, r.Client, deploymentItem, false, r.Recorder, "DEPLOYMENTWATCHCONTROLLER")
 	}
 
 	log.Info("Deployment Reconciliation loop completed")

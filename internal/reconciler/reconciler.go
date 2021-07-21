@@ -2,8 +2,10 @@ package reconciler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/containersol/prescale-operator/api/v1alpha1"
 	constants "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/quotas"
 	"github.com/containersol/prescale-operator/internal/resources"
@@ -69,11 +71,13 @@ func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, na
 			overallNsInformation.NumberofNsToScale--
 			ReconcileNamespace(ctx, _client, namespaceKey, overallNsInformation.NSScaleInfo[namespaceKey].ScalingItems, overallNsInformation.NSScaleInfo[namespaceKey].FinalNamespaceState, recorder, dryRun)
 		}
-		// Accumulate the information to return to the controller
+
 		nsInfoMap[namespaceKey] = NamespaceInfo{
 			NSEvents:     value.NamespaceEvents,
 			AppliedState: value.FinalNamespaceState.Name,
 		}
+
+		// Accumulate the information to return to the controller
 	}
 	if overallNsInformation.NumberofNsToScale > 0 {
 		reTrigger = true
@@ -91,7 +95,7 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 
 	for _, scalingItem := range scalingItems {
 		// Don't scale if we don't need to
-		if scalingItem.SpecReplica == scalingItem.DesiredReplicas {
+		if scalingItem.SpecReplica == scalingItem.DesiredReplicas || scalingItem.DesiredReplicas == -1 {
 			continue
 		}
 
@@ -117,46 +121,72 @@ func ReconcileNamespace(ctx context.Context, _client client.Client, namespace st
 	}
 }
 
-func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingItem g.ScalingInfo, state states.State, forceReconcile bool, recorder record.EventRecorder, whereFromScalingItem string) error {
+func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingItem g.ScalingInfo, forceReconcile bool, recorder record.EventRecorder, whereFromScalingItem string) error {
 	log := ctrl.Log.
 		WithValues("deploymentItem", scalingItem.Name).
 		WithValues("namespace", scalingItem.Namespace)
 
-	stateReplica, err := resources.StateReplicas(state, scalingItem)
+		// Get all necessary information
+	stateDefinitions, err := states.GetClusterScalingStates(ctx, _client)
 	if err != nil {
-		log.Error(err, "Error getting the state replicas")
+		log.Error(err, "Failed to get ClusterStateDefinitions")
 		return err
+	}
+	namespaceState, nsStateErr := states.FetchNameSpaceState(ctx, _client, stateDefinitions, scalingItem.Namespace)
+	if err != nsStateErr {
+		return nsStateErr
+	}
+	// get all css
+	clusterScalingStates := v1alpha1.ClusterScalingStateList{}
+	cssErr := _client.List(ctx, &clusterScalingStates, &client.ListOptions{})
+	if cssErr != nil {
+		return cssErr
+	}
+
+	// The state and replica determination functions are using lists.
+	deploymentItems := []g.ScalingInfo{}
+	deploymentItems = append(deploymentItems, scalingItem)
+	deploymentItems = states.GetAppliedStatesOnItems(scalingItem.Namespace, namespaceState, clusterScalingStates, stateDefinitions, deploymentItems)
+	deploymentItems, _ = resources.DetermineDesiredReplicas(deploymentItems)
+
+	if len(deploymentItems) == 0 {
+		return nil
+	} else {
+		scalingItem = deploymentItems[0]
+	}
+
+	if scalingItem.DesiredReplicas == -1 {
+		return errors.New(fmt.Sprintf("Desired replica count could not be determined! State: %s | Class: %s ", scalingItem.State, scalingItem.ScalingClass))
 	}
 
 	// Don't scale if we don't need to
-	if scalingItem.ReadyReplicas == stateReplica.Replicas && scalingItem.SpecReplica == stateReplica.Replicas {
+	if scalingItem.ReadyReplicas == scalingItem.DesiredReplicas && scalingItem.SpecReplica == scalingItem.DesiredReplicas {
 		return nil
 	}
 
-	_, _, allowed, err := quotas.ResourceQuotaCheck(ctx, scalingItem.Namespace, resources.LimitsNeeded(scalingItem, stateReplica.Replicas))
+	_, _, allowed, err := quotas.ResourceQuotaCheck(ctx, scalingItem.Namespace, resources.LimitsNeeded(scalingItem, scalingItem.DesiredReplicas))
 	if err != nil {
 		log.Error(err, "Cannot calculate the resource quotas")
 		return err
 	}
 
 	if allowed {
-		scalingItem, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(scalingItem)
+		scalingItemNew, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(scalingItem)
 		if notFoundErr == nil {
-			if scalingItem.DesiredReplicas != stateReplica.Replicas {
-				g.GetDenyList().SetScalingItemOnList(scalingItem, scalingItem.Failure, scalingItem.FailureMessage, stateReplica.Replicas)
+			if scalingItemNew.DesiredReplicas != scalingItem.DesiredReplicas {
+				g.GetDenyList().SetScalingItemOnList(scalingItemNew, scalingItemNew.Failure, scalingItemNew.FailureMessage, scalingItemNew.DesiredReplicas)
 
-				log.WithValues("Name: ", scalingItem.Name).
-					WithValues("Namespace: ", scalingItem.Namespace).
-					WithValues("Object: ", scalingItem.ScalingItemType.ItemTypeName).
-					WithValues("DesiredReplicacount on item: ", scalingItem.DesiredReplicas).
-					WithValues("New replica count:", stateReplica.Replicas).
-					WithValues("Failure: ", scalingItem.Failure).
-					WithValues("Failure message: ", scalingItem.FailureMessage).
+				log.WithValues("Name: ", scalingItemNew.Name).
+					WithValues("Namespace: ", scalingItemNew.Namespace).
+					WithValues("Object: ", scalingItemNew.ScalingItemType.ItemTypeName).
+					WithValues("DesiredReplicacount on item: ", scalingItemNew.DesiredReplicas).
+					WithValues("New desired replica count:", scalingItem.DesiredReplicas).
+					WithValues("Failure: ", scalingItemNew.Failure).
+					WithValues("Failure message: ", scalingItemNew.FailureMessage).
 					Info("Deployment is already being scaled at the moment. Updated desired replica count with new replica count")
 			}
 		} else {
-			scalingItem.DesiredReplicas = stateReplica.Replicas
-			err = resources.ScaleOrStepScale(ctx, _client, scalingItem, "deployScaler", recorder)
+			err = resources.ScaleOrStepScale(ctx, _client, scalingItemNew, "deployScaler", recorder)
 			if err != nil {
 				log.Error(err, "Error scaling object!")
 			}

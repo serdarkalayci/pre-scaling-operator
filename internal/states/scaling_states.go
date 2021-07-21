@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 
+	"github.com/containersol/prescale-operator/api/v1alpha1"
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
 	"github.com/containersol/prescale-operator/pkg/utils/annotations"
 	g "github.com/containersol/prescale-operator/pkg/utils/global"
@@ -140,6 +142,11 @@ func GetClusterScalingState(ctx context.Context, _client client.Client) (string,
 	return clusterScalingStates.Items[0].Spec.State, nil
 }
 
+func GetClusterScalingStateNew(css v1alpha1.ClusterScalingState) string {
+	return css.Spec.State
+
+}
+
 func fetchClusterState(ctx context.Context, _client client.Client, stateDefinitions States) (State, error) {
 	clusterStateName, err := GetClusterScalingState(ctx, _client)
 	if err != nil {
@@ -165,7 +172,7 @@ func fetchClusterState(ctx context.Context, _client client.Client, stateDefiniti
 	return clusterState, nil
 }
 
-func fetchNameSpaceState(ctx context.Context, _client client.Client, stateDefinitions States, namespace string) (State, error) {
+func FetchNameSpaceState(ctx context.Context, _client client.Client, stateDefinitions States, namespace string) (State, error) {
 	namespaceStateName, err := GetNamespaceScalingStateName(ctx, _client, namespace)
 	if err != nil {
 		switch err.(type) {
@@ -189,7 +196,7 @@ func fetchNameSpaceState(ctx context.Context, _client client.Client, stateDefini
 	return namespaceState, nil
 }
 
-func GetAppliedState(ctx context.Context, _client client.Client, namespace string, stateDefinitions States, clusterState State) (State, error) {
+func GetAppliedStateOld(ctx context.Context, _client client.Client, namespace string, stateDefinitions States, clusterState State) (State, error) {
 	// Here we allow overriding the cluster state by passing it in.
 	// This allows us to not recall the client when looping namespaces
 	if clusterState == (State{}) {
@@ -201,7 +208,7 @@ func GetAppliedState(ctx context.Context, _client client.Client, namespace strin
 	}
 
 	// If we receive an error here, we cannot handle it and should return
-	namespaceState, err := fetchNameSpaceState(ctx, _client, stateDefinitions, namespace)
+	namespaceState, err := FetchNameSpaceState(ctx, _client, stateDefinitions, namespace)
 	if err != nil {
 		return State{}, err
 	}
@@ -212,4 +219,95 @@ func GetAppliedState(ctx context.Context, _client client.Client, namespace strin
 
 	finalState := stateDefinitions.FindPriorityState(namespaceState, clusterState)
 	return finalState, nil
+}
+
+func GetAppliedStatesOnItems(namespace string, namespaceState State, clusterScalingStates v1alpha1.ClusterScalingStateList, stateDefinitions States, items []g.ScalingInfo) []g.ScalingInfo {
+
+	for i, item := range items {
+		if (len(clusterScalingStates.Items) == 0 && namespaceState != State{}) {
+			items[i].State = namespaceState.Name
+		} else {
+			items[i] = GetAppliedStateAndClassOnItem(item, namespaceState, clusterScalingStates, stateDefinitions)
+
+		}
+	}
+
+	return items
+}
+
+func GetAppliedStateAndClassOnItem(item g.ScalingInfo, namespaceState State, clusterScalingStates v1alpha1.ClusterScalingStateList, stateDefinitions States) g.ScalingInfo {
+
+	item = GetAppliedClass(clusterScalingStates, stateDefinitions, item)
+	if !item.Failure {
+		item.State = stateDefinitions.FindPriorityState(namespaceState, State(item.ClusterClassState)).Name
+	}
+	return item
+}
+
+type ScalingClass struct {
+	Name string
+}
+
+func GetAppliedScalingClassFromScalingItem(scalingItem g.ScalingInfo) ScalingClass {
+	var class = ScalingClass{
+		Name: scalingItem.Labels["scaler/scaling-class"],
+	}
+
+	// Return default class if none is found
+	if class.Name == "" {
+		return ScalingClass{
+			Name: "default",
+		}
+	}
+
+	return class
+}
+
+func GetAppliedScalingClassFromClusterScalingState(css v1alpha1.ClusterScalingState) ScalingClass {
+
+	// Return default class if none is found
+	var class = ScalingClass{
+		Name: css.Spec.ScalingClass,
+	}
+	if class.Name == "" {
+		return ScalingClass{
+			Name: "default",
+		}
+	}
+
+	return class
+}
+
+func GetAppliedClass(clusterScalingStates v1alpha1.ClusterScalingStateList, stateDefinitions States, item g.ScalingInfo) g.ScalingInfo {
+
+	finalClass, state, err := FindScalingClassOnClusterScalingState(GetAppliedScalingClassFromScalingItem(item), clusterScalingStates, stateDefinitions)
+	if err != nil {
+		item.Failure = true
+		item.FailureMessage = err.Error()
+	} else {
+		// TODO: Refactor state to common to avoid cyclic dependency and dual declaration (one here and one in global)
+		item.ClusterClassState = g.State(state)
+		item.ScalingClass = finalClass.Name
+	}
+
+	return item
+}
+
+func FindScalingClassOnClusterScalingState(itemClass ScalingClass, clusterScalingStates v1alpha1.ClusterScalingStateList, stateDefinitions States) (ScalingClass, State, error) {
+
+	for _, css := range clusterScalingStates.Items {
+		cssClass := GetAppliedScalingClassFromClusterScalingState(css)
+
+		if reflect.DeepEqual(cssClass, itemClass) {
+			stateName := css.Spec.State
+			stateOnCss := State{}
+			err := stateDefinitions.FindState(stateName, &stateOnCss)
+			if err != nil {
+				return ScalingClass{}, State{}, errors.New(fmt.Sprintf("The state %s was not found on the ClusterStateDefinitions", stateName))
+			}
+
+			return itemClass, stateOnCss, nil
+		}
+	}
+	return ScalingClass{}, State{}, errors.New(fmt.Sprintf("The scalingClass %s was not found in any clusterscalingstate!", itemClass.Name))
 }

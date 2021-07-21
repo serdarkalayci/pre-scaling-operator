@@ -29,6 +29,7 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 		deploymentconfigList []ocv1.DeploymentConfig
 		deploymentList       []v1.Deployment
 		css                  v1alpha1.ClusterScalingState
+		css1                 v1alpha1.ClusterScalingState
 		ss                   v1alpha1.ScalingState
 		cssd                 v1alpha1.ClusterScalingStateDefinition
 		namespaceList        []corev1.Namespace
@@ -83,10 +84,15 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 		// Wait until all potential wait-loops in the step scaler are finished.
 		time.Sleep(time.Second * 5)
 
-		if casenumber == 1 || casenumber == 6 {
+		if casenumber == 1 {
 			Expect(k8sClient.Delete(context.Background(), &css)).Should(Succeed())
 		} else if casenumber == 2 {
 			Expect(k8sClient.Delete(context.Background(), &ss)).Should(Succeed())
+		} else if casenumber == 5 {
+			Expect(k8sClient.Delete(context.Background(), &css)).Should(Succeed())
+		} else if casenumber == 6 {
+			Expect(k8sClient.Delete(context.Background(), &css)).Should(Succeed())
+			Expect(k8sClient.Delete(context.Background(), &css1)).Should(Succeed())
 		} else {
 			Expect(k8sClient.Delete(context.Background(), &css)).Should(Succeed())
 			Expect(k8sClient.Delete(context.Background(), &ss)).Should(Succeed())
@@ -113,20 +119,20 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 				fetchedDeploymentList := []v1.Deployment{}
 
 				if casenumber == 1 {
-					css = CreateClusterScalingState("bau")
+					css = CreateClusterScalingState(casenumber, "bau", "")
 					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
 				} else if casenumber == 2 {
 					ss = CreateScalingState("peak", namespaceList[0].Name)
 					Expect(k8sClient.Create(context.Background(), &ss)).Should(Succeed())
 				} else if casenumber == 3 {
-					css = CreateClusterScalingState("bau")
+					css = CreateClusterScalingState(casenumber, "bau", "")
 					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
 
 					time.Sleep(time.Second * 5)
 					ss = CreateScalingState("peak", namespaceList[0].Name)
 					Expect(k8sClient.Create(context.Background(), &ss)).Should(Succeed())
 				} else if casenumber == 4 {
-					css = CreateClusterScalingState("peak")
+					css = CreateClusterScalingState(casenumber, "peak", "")
 					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
 
 					time.Sleep(time.Second * 5)
@@ -134,7 +140,23 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 					ss = CreateScalingState("bau", namespaceList[1].Name)
 					Expect(k8sClient.Create(context.Background(), &ss)).Should(Succeed())
 				} else if casenumber == 5 {
-					css = CreateClusterScalingState("bau")
+					css = CreateClusterScalingState(casenumber, "peak", "prod-test")
+					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
+
+					time.Sleep(time.Second * 5)
+
+				} else if casenumber == 6 {
+
+					css = CreateClusterScalingState(casenumber, "bau", "prod-test")
+					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
+
+					css1 = CreateClusterScalingState(casenumber, "peak", "prod-prod")
+					Expect(k8sClient.Create(context.Background(), &css1)).Should(Succeed())
+
+					time.Sleep(time.Second * 5)
+
+				} else if casenumber == 7 {
+					css = CreateClusterScalingState(casenumber, "bau", "")
 					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
 
 					ss = CreateScalingState("peak", namespaceList[0].Name)
@@ -150,8 +172,8 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 
 					cssdMofified := getModifiedClusterScalingStateDefinition(cssdList.Items[0], false, true)
 					Expect(k8sClient.Update(context.Background(), &cssdMofified)).Should(Succeed())
-				} else if casenumber == 6 {
-					css = CreateClusterScalingState("peak")
+				} else if casenumber == 8 {
+					css = CreateClusterScalingState(casenumber, "peak", "")
 					Expect(k8sClient.Create(context.Background(), &css)).Should(Succeed())
 
 					time.Sleep(time.Second * 5)
@@ -216,8 +238,10 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 				table.Entry("CASE 2  | Apply a SS on one namespace", []int{4, 1, 1, 1}),
 				table.Entry("CASE 3  | Apply SS with higher prio than an existing CSS", []int{4, 1, 2, 1}),
 				table.Entry("CASE 4  | Apply CSS with higher prio than an existing SS", []int{4, 1, 4, 1}),
-			// table.Entry("CASE 5  | Swap Prio in CSSD", []int{2, 1, 2, 1}),
-			// table.Entry("CASE 6  | Remove states in CSSD", []int{4, 1, 4, 1}),
+				table.Entry("CASE 5  | Use only one clusterscalingclass for both opted deployments", []int{4, 1, 4, 1}),
+				table.Entry("CASE 6  | Use one clusterscalingclass each for both opted in deployments", []int{4, 1, 2, 1}),
+				//table.Entry("CASE 7  | Swap Prio in CSSD", []int{2, 1, 2, 1}),
+				//table.Entry("CASE 8  | Remove states in CSSD", []int{4, 1, 4, 1}),
 			)
 		})
 	})
@@ -247,18 +271,53 @@ func updateKey(namespaceName, name string, key types.NamespacedName) types.Names
 
 }
 
+func defineLabelsBasedOnCase(namespaceName string, optin string, casenumber int, number int) map[string]string {
+	labels := map[string]string{}
+	if casenumber == 5 {
+		labels = map[string]string{
+			"app":                  "random-generator-1",
+			"scaler/scaling-class": "prod-test",
+			"scaler/opt-in":        optin,
+		}
+	} else if namespaceName == "e2e-tests-crds6-1" && number == 1 {
+		labels = map[string]string{
+			"app":                  "random-generator-1",
+			"scaler/scaling-class": "prod-prod",
+			"scaler/opt-in":        optin,
+		}
+	} else if namespaceName == "e2e-tests-crds6-2" && number == 1 {
+		labels = map[string]string{
+			"app":                  "random-generator-1",
+			"scaler/scaling-class": "prod-test",
+			"scaler/opt-in":        optin,
+		}
+	} else if casenumber == 8 && number == 2 {
+		labels = map[string]string{
+			"app":                  "random-generator-1",
+			"scaler/scaling-class": "prod-prod",
+			"scaler/opt-in":        optin,
+		}
+	} else {
+		labels = map[string]string{
+			"app":           "random-generator-1",
+			"scaler/opt-in": optin,
+		}
+	}
+
+	return labels
+}
+
 func defineDeployment(namespaceName string, optin string, casenumber int, number int) v1.Deployment {
 
 	var replicaCount int32 = 1
+
+	labels := defineLabelsBasedOnCase(namespaceName, optin, casenumber, number)
 
 	dep := &v1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "case" + strconv.Itoa(casenumber) + "-" + strconv.Itoa(number),
 			Namespace: namespaceName,
-			Labels: map[string]string{
-				"app":           "random-generator-1",
-				"scaler/opt-in": optin,
-			},
+			Labels:    labels,
 			Annotations: map[string]string{
 				"scaler/state-bau-replicas":     "2",
 				"scaler/state-default-replicas": "1",
@@ -309,14 +368,13 @@ func createMultipleDeploymentConfigs(namespaceName string, numberOfDCs, casenumb
 
 func defineDeploymentConfig(namespaceName string, optin string, casenumber int, number int) ocv1.DeploymentConfig {
 
+	labels := defineLabelsBasedOnCase(namespaceName, optin, casenumber, number)
+
 	deploymentConfig := &ocv1.DeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "case" + strconv.Itoa(casenumber) + "-" + strconv.Itoa(number),
 			Namespace: namespaceName,
-			Labels: map[string]string{
-				"deployment-config.name": "random-generator-1",
-				"scaler/opt-in":          optin,
-			},
+			Labels:    labels,
 			Annotations: map[string]string{
 				"scaler/state-bau-replicas":     "2",
 				"scaler/state-default-replicas": "1",

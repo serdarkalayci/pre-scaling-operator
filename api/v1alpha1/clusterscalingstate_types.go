@@ -27,7 +27,8 @@ import (
 type ClusterScalingStateSpec struct {
 
 	// The State field represents the desired state for the cluster
-	State string `json:"state"`
+	State        string `json:"state"`
+	ScalingClass string `json:"scalingClass,omitempty"`
 }
 
 // ClusterScalingStateStatus defines the observed state of ClusterScalingState
