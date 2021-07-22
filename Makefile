@@ -26,10 +26,15 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
 # BUNDLE_IMG defines the image:tag used for the bundle. 
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
-BUNDLE_IMG ?= prescaler-controller-bundle:$(VERSION)
+BUNDLE_IMG ?= pre-scaling-operator-bundle:$(VERSION)
 
 # Image URL to use all building/pushing image targets
 IMG ?= containersol/pre-scaling-operator:ci
+
+# Image REF in bundle image
+# Can be overwritten with make bundle IMAGE_REF=<some-registry>/<project-name-bundle>:<tag>
+IMAGE_REF ?= $(IMG)
+
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
 
@@ -126,7 +131,7 @@ endef
 .PHONY: bundle
 bundle: manifests kustomize
 	operator-sdk generate kustomize manifests -q
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
+	cd config/manager && $(KUSTOMIZE) edit set image containersol/pre-scaling-operator=$(IMAGE_REF)
 	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	operator-sdk bundle validate ./bundle
 
