@@ -11,6 +11,7 @@ import (
 
 	"github.com/containersol/prescale-operator/api/v1alpha1"
 	constants "github.com/containersol/prescale-operator/internal"
+	redisalpha "github.com/containersolutions/redis-operator/api/v1alpha1"
 	"github.com/containersol/prescale-operator/internal/quotas"
 	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
@@ -421,6 +422,7 @@ func UpdateScalingItem(ctx context.Context, _client client.Client, deploymentIte
 	var getErr error = nil
 	deployment := v1.Deployment{}
 	deploymentConfig := ocv1.DeploymentConfig{}
+	redisCluster := redisalpha.RedisCluster{}
 
 	if deploymentItem.ScalingItemType.ItemTypeName == "DeploymentConfig" {
 		deploymentConfig, getErr = DeploymentConfigGetter(ctx, _client, req)
@@ -429,13 +431,20 @@ func UpdateScalingItem(ctx context.Context, _client client.Client, deploymentIte
 		}
 		deploymentConfig.Spec.Replicas = deploymentItem.SpecReplica
 		updateErr = _client.Update(ctx, &deploymentConfig, &client.UpdateOptions{})
-	} else {
+	} else if  deploymentItem.ScalingItemType.ItemTypeName == "Deployment"{
 		deployment, getErr = DeploymentGetter(ctx, _client, req)
 		if getErr != nil {
 			return getErr
 		}
 		deployment.Spec.Replicas = &deploymentItem.SpecReplica
 		updateErr = _client.Update(ctx, &deployment, &client.UpdateOptions{})
+	} else {
+		redisCluster, getErr = RedisClusterGetter(ctx, _client, req)
+		if getErr != nil {
+			return getErr
+		}
+		redisCluster.Spec.Replicas = deploymentItem.SpecReplica
+		updateErr = _client.Update(ctx, &redisCluster, &client.UpdateOptions{})
 	}
 
 	return updateErr
