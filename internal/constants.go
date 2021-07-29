@@ -16,6 +16,9 @@ const (
 	//OpenshiftObjectGroup is the resource group and version of openshift objects
 	OpenshiftObjectGroup = "apps.openshift.io/v1"
 
+	//RedisClusterObjectGroup is the resource group and version of rediscluster objects
+	RedisClusterObjectGroup = "redis.containersolutions.com/v1alpha1"
+
 	//OpenshiftResources respresents the Openshift object to watch
 	OpenshiftResources = "DeploymentConfig"
 
@@ -38,6 +41,9 @@ var (
 	//OpenshiftCluster is used to identify if the operator is running in an Openshift cluster
 	OpenshiftCluster bool
 
+	//RedisCluster is used to identify if there might be RedisCluster resources present in the cluster
+	RedisCluster bool
+	
 	StartTime time.Time
 
 	DefaultScalingClass = ScalingClass{

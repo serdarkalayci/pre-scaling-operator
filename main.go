@@ -40,6 +40,7 @@ import (
 	scalingv1alpha1 "github.com/containersol/prescale-operator/api/v1alpha1"
 	"github.com/containersol/prescale-operator/controllers"
 	r "github.com/containersol/prescale-operator/internal/reconciler"
+	redisalpha "github.com/containersolutions/redis-operator/api/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -52,6 +53,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(dc.AddToScheme(scheme))
 	utilruntime.Must(scalingv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(redisalpha.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -123,7 +125,7 @@ func main() {
 	}
 
 	//We need to identify if the operator is running on an Openshift cluster. If yes, we activate the deploymentconfig watcher
-	constants.OpenshiftCluster, err = validations.ClusterCheck()
+	constants.OpenshiftCluster, err = validations.OpenshiftClusterCheck()
 	if err != nil {
 		setupLog.Error(err, "unable to identify cluster")
 	}
@@ -138,6 +140,23 @@ func main() {
 			os.Exit(1)
 		}
 	}
+
+	constants.RedisCluster, err = validations.RedisClusterInstalled()
+	if err != nil {
+		setupLog.Error(err, "Problem identifying RedisCluster CRD")
+	}
+	if constants.RedisCluster {
+		if err = (&controllers.RedisClusterWatcher{
+			Client:   mgr.GetClient(),
+			Log:      ctrl.Log.WithName("controllers").WithName("RedisClusterWatcher"),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("rediscluster-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "RedisClusterWatcher")
+			os.Exit(1)
+		}
+	}
+
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("health", healthz.Ping); err != nil {

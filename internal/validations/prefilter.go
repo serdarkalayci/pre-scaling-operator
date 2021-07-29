@@ -9,6 +9,7 @@ import (
 	"github.com/containersol/prescale-operator/pkg/utils/annotations"
 	g "github.com/containersol/prescale-operator/pkg/utils/global"
 	"github.com/containersol/prescale-operator/pkg/utils/labels"
+	redisalpha "github.com/containersolutions/redis-operator/api/v1alpha1"
 	ocv1 "github.com/openshift/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
 	"k8s.io/client-go/tools/record"
@@ -143,9 +144,12 @@ func AssesReplicaChange(e event.UpdateEvent) bool {
 	if reflect.TypeOf(e.ObjectNew) == reflect.TypeOf(&ocv1.DeploymentConfig{}) {
 		replicasOld = &e.ObjectOld.(*ocv1.DeploymentConfig).Spec.Replicas
 		replicasNew = &e.ObjectNew.(*ocv1.DeploymentConfig).Spec.Replicas
-	} else {
+	} else if reflect.TypeOf(e.ObjectNew) == reflect.TypeOf(&v1.Deployment{}) {
 		replicasOld = e.ObjectOld.(*v1.Deployment).Spec.Replicas
 		replicasNew = e.ObjectNew.(*v1.Deployment).Spec.Replicas
+	} else {
+		replicasOld = &e.ObjectOld.(*redisalpha.RedisCluster).Spec.Replicas
+		replicasNew = &e.ObjectNew.(*redisalpha.RedisCluster).Spec.Replicas
 	}
 
 	// Check if replicas count has changed
@@ -185,7 +189,9 @@ func generateOptInLabelCreateEvent(e event.CreateEvent, r record.EventRecorder, 
 	if reflect.TypeOf(e.Object) == reflect.TypeOf(&ocv1.DeploymentConfig{}) {
 		r.Event(e.Object.(*ocv1.DeploymentConfig), "Normal", "PreScalingOperator", fmt.Sprintf("The %s object has just opted-in", e.Object.(*ocv1.DeploymentConfig).Name))
 
-	} else {
+	} else if reflect.TypeOf(e.Object) == reflect.TypeOf(&v1.Deployment{}) {
 		r.Event(e.Object.(*v1.Deployment), "Normal", "PreScalingOperator", fmt.Sprintf("The %s object has just opted-in", e.Object.(*v1.Deployment).Name))
+	} else {
+		r.Event(e.Object.(*redisalpha.RedisCluster), "Normal", "PreScalingOperator", fmt.Sprintf("The %s object has just opted-in", e.Object.(*redisalpha.RedisCluster).Name))
 	}
 }

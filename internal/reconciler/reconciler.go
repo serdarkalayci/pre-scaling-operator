@@ -55,7 +55,7 @@ func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, na
 	}
 
 	if len(scalingobjects) == 0 {
-		log.Info("nothing to reconcile. No opted in Deployments or DeploymentConfigs found.")
+		log.Info("nothing to reconcile. No opted in objects found.")
 		return nil, false, nil
 	}
 

@@ -1,0 +1,60 @@
+# RedisCluster Object for testing purposes. Make sure that the CRD of this resource is installed. See https://github.com/ContainerSolutions/redis-operator
+# For optimal behaviour make sure that the redis operator is also properly configured and running in the cluster
+apiVersion: redis.containersolutions.com/v1alpha1
+kind: RedisCluster
+metadata:
+  name: redis-cluster-prescaler
+  namespace: default
+  finalizers:
+#    - redis.containersolutions.com/rdb-backup
+#    - redis.containersolutions.com/configmap-cleanup
+  labels:
+    app: redis-graph
+    team: team-x
+    custom: labels
+    scaler/opt-in: "true"
+  annotations:
+    scaler/state-peak-replicas: "5"
+    scaler/state-bau-replicas: "3"
+    scaler/state-default-replicas: "1"
+spec:
+  replicas: 1
+  storage: 500Mi
+  image: redislabs/redisgraph:2.4.1
+  labels:
+    team: team-x
+    custom: labels
+  resources:
+    limits:
+      cpu: 1
+      memory: 200Mi
+    requests:
+      cpu: 1
+      memory: 200Mi
+  config: |
+    maxmemory 200mb
+    maxmemory-samples 5
+    maxmemory-policy allkeys-lru
+    appendonly yes
+    protected-mode no
+    loadmodule /usr/lib/redis/modules/redisgraph.so
+  # auth:
+  #   secret: redis-auth
+  # monitoring:
+  #   spec:
+  #     volumes:
+  #       - name: rediscluster-samplemonitoring-config
+  #     containers:
+  #       - name: monitoring
+  #         image: redis-redis-metrics
+  #         # env:
+  #         #   - name: REDISAUTH
+  #         #     valueFrom:
+  #         #       secretKeyRef:
+  #         #         name: redis-auth
+  #         #         key: requirepass
+  #         ports:
+  #           - containerPort: 8080
+  #             name: monitor
+                  
+---

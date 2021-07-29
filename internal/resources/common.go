@@ -11,13 +11,13 @@ import (
 
 	"github.com/containersol/prescale-operator/api/v1alpha1"
 	constants "github.com/containersol/prescale-operator/internal"
-	redisalpha "github.com/containersolutions/redis-operator/api/v1alpha1"
 	"github.com/containersol/prescale-operator/internal/quotas"
 	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
 	"github.com/containersol/prescale-operator/internal/validations"
 	g "github.com/containersol/prescale-operator/pkg/utils/global"
 	"github.com/containersol/prescale-operator/pkg/utils/math"
+	redisalpha "github.com/containersolutions/redis-operator/api/v1alpha1"
 	"github.com/olekukonko/tablewriter"
 	ocv1 "github.com/openshift/api/apps/v1"
 	"github.com/prometheus/common/log"
@@ -349,7 +349,7 @@ func GetRefreshedScalingItem(ctx context.Context, _client client.Client, deploym
 			return g.ScalingInfo{}, err
 		}
 		itemToReturn = g.ConvertDeploymentConfigToItem(deploymentconfig)
-	} else {
+	} else if deploymentInfo.ScalingItemType.ItemTypeName == "Deployment" {
 		// deployment
 		deployment := v1.Deployment{}
 		err := _client.Get(ctx, req.NamespacedName, &deployment)
@@ -357,6 +357,14 @@ func GetRefreshedScalingItem(ctx context.Context, _client client.Client, deploym
 			return g.ScalingInfo{}, err
 		}
 		itemToReturn = g.ConvertDeploymentToItem(deployment)
+	} else {
+		// RedisCluster
+		redisCluster := redisalpha.RedisCluster{}
+		err := _client.Get(ctx, req.NamespacedName, &redisCluster)
+		if err != nil {
+			return g.ScalingInfo{}, err
+		}
+		itemToReturn = g.ConvertRedisClusterToItem(redisCluster)
 	}
 	// Refresh the item on the list as well
 	itemToReturn.IsBeingScaled = deploymentInfo.IsBeingScaled
@@ -371,6 +379,7 @@ func ScalingItemNamespaceLister(ctx context.Context, _client client.Client, name
 	returnList := []g.ScalingInfo{}
 	deployments := v1.DeploymentList{}
 	deploymentconfigs := ocv1.DeploymentConfigList{}
+	redisclusters := redisalpha.RedisClusterList{}
 
 	if namespace != "" {
 		err := _client.List(ctx, &deployments, client.MatchingLabels(OptInLabel), client.InNamespace(namespace))
@@ -401,12 +410,32 @@ func ScalingItemNamespaceLister(ctx context.Context, _client client.Client, name
 		}
 	}
 
+	if constants.RedisCluster {
+
+		if namespace != "" {
+			err := _client.List(ctx, &redisclusters, client.MatchingLabels(OptInLabel), client.InNamespace(namespace))
+			if err != nil {
+				return []g.ScalingInfo{}, err
+			}
+		} else {
+			// List all redisclusters, clusterwide.
+			err := _client.List(ctx, &redisclusters, client.MatchingLabels(OptInLabel))
+			if err != nil {
+				return []g.ScalingInfo{}, err
+			}
+		}
+	}
+
 	for _, deployment := range deployments.Items {
 		returnList = append(returnList, g.ConvertDeploymentToItem(deployment))
 	}
 
 	for _, deploymentConfig := range deploymentconfigs.Items {
 		returnList = append(returnList, g.ConvertDeploymentConfigToItem(deploymentConfig))
+	}
+
+	for _, redisCluster := range redisclusters.Items {
+		returnList = append(returnList, g.ConvertRedisClusterToItem(redisCluster))
 	}
 
 	return returnList, nil
@@ -431,7 +460,7 @@ func UpdateScalingItem(ctx context.Context, _client client.Client, deploymentIte
 		}
 		deploymentConfig.Spec.Replicas = deploymentItem.SpecReplica
 		updateErr = _client.Update(ctx, &deploymentConfig, &client.UpdateOptions{})
-	} else if  deploymentItem.ScalingItemType.ItemTypeName == "Deployment"{
+	} else if deploymentItem.ScalingItemType.ItemTypeName == "Deployment" {
 		deployment, getErr = DeploymentGetter(ctx, _client, req)
 		if getErr != nil {
 			return getErr
