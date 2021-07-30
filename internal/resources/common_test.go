@@ -8,10 +8,12 @@ import (
 	sr "github.com/containersol/prescale-operator/internal/state_replicas"
 	"github.com/containersol/prescale-operator/internal/states"
 	g "github.com/containersol/prescale-operator/pkg/utils/global"
+	redisalpha "github.com/containersolutions/redis-operator/api/v1alpha1"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -148,6 +150,8 @@ func TestScaler(t *testing.T) {
 		deployment  v1.Deployment
 		replicas    int32
 	}
+
+	_ = redisalpha.AddToScheme(scheme.Scheme)
 	tests := []struct {
 		name    string
 		args    args
@@ -173,13 +177,14 @@ func TestScaler(t *testing.T) {
 							ProgressDeadlineSeconds: new(int32),
 						},
 						Status: v1.DeploymentStatus{},
-					}).
+					}).WithScheme(scheme.Scheme).
 					Build(),
 				scalingItem: g.ScalingInfo{
-					Name:        "foo",
-					Namespace:   "bar",
-					SpecReplica: 4,
-					Labels:      map[string]string{"scaler/opt-in": "true"},
+					Name:            "foo",
+					Namespace:       "bar",
+					SpecReplica:     4,
+					Labels:          map[string]string{"scaler/opt-in": "true"},
+					ScalingItemType: g.ScalingItemType{"Deployment"},
 				},
 				deployment: v1.Deployment{
 					TypeMeta: metav1.TypeMeta{
@@ -223,10 +228,11 @@ func TestScaler(t *testing.T) {
 					}).
 					Build(),
 				scalingItem: g.ScalingInfo{
-					Name:        "bar",
-					Namespace:   "foo",
-					SpecReplica: 4,
-					Labels:      map[string]string{"scaler/opt-in": "true"},
+					Name:            "bar",
+					Namespace:       "foo",
+					SpecReplica:     4,
+					Labels:          map[string]string{"scaler/opt-in": "true"},
+					ScalingItemType: g.ScalingItemType{"Deployment"},
 				},
 				deployment: v1.Deployment{
 					TypeMeta: metav1.TypeMeta{
@@ -271,12 +277,13 @@ func TestScaler(t *testing.T) {
 					}).
 					Build(),
 				scalingItem: g.ScalingInfo{
-					Name:          "foo",
-					Namespace:     "bar",
-					Annotations:   map[string]string{"scaler/allow-autoscaling": "true"},
-					SpecReplica:   0,
-					ReadyReplicas: 5,
-					Labels:        map[string]string{"scaler/opt-in": "true"},
+					Name:            "foo",
+					Namespace:       "bar",
+					Annotations:     map[string]string{"scaler/allow-autoscaling": "true"},
+					SpecReplica:     0,
+					ReadyReplicas:   5,
+					Labels:          map[string]string{"scaler/opt-in": "true"},
+					ScalingItemType: g.ScalingItemType{"Deployment"},
 				},
 				deployment: v1.Deployment{
 					TypeMeta: metav1.TypeMeta{
