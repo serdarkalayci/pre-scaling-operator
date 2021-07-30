@@ -184,7 +184,7 @@ func TestScaler(t *testing.T) {
 					Namespace:       "bar",
 					SpecReplica:     4,
 					Labels:          map[string]string{"scaler/opt-in": "true"},
-					ScalingItemType: g.ScalingItemType{"Deployment"},
+					ScalingItemType: g.ScalingItemType{ItemTypeName: "Deployment"},
 				},
 				deployment: v1.Deployment{
 					TypeMeta: metav1.TypeMeta{
@@ -232,7 +232,7 @@ func TestScaler(t *testing.T) {
 					Namespace:       "foo",
 					SpecReplica:     4,
 					Labels:          map[string]string{"scaler/opt-in": "true"},
-					ScalingItemType: g.ScalingItemType{"Deployment"},
+					ScalingItemType: g.ScalingItemType{ItemTypeName: "Deployment"},
 				},
 				deployment: v1.Deployment{
 					TypeMeta: metav1.TypeMeta{
@@ -283,7 +283,7 @@ func TestScaler(t *testing.T) {
 					SpecReplica:     0,
 					ReadyReplicas:   5,
 					Labels:          map[string]string{"scaler/opt-in": "true"},
-					ScalingItemType: g.ScalingItemType{"Deployment"},
+					ScalingItemType: g.ScalingItemType{ItemTypeName: "Deployment"},
 				},
 				deployment: v1.Deployment{
 					TypeMeta: metav1.TypeMeta{
