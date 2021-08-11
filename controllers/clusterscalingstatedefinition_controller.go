@@ -35,6 +35,7 @@ import (
 	constants "github.com/containersol/prescale-operator/internal"
 	"github.com/containersol/prescale-operator/internal/reconciler"
 	"github.com/containersol/prescale-operator/internal/states"
+	"github.com/containersol/prescale-operator/internal/validations"
 )
 
 // ClusterScalingStateDefinitionReconciler reconciles a ClusterScalingStateDefinition object
@@ -153,5 +154,6 @@ func (r *ClusterScalingStateDefinitionReconciler) SetupWithManager(mgr ctrl.Mana
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&scalingv1alpha1.ClusterScalingStateDefinition{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 1}).
+		WithEventFilter(validations.DeleteFilter()).
 		Complete(r)
 }
