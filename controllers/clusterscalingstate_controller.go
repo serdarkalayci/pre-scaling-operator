@@ -145,6 +145,7 @@ func (r *ClusterScalingStateReconciler) SetupWithManager(mgr ctrl.Manager) error
 		For(&scalingv1alpha1.ClusterScalingState{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 1}).
 		WithEventFilter(validations.StartupFilter()).
+		WithEventFilter(validations.DeleteFilter()).
 		Owns(&scalingv1alpha1.ScalingState{}).
 		Complete(r)
 }
