@@ -109,7 +109,9 @@ func (r *ClusterScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.
 			appliedStates = append(appliedStates, nsInfo.AppliedState)
 
 		} else {
-			dryRunCluster = dryRunCluster + nsInfo.NSEvents.DryRunInfo
+			if nsInfo.ScaleNamespace || nsInfo.NSEvents.QuotaExceeded != "" {
+				dryRunCluster = dryRunCluster + nsInfo.NSEvents.DryRunInfo
+			}
 		}
 	}
 

@@ -602,11 +602,19 @@ func MakeNamespacesScaleDecisions(ctx context.Context, _client client.Client, gr
 
 			table.Render()
 
+			// Check if we need to care about this namespace being dryrun.
+			scaleNameSpace := false
+			for _, item := range scalingInfoList {
+				if item.SpecReplica != item.DesiredReplicas {
+					scaleNameSpace = true
+				}
+			}
+
 			nsEvents.DryRunInfo = nsEvents.DryRunInfo + tableString.String()
 			putOnMap := NamespaceScaleInfo{
 				ScalingItems:            scalingInfoList,
 				FinalNamespaceState:     namespaceState,
-				ScaleNameSpace:          false,
+				ScaleNameSpace:          scaleNameSpace,
 				StateError:              nsStateErr,
 				ReplicaListError:        replicalisterr,
 				ResourceQuotaCheckError: rqCheckErr,
