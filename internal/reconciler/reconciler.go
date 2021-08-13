@@ -174,7 +174,7 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 		scalingItemNew, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(scalingItem)
 		if notFoundErr == nil {
 			if scalingItemNew.DesiredReplicas != scalingItem.DesiredReplicas {
-				g.GetDenyList().SetScalingItemOnList(scalingItemNew, scalingItemNew.Failure, scalingItemNew.FailureMessage, scalingItemNew.DesiredReplicas)
+				g.GetDenyList().SetScalingItemOnList(scalingItemNew, scalingItemNew.Failure, scalingItemNew.FailureMessage, scalingItem.DesiredReplicas)
 
 				log.WithValues("Name: ", scalingItemNew.Name).
 					WithValues("Namespace: ", scalingItemNew.Namespace).
