@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -366,7 +367,7 @@ func GetRefreshedScalingItem(ctx context.Context, _client client.Client, deploym
 			return g.ScalingInfo{}, err
 		}
 		itemToReturn = g.ConvertDeploymentToItem(deployment)
-	} else {
+	} else if deploymentInfo.ScalingItemType.ItemTypeName == "RedisCluster" {
 		// RedisCluster
 		redisCluster := redisalpha.RedisCluster{}
 		err := _client.Get(ctx, req.NamespacedName, &redisCluster)
@@ -374,6 +375,8 @@ func GetRefreshedScalingItem(ctx context.Context, _client client.Client, deploym
 			return g.ScalingInfo{}, err
 		}
 		itemToReturn = g.ConvertRedisClusterToItem(redisCluster)
+	} else {
+		return g.ScalingInfo{}, errors.New("type of the item could not be determined!")
 	}
 	// Refresh the item on the list as well
 	itemToReturn.IsBeingScaled = deploymentInfo.IsBeingScaled
@@ -476,13 +479,15 @@ func UpdateScalingItem(ctx context.Context, _client client.Client, deploymentIte
 		}
 		deployment.Spec.Replicas = &deploymentItem.SpecReplica
 		updateErr = _client.Update(ctx, &deployment, &client.UpdateOptions{})
-	} else {
+	} else if deploymentItem.ScalingItemType.ItemTypeName == "RedisCluster" {
 		redisCluster, getErr = RedisClusterGetter(ctx, _client, req)
 		if getErr != nil {
 			return getErr
 		}
 		redisCluster.Spec.Replicas = deploymentItem.SpecReplica
 		updateErr = _client.Update(ctx, &redisCluster, &client.UpdateOptions{})
+	} else {
+		return errors.New("type of the item could not be determined! No update")
 	}
 
 	return updateErr
