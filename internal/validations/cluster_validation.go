@@ -8,8 +8,26 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-// ClusterCheck checks if we are operating in an Openshift cluster
-func ClusterCheck() (bool, error) {
+// Checks if the RedisCluster CRD is in place
+func RedisClusterInstalled() (bool, error) {
+	kubernetesclient, err := client.GetClientSet()
+	if err != nil {
+		return false, err
+	}
+
+	_, err = kubernetesclient.DiscoveryClient.ServerResourcesForGroupVersion(constants.RedisClusterObjectGroup)
+	if err != nil {
+		if strings.Contains(err.Error(), constants.ResourceNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	ctrl.Log.Info("RedisCluster CRD found. Activating the RedisCluster objects watcher")
+	return true, nil
+}
+
+// OpenshiftClusterCheck checks if we are operating in an Openshift cluster
+func OpenshiftClusterCheck() (bool, error) {
 
 	kubernetesclient, err := client.GetClientSet()
 	if err != nil {

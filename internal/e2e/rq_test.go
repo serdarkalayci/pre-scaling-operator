@@ -24,7 +24,7 @@ var _ = Describe("e2e Test for the resource quotas functionalities", func() {
 	const interval = time.Millisecond * 500
 
 	var casenumber = 1
-	OpenshiftCluster, _ := validations.ClusterCheck()
+	OpenshiftCluster, _ := validations.OpenshiftClusterCheck()
 	var deployment v1.Deployment
 	var deploymentconfig ocv1.DeploymentConfig
 	var namespace corev1.Namespace

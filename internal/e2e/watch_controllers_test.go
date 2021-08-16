@@ -24,7 +24,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 
 	var casenumber = 1
 	var namespace corev1.Namespace
-	OpenshiftCluster, _ := validations.ClusterCheck()
+	OpenshiftCluster, _ := validations.OpenshiftClusterCheck()
 	var deployment v1.Deployment
 	var deploymentconfig ocv1.DeploymentConfig
 	var css v1alpha1.ClusterScalingState

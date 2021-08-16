@@ -3,6 +3,7 @@ package global
 import (
 	"sync"
 
+	redisalpha "github.com/containersolutions/redis-operator/api/v1alpha1"
 	ocv1 "github.com/openshift/api/apps/v1"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -331,5 +332,34 @@ func ConvertDeploymentConfigToItem(deploymentConfig ocv1.DeploymentConfig) Scali
 		ResourceList:     resourceList,
 		ConditionReason:  conditionReason,
 		ProgressDeadline: progressDeadLine,
+	}
+}
+
+func ConvertRedisClusterToItem(rediscluster redisalpha.RedisCluster) ScalingInfo {
+
+	var resourceList corev1.ResourceList = corev1.ResourceList{}
+	if len(rediscluster.Spec.Resources.Limits) != 0 {
+		// get the latest condition reason in case there is one.
+		resourceList = rediscluster.Spec.Resources.Limits
+	}
+
+	failure := false
+	failureMessage := ""
+	conditionReason := rediscluster.Status.Status
+
+	return ScalingInfo{
+		Name:             rediscluster.Name,
+		Namespace:        rediscluster.Namespace,
+		Annotations:      rediscluster.Annotations,
+		Labels:           rediscluster.Labels,
+		ScalingItemType:  ScalingItemType{ItemTypeName: "RedisCluster"},
+		Failure:          failure,
+		FailureMessage:   failureMessage,
+		SpecReplica:      rediscluster.Spec.Replicas,
+		ReadyReplicas:    int32(len(rediscluster.Status.Nodes)),
+		DesiredReplicas:  -1,
+		ResourceList:     resourceList,
+		ConditionReason:  conditionReason,
+		ProgressDeadline: int32(500),
 	}
 }

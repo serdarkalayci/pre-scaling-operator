@@ -79,6 +79,11 @@ func GetRapidScalingSetting(deploymentItem g.ScalingInfo) bool {
 
 	scalingAnnotation := annotations.FilterByKeyPrefix("scaler/rapid-", deploymentItem.Annotations)
 
+	// Redis Cluster doesn't support step scaling. Do rapid scale
+	if deploymentItem.ItemTypeName == "RedisCluster" {
+		return true
+	}
+
 	if len(scalingAnnotation) == 0 {
 		return false
 	}
