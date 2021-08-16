@@ -66,7 +66,7 @@ func (r *ScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	ss := &v1alpha1.ScalingState{}
 	err := r.Get(ctx, req.NamespacedName, ss)
 	if err != nil {
-		return ctrl.Result{}, err
+		log.Error(err, "Scalingstate could not be found! It might've been deleted. Reconciling.")
 	}
 
 	clusterStateDefinitions, err := states.GetClusterScalingStates(ctx, r.Client)
@@ -113,7 +113,6 @@ func (r *ScalingStateReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&scalingv1alpha1.ScalingState{}).
 		WithEventFilter(validations.StartupFilter()).
-		WithEventFilter(validations.DeleteFilter()).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 5}).
 		Owns(&scalingv1alpha1.ClusterScalingState{}).
 		Complete(r)

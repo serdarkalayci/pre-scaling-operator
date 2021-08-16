@@ -157,9 +157,18 @@ func DetermineDesiredReplicas(items []g.ScalingInfo) ([]g.ScalingInfo, error) {
 		if err != nil {
 			// TODO here we should do priority filtering, and go down one level of priority to find the lowest set one.
 			// We will ignore any that are not set
-			log.WithValues("set states", stateReplicas).
-				WithValues("state", item.State).
-				Info(fmt.Sprintf("State %s could not be found on scalingItem %s in namespace %s", item.State, item.Name, item.Namespace))
+
+			if item.State == "" {
+				log.WithValues("set states", stateReplicas).
+					WithValues("state", item.State).
+					Info(fmt.Sprintf("No determined state on scalingItem %s in namespace %s! Skipping desiredreplica determination", item.Name, item.Namespace))
+
+			} else {
+				log.WithValues("set states", stateReplicas).
+					WithValues("state", item.State).
+					Info(fmt.Sprintf("State %s could not be found on scalingItem %s in namespace %s", item.State, item.Name, item.Namespace))
+
+			}
 			continue
 		}
 		items[i].State = stateReplica.Name
@@ -542,6 +551,12 @@ func MakeNamespacesScaleDecisions(ctx context.Context, _client client.Client, gr
 		}
 
 		scalingInfoList := states.GetAppliedStatesOnItems(namespaceKey, namespaceState, clusterScalingStates, stateDefinitions, scalingInfoList)
+		for _, item := range scalingInfoList {
+			if item.Failure {
+				log.Info(fmt.Sprintf("Error on scalingitem %s in namespace %s | Error: %s", item.Name, item.Namespace, item.FailureMessage))
+			}
+		}
+
 		var finalLimitsCPU, finalLimitsMemory string
 		var nsEvents NamespaceEvents
 
