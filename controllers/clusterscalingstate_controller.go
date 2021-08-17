@@ -71,7 +71,7 @@ func (r *ClusterScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.
 	css := &v1alpha1.ClusterScalingState{}
 	err := r.Get(ctx, req.NamespacedName, css)
 	if err != nil {
-		return ctrl.Result{}, err
+		log.Error(err, "ClusterScalingState could not be found! It might've been deleted. Reconciling.")
 	}
 
 	clusterStateDefinitions, err := states.GetClusterScalingStates(ctx, r.Client)
@@ -109,7 +109,9 @@ func (r *ClusterScalingStateReconciler) Reconcile(ctx context.Context, req ctrl.
 			appliedStates = append(appliedStates, nsInfo.AppliedState)
 
 		} else {
-			dryRunCluster = dryRunCluster + nsInfo.NSEvents.DryRunInfo
+			if nsInfo.ScaleNamespace || nsInfo.NSEvents.QuotaExceeded != "" {
+				dryRunCluster = dryRunCluster + nsInfo.NSEvents.DryRunInfo
+			}
 		}
 	}
 

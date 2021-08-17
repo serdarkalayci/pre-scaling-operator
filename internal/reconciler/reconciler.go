@@ -18,10 +18,11 @@ import (
 )
 
 type NamespaceInfo struct {
-	NSEvents     resources.NamespaceEvents
-	AppliedState string
-	Error        error
-	RetriggerMe  bool
+	NSEvents       resources.NamespaceEvents
+	AppliedState   string
+	Error          error
+	RetriggerMe    bool
+	ScaleNamespace bool
 }
 
 type ReconcilerError struct {
@@ -73,13 +74,14 @@ func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, na
 		}
 
 		nsInfoMap[namespaceKey] = NamespaceInfo{
-			NSEvents:     value.NamespaceEvents,
-			AppliedState: value.FinalNamespaceState.Name,
+			NSEvents:       value.NamespaceEvents,
+			AppliedState:   value.FinalNamespaceState.Name,
+			ScaleNamespace: value.ScaleNameSpace,
 		}
 
 		// Accumulate the information to return to the controller
 	}
-	if overallNsInformation.NumberofNsToScale > 0 {
+	if overallNsInformation.NumberofNsToScale > 0 && !dryRun {
 		reTrigger = true
 	}
 	return nsInfoMap, reTrigger, nil
@@ -174,7 +176,7 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 		scalingItemNew, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(scalingItem)
 		if notFoundErr == nil {
 			if scalingItemNew.DesiredReplicas != scalingItem.DesiredReplicas {
-				g.GetDenyList().SetScalingItemOnList(scalingItemNew, scalingItemNew.Failure, scalingItemNew.FailureMessage, scalingItemNew.DesiredReplicas)
+				g.GetDenyList().SetScalingItemOnList(scalingItemNew, scalingItemNew.Failure, scalingItemNew.FailureMessage, scalingItem.DesiredReplicas)
 
 				log.WithValues("Name: ", scalingItemNew.Name).
 					WithValues("Namespace: ", scalingItemNew.Namespace).

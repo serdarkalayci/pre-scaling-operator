@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -157,9 +158,18 @@ func DetermineDesiredReplicas(items []g.ScalingInfo) ([]g.ScalingInfo, error) {
 		if err != nil {
 			// TODO here we should do priority filtering, and go down one level of priority to find the lowest set one.
 			// We will ignore any that are not set
-			log.WithValues("set states", stateReplicas).
-				WithValues("state", item.State).
-				Info(fmt.Sprintf("State %s could not be found on scalingItem %s in namespace %s", item.State, item.Name, item.Namespace))
+
+			if item.State == "" {
+				log.WithValues("set states", stateReplicas).
+					WithValues("state", item.State).
+					Info(fmt.Sprintf("No determined state on scalingItem %s in namespace %s! Skipping desiredreplica determination", item.Name, item.Namespace))
+
+			} else {
+				log.WithValues("set states", stateReplicas).
+					WithValues("state", item.State).
+					Info(fmt.Sprintf("State %s could not be found on scalingItem %s in namespace %s", item.State, item.Name, item.Namespace))
+
+			}
 			continue
 		}
 		items[i].State = stateReplica.Name
@@ -357,7 +367,7 @@ func GetRefreshedScalingItem(ctx context.Context, _client client.Client, deploym
 			return g.ScalingInfo{}, err
 		}
 		itemToReturn = g.ConvertDeploymentToItem(deployment)
-	} else {
+	} else if deploymentInfo.ScalingItemType.ItemTypeName == "RedisCluster" {
 		// RedisCluster
 		redisCluster := redisalpha.RedisCluster{}
 		err := _client.Get(ctx, req.NamespacedName, &redisCluster)
@@ -365,6 +375,8 @@ func GetRefreshedScalingItem(ctx context.Context, _client client.Client, deploym
 			return g.ScalingInfo{}, err
 		}
 		itemToReturn = g.ConvertRedisClusterToItem(redisCluster)
+	} else {
+		return g.ScalingInfo{}, errors.New("type of the item could not be determined!")
 	}
 	// Refresh the item on the list as well
 	itemToReturn.IsBeingScaled = deploymentInfo.IsBeingScaled
@@ -467,13 +479,15 @@ func UpdateScalingItem(ctx context.Context, _client client.Client, deploymentIte
 		}
 		deployment.Spec.Replicas = &deploymentItem.SpecReplica
 		updateErr = _client.Update(ctx, &deployment, &client.UpdateOptions{})
-	} else {
+	} else if deploymentItem.ScalingItemType.ItemTypeName == "RedisCluster" {
 		redisCluster, getErr = RedisClusterGetter(ctx, _client, req)
 		if getErr != nil {
 			return getErr
 		}
 		redisCluster.Spec.Replicas = deploymentItem.SpecReplica
 		updateErr = _client.Update(ctx, &redisCluster, &client.UpdateOptions{})
+	} else {
+		return errors.New("type of the item could not be determined! No update")
 	}
 
 	return updateErr
@@ -542,6 +556,12 @@ func MakeNamespacesScaleDecisions(ctx context.Context, _client client.Client, gr
 		}
 
 		scalingInfoList := states.GetAppliedStatesOnItems(namespaceKey, namespaceState, clusterScalingStates, stateDefinitions, scalingInfoList)
+		for _, item := range scalingInfoList {
+			if item.Failure {
+				log.Info(fmt.Sprintf("Error on scalingitem %s in namespace %s | Error: %s", item.Name, item.Namespace, item.FailureMessage))
+			}
+		}
+
 		var finalLimitsCPU, finalLimitsMemory string
 		var nsEvents NamespaceEvents
 
@@ -602,11 +622,19 @@ func MakeNamespacesScaleDecisions(ctx context.Context, _client client.Client, gr
 
 			table.Render()
 
+			// Check if we need to care about this namespace being dryrun.
+			scaleNameSpace := false
+			for _, item := range scalingInfoList {
+				if item.SpecReplica != item.DesiredReplicas {
+					scaleNameSpace = true
+				}
+			}
+
 			nsEvents.DryRunInfo = nsEvents.DryRunInfo + tableString.String()
 			putOnMap := NamespaceScaleInfo{
 				ScalingItems:            scalingInfoList,
 				FinalNamespaceState:     namespaceState,
-				ScaleNameSpace:          false,
+				ScaleNameSpace:          scaleNameSpace,
 				StateError:              nsStateErr,
 				ReplicaListError:        replicalisterr,
 				ResourceQuotaCheckError: rqCheckErr,
