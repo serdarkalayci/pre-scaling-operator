@@ -174,7 +174,7 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 
 	if allowed {
 		scalingItemNew, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(scalingItem)
-		if notFoundErr == nil {
+		if notFoundErr == nil && !scalingItemNew.Failure {
 			if scalingItemNew.DesiredReplicas != scalingItem.DesiredReplicas {
 				g.GetDenyList().SetScalingItemOnList(scalingItemNew, scalingItemNew.Failure, scalingItemNew.FailureMessage, scalingItem.DesiredReplicas)
 
@@ -192,6 +192,7 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 			if err != nil {
 				log.Error(err, "Error scaling object!")
 			}
+			return err
 		}
 
 	} else {
