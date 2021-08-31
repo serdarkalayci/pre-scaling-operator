@@ -47,6 +47,7 @@ spec:
     type: AllNamespaces
   keywords:
   - kubernetes
+  - prescaling
   links:
   - name: Pre Scaling Operator
     url: https://pre-scaling-operator.domain

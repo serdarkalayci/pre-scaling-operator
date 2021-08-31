@@ -52,5 +52,6 @@ spec:
              memory: 250Mi
         env:
           - name: MaxConcurrentNamespaceReconciles
-            value: "2"
+            value: "5"
+      serviceAccountName: pre-scaling-operator-sa
       terminationGracePeriodSeconds: 10

@@ -8,5 +8,5 @@ roleRef:
   name: proxy-role
 subjects:
 - kind: ServiceAccount
-  name: pre-scaling-operator-sa
+  name: sa
   namespace: system
