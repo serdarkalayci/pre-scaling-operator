@@ -17,7 +17,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: manager-role
+  name: pre-scaling-operator-role
 rules:
 - apiGroups:
   - ""

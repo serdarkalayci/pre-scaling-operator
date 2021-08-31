@@ -81,7 +81,7 @@ undeploy:
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=pre-scaling-operator-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 # Run go fmt against code
 fmt:
@@ -130,6 +130,8 @@ endef
 # Generate bundle manifests and metadata, then validate generated files.
 .PHONY: bundle
 bundle: manifests kustomize
+	rm -rf bundle/manifests/*
+	rm -rf bundle/metadata/*
 	operator-sdk generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image containersol/pre-scaling-operator=$(IMAGE_REF)
 	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)

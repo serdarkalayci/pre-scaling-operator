@@ -10,12 +10,14 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: ClusterScalingStateDefinition is the Schema for the clusterscalingstatedefinitions API
+    - description: ClusterScalingStateDefinition is the Schema for the clusterscalingstatedefinitions
+        API
       displayName: Cluster Scaling State Definition
       kind: ClusterScalingStateDefinition
       name: clusterscalingstatedefinitions.scaling.prescale.com
       version: v1alpha1
-    - description: ClusterScalingState is the Schema for the clusterscalingstates API
+    - description: ClusterScalingState is the Schema for the clusterscalingstates
+        API
       displayName: Cluster Scaling State
       kind: ClusterScalingState
       name: clusterscalingstates.scaling.prescale.com

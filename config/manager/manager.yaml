@@ -2,25 +2,25 @@ apiVersion: v1
 kind: Namespace
 metadata:
   labels:
-    control-plane: controller-manager
+    control-plane: pre-scaling-operator
   name: system
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: controller-manager
+  name: pre-scaling-operator
   namespace: system
   labels:
-    control-plane: controller-manager
+    control-plane: pre-scaling-operator
 spec:
   selector:
     matchLabels:
-      control-plane: controller-manager
+      control-plane: pre-scaling-operator
   replicas: 1
   template:
     metadata:
       labels:
-        control-plane: controller-manager
+        control-plane: pre-scaling-operator
     spec:
       containers:
       - command:

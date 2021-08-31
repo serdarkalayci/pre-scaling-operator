@@ -3,14 +3,14 @@ kind: Service
 metadata:
   creationTimestamp: null
   labels:
-    control-plane: controller-manager
-  name: pre-scaling-operator-controller-manager-metrics-service
+    control-plane: pre-scaling-operator
+  name: pre-scaling-operator-metrics-service
 spec:
   ports:
   - name: https
     port: 8443
     targetPort: https
   selector:
-    control-plane: controller-manager
+    control-plane: pre-scaling-operator
 status:
   loadBalancer: {}

@@ -4,7 +4,7 @@ metadata:
   annotations:
     alm-examples: '[]'
     capabilities: Basic Install
-    operators.operatorframework.io/builder: operator-sdk-v1.4.0
+    operators.operatorframework.io/builder: operator-sdk-v1.10.0+git
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: pre-scaling-operator.v0.0.1
   namespace: placeholder
@@ -12,12 +12,14 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: ClusterScalingStateDefinition is the Schema for the clusterscalingstatedefinitions API
+    - description: ClusterScalingStateDefinition is the Schema for the clusterscalingstatedefinitions
+        API
       displayName: Cluster Scaling State Definition
       kind: ClusterScalingStateDefinition
       name: clusterscalingstatedefinitions.scaling.prescale.com
       version: v1alpha1
-    - description: ClusterScalingState is the Schema for the clusterscalingstates API
+    - description: ClusterScalingState is the Schema for the clusterscalingstates
+        API
       displayName: Cluster Scaling State
       kind: ClusterScalingState
       name: clusterscalingstates.scaling.prescale.com
@@ -34,151 +36,18 @@ spec:
     mediatype: ""
   install:
     spec:
-      clusterPermissions:
-      - rules:
-        - apiGroups:
-          - ""
-          resources:
-          - events
-          verbs:
-          - create
-          - patch
-        - apiGroups:
-          - ""
-          resources:
-          - namespaces
-          verbs:
-          - list
-          - watch
-        - apiGroups:
-          - ""
-          resources:
-          - resourcequotas
-          verbs:
-          - list
-        - apiGroups:
-          - apps
-          resources:
-          - deployments
-          verbs:
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - apps.openshift.io
-          resources:
-          - deploymentconfigs
-          verbs:
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - scaling.prescale.com
-          resources:
-          - clusterscalingstatedefinitions
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - scaling.prescale.com
-          resources:
-          - clusterscalingstatedefinitions/finalizers
-          verbs:
-          - update
-        - apiGroups:
-          - scaling.prescale.com
-          resources:
-          - clusterscalingstatedefinitions/status
-          verbs:
-          - get
-          - patch
-          - update
-        - apiGroups:
-          - scaling.prescale.com
-          resources:
-          - clusterscalingstates
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - scaling.prescale.com
-          resources:
-          - clusterscalingstates/finalizers
-          verbs:
-          - update
-        - apiGroups:
-          - scaling.prescale.com
-          resources:
-          - clusterscalingstates/status
-          verbs:
-          - get
-          - patch
-          - update
-        - apiGroups:
-          - scaling.prescale.com
-          resources:
-          - scalingstates
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - scaling.prescale.com
-          resources:
-          - scalingstates/finalizers
-          verbs:
-          - update
-        - apiGroups:
-          - scaling.prescale.com
-          resources:
-          - scalingstates/status
-          verbs:
-          - get
-          - patch
-          - update
-        - apiGroups:
-          - authentication.k8s.io
-          resources:
-          - tokenreviews
-          verbs:
-          - create
-        - apiGroups:
-          - authorization.k8s.io
-          resources:
-          - subjectaccessreviews
-          verbs:
-          - create
-        serviceAccountName: default
       deployments:
-      - name: pre-scaling-operator-controller-manager
+      - name: pre-scaling-operator-pre-scaling-operator
         spec:
           replicas: 1
           selector:
             matchLabels:
-              control-plane: controller-manager
+              control-plane: pre-scaling-operator
           strategy: {}
           template:
             metadata:
               labels:
-                control-plane: controller-manager
+                control-plane: pre-scaling-operator
             spec:
               containers:
               - args:
@@ -217,38 +86,14 @@ spec:
                   periodSeconds: 10
                 resources:
                   limits:
-                    cpu: 100m
-                    memory: 30Mi
+                    cpu: 200m
+                    memory: 300Mi
                   requests:
                     cpu: 100m
-                    memory: 20Mi
+                    memory: 250Mi
                 securityContext:
                   allowPrivilegeEscalation: false
               terminationGracePeriodSeconds: 10
-      permissions:
-      - rules:
-        - apiGroups:
-          - ""
-          - coordination.k8s.io
-          resources:
-          - configmaps
-          - leases
-          verbs:
-          - get
-          - list
-          - watch
-          - create
-          - update
-          - patch
-          - delete
-        - apiGroups:
-          - ""
-          resources:
-          - events
-          verbs:
-          - create
-          - patch
-        serviceAccountName: default
     strategy: deployment
   installModes:
   - supported: false
