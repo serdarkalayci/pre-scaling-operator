@@ -12,6 +12,7 @@ metadata:
   namespace: system
   labels:
     control-plane: controller-manager
+    operator: pre-scaling-operator
 spec:
   selector:
     matchLabels:

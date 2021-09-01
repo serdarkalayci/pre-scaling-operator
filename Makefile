@@ -49,10 +49,21 @@ all: manager
 
 # Run tests
 ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
-test: generate fmt vet manifests
+test: cleanup generate fmt vet manifests 
 	mkdir -p ${ENVTEST_ASSETS_DIR}
 	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.7.0/hack/setup-envtest.sh
 	source ${ENVTEST_ASSETS_DIR}/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); go test ./... -coverprofile cover.out -timeout 40m
+
+# Clean up cluster to prepare for e2e test run
+cleanup:
+	./cleanup.sh
+
+## TODO
+# Save cluster state
+# cleanup x
+# test
+# Restore cluster state
+
 
 # Build manager binary
 manager: generate fmt vet
