@@ -31,6 +31,8 @@ BUNDLE_IMG ?= pre-scaling-operator-bundle:$(VERSION)
 # Image URL to use all building/pushing image targets
 IMG ?= containersol/pre-scaling-operator:ci
 
+CHANNELS ?= alpha,beta
+
 # Image REF in bundle image
 # Can be overwritten with make bundle IMAGE_REF=<some-registry>/<project-name-bundle>:<tag>
 IMAGE_REF ?= $(IMG)
@@ -134,7 +136,7 @@ bundle: manifests kustomize
 	rm -rf bundle/metadata/*
 	operator-sdk generate kustomize manifests -q
 	cd config/apps && $(KUSTOMIZE) edit set image containersol/pre-scaling-operator=$(IMAGE_REF)
-	$(KUSTOMIZE) build config | operator-sdk generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	$(KUSTOMIZE) build config | operator-sdk generate bundle -q --overwrite --channels $(CHANNELS) --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	operator-sdk bundle validate ./bundle
 
 # Build the bundle image.
