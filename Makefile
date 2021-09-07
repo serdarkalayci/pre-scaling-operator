@@ -60,15 +60,15 @@ run-tests: generate fmt vet manifests
 
 # Save cluster state prior to e2e test
 save-cluster:
-	./save_state.sh
+	scripts/save_state.sh
 
 # Clean up cluster to prepare for e2e test run
 cleanup:
-	./cleanup.sh
+	scripts/cleanup.sh
 
 # Restore cluster to pre-test state
 restore-cluster:
-	./load_state.sh
+	scripts/load_state.sh
 
 # Build manager binary
 manager: generate fmt vet
