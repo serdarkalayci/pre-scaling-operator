@@ -26,3 +26,5 @@ while read p; do
     line=($p)
     kubectl -n "${line[0]}" scale deployment "${line[1]}" --replicas=1
 done < temp/operators.txt
+
+rm -rf ./temp

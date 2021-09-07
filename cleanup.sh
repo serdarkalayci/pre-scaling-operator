@@ -1,5 +1,9 @@
 #!/bin/bash
 
+mkdir -p temp/clusterScalingState
+mkdir  -p temp/clusterScalingStateDefinition
+mkdir -p temp/namespace
+
 # Delete e2e namespaces
 kubectl get namespaces --no-headers=true -o custom-columns=:metadata.name | grep e2e > temp/namespaces.txt
 while read p; do 
