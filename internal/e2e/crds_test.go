@@ -40,7 +40,7 @@ var _ = Describe("e2e Test for the crd controllers", func() {
 		}
 	)
 
-	OpenshiftCluster, _ := validations.ClusterCheck()
+	OpenshiftCluster, _ := validations.OpenshiftClusterCheck()
 
 	BeforeEach(func() {
 

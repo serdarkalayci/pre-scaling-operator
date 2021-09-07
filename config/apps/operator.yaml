@@ -2,26 +2,30 @@ apiVersion: v1
 kind: Namespace
 metadata:
   labels:
-    control-plane: controller-manager
+    control-plane: pre-scaling-operator
   name: system
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: controller-manager
+  name: pre-scaling-operator
   namespace: system
   labels:
-    control-plane: controller-manager
+<<<<<<< HEAD:config/manager/manager.yaml
+    control-plane: pre-scaling-operator
     operator-name: pre-scaling-operator
+=======
+    
+>>>>>>> main:config/apps/operator.yaml
 spec:
   selector:
     matchLabels:
-      control-plane: controller-manager
+      control-plane: pre-scaling-operator
   replicas: 1
   template:
     metadata:
       labels:
-        control-plane: controller-manager
+        control-plane: pre-scaling-operator
     spec:
       containers:
       - command:
@@ -45,13 +49,11 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 10
         resources:
-          limits:
-            cpu: 100m
-            memory: 30Mi
-          requests:
-            cpu: 100m
-            memory: 20Mi
+           limits:
+             cpu: "1"
+             memory: 800Mi
         env:
           - name: MaxConcurrentNamespaceReconciles
-            value: "2"
+            value: "5"
+      serviceAccountName: pre-scaling-operator-sa
       terminationGracePeriodSeconds: 10

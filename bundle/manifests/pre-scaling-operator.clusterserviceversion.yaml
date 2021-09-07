@@ -2,9 +2,65 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
   annotations:
-    alm-examples: '[]'
+    alm-examples: |-
+      [
+        {
+          "apiVersion": "scaling.prescale.com/v1alpha1",
+          "config": {
+            "dryRun": false
+          },
+          "kind": "ClusterScalingState",
+          "metadata": {
+            "name": "clusterscalingstate-sample-test"
+          },
+          "spec": {
+            "scalingClass": "test",
+            "state": "bau"
+          }
+        },
+        {
+          "apiVersion": "scaling.prescale.com/v1alpha1",
+          "config": {
+            "dryRun": false
+          },
+          "kind": "ClusterScalingStateDefinition",
+          "metadata": {
+            "name": "global-state-definition"
+          },
+          "spec": [
+            {
+              "description": "Maximum scaling settings",
+              "name": "peak",
+              "priority": 1
+            },
+            {
+              "description": "Higher expected load after a marketing run. Possibly an email blast or twitter share.",
+              "name": "marketing-run",
+              "priority": 5
+            },
+            {
+              "description": "Business as usual",
+              "name": "bau",
+              "priority": 10
+            }
+          ]
+        },
+        {
+          "apiVersion": "scaling.prescale.com/v1alpha1",
+          "config": {
+            "dryRun": false
+          },
+          "kind": "ScalingState",
+          "metadata": {
+            "name": "scalingstate-product"
+          },
+          "spec": {
+            "state": "peak"
+          }
+        }
+      ]
     capabilities: Basic Install
-    operators.operatorframework.io/builder: operator-sdk-v1.4.0
+    operators.operatorframework.io/builder: operator-sdk-v1.10.0+git
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: pre-scaling-operator.v0.0.1
   namespace: placeholder
@@ -12,12 +68,14 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: ClusterScalingStateDefinition is the Schema for the clusterscalingstatedefinitions API
+    - description: ClusterScalingStateDefinition is the Schema for the clusterscalingstatedefinitions
+        API
       displayName: Cluster Scaling State Definition
       kind: ClusterScalingStateDefinition
       name: clusterscalingstatedefinitions.scaling.prescale.com
       version: v1alpha1
-    - description: ClusterScalingState is the Schema for the clusterscalingstates API
+    - description: ClusterScalingState is the Schema for the clusterscalingstates
+        API
       displayName: Cluster Scaling State
       kind: ClusterScalingState
       name: clusterscalingstates.scaling.prescale.com
@@ -60,6 +118,16 @@ spec:
           - apps
           resources:
           - deployments
+          verbs:
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - redisclusters
           verbs:
           - get
           - list
@@ -154,53 +222,28 @@ spec:
           - get
           - patch
           - update
-        - apiGroups:
-          - authentication.k8s.io
-          resources:
-          - tokenreviews
-          verbs:
-          - create
-        - apiGroups:
-          - authorization.k8s.io
-          resources:
-          - subjectaccessreviews
-          verbs:
-          - create
-        serviceAccountName: default
+        serviceAccountName: pre-scaling-operator-sa
       deployments:
-      - name: pre-scaling-operator-controller-manager
+      - name: pre-scaling-operator
         spec:
           replicas: 1
           selector:
             matchLabels:
-              control-plane: controller-manager
+              control-plane: pre-scaling-operator
           strategy: {}
           template:
             metadata:
               labels:
-                control-plane: controller-manager
+                control-plane: pre-scaling-operator
             spec:
               containers:
               - args:
-                - --secure-listen-address=0.0.0.0:8443
-                - --upstream=http://127.0.0.1:8080/
-                - --logtostderr=true
-                - --v=10
-                image: gcr.io/kubebuilder/kube-rbac-proxy:v0.5.0
-                name: kube-rbac-proxy
-                ports:
-                - containerPort: 8443
-                  name: https
-                resources: {}
-              - args:
-                - --health-probe-bind-address=:8081
-                - --metrics-bind-address=127.0.0.1:8080
                 - --leader-elect
                 command:
                 - /manager
                 env:
                 - name: MaxConcurrentNamespaceReconciles
-                  value: "2"
+                  value: "5"
                 image: containersol/pre-scaling-operator:ci
                 livenessProbe:
                   httpGet:
@@ -217,13 +260,14 @@ spec:
                   periodSeconds: 10
                 resources:
                   limits:
-                    cpu: 100m
-                    memory: 30Mi
+                    cpu: 200m
+                    memory: 300Mi
                   requests:
                     cpu: 100m
-                    memory: 20Mi
+                    memory: 250Mi
                 securityContext:
                   allowPrivilegeEscalation: false
+              serviceAccountName: pre-scaling-operator-sa
               terminationGracePeriodSeconds: 10
       permissions:
       - rules:
@@ -248,7 +292,7 @@ spec:
           verbs:
           - create
           - patch
-        serviceAccountName: default
+        serviceAccountName: pre-scaling-operator-sa
     strategy: deployment
   installModes:
   - supported: false
@@ -261,6 +305,7 @@ spec:
     type: AllNamespaces
   keywords:
   - kubernetes
+  - prescaling
   links:
   - name: Pre Scaling Operator
     url: https://pre-scaling-operator.domain

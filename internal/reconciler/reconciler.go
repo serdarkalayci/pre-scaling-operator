@@ -18,10 +18,11 @@ import (
 )
 
 type NamespaceInfo struct {
-	NSEvents     resources.NamespaceEvents
-	AppliedState string
-	Error        error
-	RetriggerMe  bool
+	NSEvents       resources.NamespaceEvents
+	AppliedState   string
+	Error          error
+	RetriggerMe    bool
+	ScaleNamespace bool
 }
 
 type ReconcilerError struct {
@@ -55,7 +56,7 @@ func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, na
 	}
 
 	if len(scalingobjects) == 0 {
-		log.Info("nothing to reconcile. No opted in Deployments or DeploymentConfigs found.")
+		log.Info("nothing to reconcile. No opted in objects found.")
 		return nil, false, nil
 	}
 
@@ -73,13 +74,14 @@ func PrepareForNamespaceReconcile(ctx context.Context, _client client.Client, na
 		}
 
 		nsInfoMap[namespaceKey] = NamespaceInfo{
-			NSEvents:     value.NamespaceEvents,
-			AppliedState: value.FinalNamespaceState.Name,
+			NSEvents:       value.NamespaceEvents,
+			AppliedState:   value.FinalNamespaceState.Name,
+			ScaleNamespace: value.ScaleNameSpace,
 		}
 
 		// Accumulate the information to return to the controller
 	}
-	if overallNsInformation.NumberofNsToScale > 0 {
+	if overallNsInformation.NumberofNsToScale > 0 && !dryRun {
 		reTrigger = true
 	}
 	return nsInfoMap, reTrigger, nil
@@ -172,9 +174,9 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 
 	if allowed {
 		scalingItemNew, notFoundErr := g.GetDenyList().GetDeploymentInfoFromList(scalingItem)
-		if notFoundErr == nil {
+		if notFoundErr == nil && !scalingItemNew.Failure {
 			if scalingItemNew.DesiredReplicas != scalingItem.DesiredReplicas {
-				g.GetDenyList().SetScalingItemOnList(scalingItemNew, scalingItemNew.Failure, scalingItemNew.FailureMessage, scalingItemNew.DesiredReplicas)
+				g.GetDenyList().SetScalingItemOnList(scalingItemNew, scalingItemNew.Failure, scalingItemNew.FailureMessage, scalingItem.DesiredReplicas)
 
 				log.WithValues("Name: ", scalingItemNew.Name).
 					WithValues("Namespace: ", scalingItemNew.Namespace).
@@ -190,6 +192,7 @@ func ReconcileScalingItem(ctx context.Context, _client client.Client, scalingIte
 			if err != nil {
 				log.Error(err, "Error scaling object!")
 			}
+			return err
 		}
 
 	} else {

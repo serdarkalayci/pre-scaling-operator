@@ -137,7 +137,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	//OpenshiftCluster, _ := validations.ClusterCheck()
-	constants.OpenshiftCluster, err = validations.ClusterCheck()
+	constants.OpenshiftCluster, err = validations.OpenshiftClusterCheck()
 	if constants.OpenshiftCluster {
 		err = (&controllers.DeploymentConfigWatcher{
 			Client:   k8sManager.GetClient(),

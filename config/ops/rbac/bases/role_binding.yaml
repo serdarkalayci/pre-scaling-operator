@@ -1,12 +1,12 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: proxy-rolebinding
+  name: pre-scaling-operator-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: proxy-role
+  name: pre-scaling-operator-role
 subjects:
 - kind: ServiceAccount
-  name: default
+  name: pre-scaling-operator-sa
   namespace: system

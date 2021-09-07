@@ -3,6 +3,7 @@ module github.com/containersol/prescale-operator
 go 1.15
 
 require (
+	github.com/containersolutions/redis-operator v0.2.6
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/go-delve/delve v1.6.1 // indirect
 	github.com/go-logr/logr v0.3.0
@@ -11,8 +12,8 @@ require (
 	github.com/mattn/go-isatty v0.0.13 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/olekukonko/tablewriter v0.0.0-20170122224234-a0225b3f23b5
-	github.com/onsi/ginkgo v1.15.2
-	github.com/onsi/gomega v1.10.2
+	github.com/onsi/ginkgo v1.16.4
+	github.com/onsi/gomega v1.14.0
 	github.com/openshift/api v3.9.0+incompatible
 	github.com/peterh/liner v1.2.1 // indirect
 	github.com/prometheus/common v0.10.0
@@ -28,5 +29,5 @@ require (
 	k8s.io/apimachinery v0.20.5
 	k8s.io/client-go v0.20.4
 	k8s.io/kubectl v0.20.4
-	sigs.k8s.io/controller-runtime v0.7.0
+	sigs.k8s.io/controller-runtime v0.7.2
 )

@@ -79,6 +79,11 @@ func GetRapidScalingSetting(deploymentItem g.ScalingInfo) bool {
 
 	scalingAnnotation := annotations.FilterByKeyPrefix("scaler/rapid-", deploymentItem.Annotations)
 
+	// Redis Cluster doesn't support step scaling. Do rapid scale
+	if deploymentItem.ItemTypeName == "RedisCluster" {
+		return true
+	}
+
 	if len(scalingAnnotation) == 0 {
 		return false
 	}
@@ -224,12 +229,7 @@ func GetAppliedStateOld(ctx context.Context, _client client.Client, namespace st
 func GetAppliedStatesOnItems(namespace string, namespaceState State, clusterScalingStates v1alpha1.ClusterScalingStateList, stateDefinitions States, items []g.ScalingInfo) []g.ScalingInfo {
 
 	for i, item := range items {
-		if (len(clusterScalingStates.Items) == 0 && namespaceState != State{}) {
-			items[i].State = namespaceState.Name
-		} else {
-			items[i] = GetAppliedStateAndClassOnItem(item, namespaceState, clusterScalingStates, stateDefinitions)
-
-		}
+		items[i] = GetAppliedStateAndClassOnItem(item, namespaceState, clusterScalingStates, stateDefinitions)
 	}
 
 	return items
@@ -238,8 +238,12 @@ func GetAppliedStatesOnItems(namespace string, namespaceState State, clusterScal
 func GetAppliedStateAndClassOnItem(item g.ScalingInfo, namespaceState State, clusterScalingStates v1alpha1.ClusterScalingStateList, stateDefinitions States) g.ScalingInfo {
 
 	item = GetAppliedClass(clusterScalingStates, stateDefinitions, item)
-	if !item.Failure {
-		item.State = stateDefinitions.FindPriorityState(namespaceState, State(item.ClusterClassState)).Name
+	item.State = stateDefinitions.FindPriorityState(namespaceState, State(item.ClusterClassState)).Name
+	
+	// Could recover state not found error. Deleting failure. 
+	if item.State != "" && item.Failure{
+		item.Failure = false
+		item.FailureMessage = ""
 	}
 	return item
 }

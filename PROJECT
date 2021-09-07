@@ -1,21 +1,31 @@
 domain: prescale.com
-layout: go.kubebuilder.io/v3
-projectName: pre-scaling-operator
-repo: github.com/containersol/prescale-operator
-resources:
-- crdVersion: v1
-  group: scaling
-  kind: ClusterScalingStateDefinition
-  version: v1alpha1
-- crdVersion: v1
-  group: scaling
-  kind: ClusterScalingState
-  version: v1alpha1
-- crdVersion: v1
-  group: scaling
-  kind: ScalingState
-  version: v1alpha1
-version: 3-alpha
+layout: 
+- go.kubebuilder.io/v3
 plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
+projectName: pre-scaling-operator
+repo: github.com/containersol/prescale-operator
+resources:
+- api:
+    crdVersion: v1
+  group: scaling
+  domain: prescale.com
+  kind: ClusterScalingStateDefinition
+  version: v1alpha1
+  path: github.com/containersolutions/pre-scaling-operator/api/v1alpha1
+- api:
+    crdVersion: v1
+  group: scaling
+  domain: prescale.com
+  kind: ClusterScalingState
+  version: v1alpha1
+  path: github.com/containersolutions/pre-scaling-operator/api/v1alpha1
+- api:
+    crdVersion: v1
+  group: scaling
+  domain: prescale.com
+  kind: ScalingState
+  version: v1alpha1
+  path: github.com/containersolutions/pre-scaling-operator/api/v1alpha1
+version: "3"
