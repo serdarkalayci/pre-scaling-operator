@@ -4,7 +4,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: pre-scaling-operator-role
+  name: pre-scaling-operator-cluster-role
 rules:
 - apiGroups:
   - ""
@@ -37,9 +37,9 @@ rules:
   - update
   - watch
 - apiGroups:
-  - apps
+  - apps.openshift.io
   resources:
-  - redisclusters
+  - deploymentconfigs
   verbs:
   - get
   - list
@@ -47,9 +47,9 @@ rules:
   - update
   - watch
 - apiGroups:
-  - apps.openshift.io
+  - redis.containersolutions.com
   resources:
-  - deploymentconfigs
+  - redisclusters
   verbs:
   - get
   - list
