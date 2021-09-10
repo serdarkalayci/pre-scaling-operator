@@ -11,12 +11,8 @@ metadata:
   name: pre-scaling-operator
   namespace: system
   labels:
-<<<<<<< HEAD:config/manager/manager.yaml
     control-plane: pre-scaling-operator
     operator-name: pre-scaling-operator
-=======
-    
->>>>>>> main:config/apps/operator.yaml
 spec:
   selector:
     matchLabels:
