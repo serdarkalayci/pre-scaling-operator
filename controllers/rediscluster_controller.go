@@ -39,7 +39,7 @@ type RedisClusterWatcher struct {
 }
 
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=list;watch;
-// +kubebuilder:rbac:groups=apps,resources=redisclusters,verbs=get;list;watch;patch;update;
+// +kubebuilder:rbac:groups=redis.containersolutions.com,resources=redisclusters,verbs=get;list;watch;patch;update;
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // Reconcile tries to reconcile the replicas of the opted-in deployments

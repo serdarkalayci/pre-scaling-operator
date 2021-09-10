@@ -280,13 +280,13 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 			if deploymentItem.ReadyReplicas == deploymentItem.DesiredReplicas {
 				stepCondition = false
 			} else {
-				log.WithValues("ScalingItem: ", deploymentItem.Name).
-					WithValues("Namespace: ", deploymentItem.Namespace).
-					WithValues("Stepreplicacount", stepReplicaCount).
-					WithValues("Oldreplicacount", oldReplicaCount).
-					WithValues("Desiredreplicacount", desiredReplicaCount).
-					WithValues("Wherefrom: ", whereFrom).
-					Info("Step Scaling!")
+				// log.WithValues("ScalingItem: ", deploymentItem.Name).
+				// 	WithValues("Namespace: ", deploymentItem.Namespace).
+				// 	WithValues("Stepreplicacount", stepReplicaCount).
+				// 	WithValues("Oldreplicacount", oldReplicaCount).
+				// 	WithValues("Desiredreplicacount", desiredReplicaCount).
+				// 	WithValues("Wherefrom: ", whereFrom).
+				// 	Info("Step Scaling!")
 
 				retryErr = DoScaling(ctx, _client, deploymentItem, stepReplicaCount)
 			}
