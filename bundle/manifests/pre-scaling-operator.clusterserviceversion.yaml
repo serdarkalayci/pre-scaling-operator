@@ -62,7 +62,7 @@ metadata:
     capabilities: Basic Install
     operators.operatorframework.io/builder: operator-sdk-v1.10.0+git
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
-  name: pre-scaling-operator.v0.0.1
+  name: pre-scaling-operator.v0.2.9
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -125,9 +125,9 @@ spec:
           - update
           - watch
         - apiGroups:
-          - apps
+          - apps.openshift.io
           resources:
-          - redisclusters
+          - deploymentconfigs
           verbs:
           - get
           - list
@@ -135,9 +135,9 @@ spec:
           - update
           - watch
         - apiGroups:
-          - apps.openshift.io
+          - redis.containersolutions.com
           resources:
-          - deploymentconfigs
+          - redisclusters
           verbs:
           - get
           - list
@@ -244,7 +244,7 @@ spec:
                 env:
                 - name: MaxConcurrentNamespaceReconciles
                   value: "5"
-                image: containersol/pre-scaling-operator:ci
+                image: docker.io/containersol/pre-scaling-operator:0.2.9
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -260,11 +260,8 @@ spec:
                   periodSeconds: 10
                 resources:
                   limits:
-                    cpu: 200m
-                    memory: 300Mi
-                  requests:
-                    cpu: 100m
-                    memory: 250Mi
+                    cpu: "1"
+                    memory: 800Mi
                 securityContext:
                   allowPrivilegeEscalation: false
               serviceAccountName: pre-scaling-operator-sa
@@ -299,7 +296,7 @@ spec:
     type: OwnNamespace
   - supported: false
     type: SingleNamespace
-  - supported: false
+  - supported: true
     type: MultiNamespace
   - supported: true
     type: AllNamespaces
@@ -315,4 +312,4 @@ spec:
   maturity: alpha
   provider:
     name: Container Solutions
-  version: 0.0.1
+  version: 0.2.9

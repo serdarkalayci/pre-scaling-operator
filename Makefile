@@ -83,7 +83,7 @@ undeploy:
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=pre-scaling-operator-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases output:rbac:artifacts:config=config/ops/rbac/bases
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=pre-scaling-operator-cluster-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases output:rbac:artifacts:config=config/ops/rbac/bases
 
 # Run go fmt against code
 fmt:
