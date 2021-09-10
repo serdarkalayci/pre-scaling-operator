@@ -92,7 +92,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 						return fetchedDeploymentConfig.Status.AvailableReplicas
 					}, timeout, interval).Should(Equal(OptInSpecificReplicaCount(optinOld)))
 
-					time.Sleep(time.Second * 2)
+					time.Sleep(time.Second * 6)
 
 					Eventually(func() ocv1.DeploymentConfig {
 						k8sClient.Get(context.Background(), key, &fetchedDeploymentConfig)
@@ -127,7 +127,7 @@ var _ = Describe("e2e Test for the main operator functionalities", func() {
 					deployment = createDeployment(key, optinOld, casenumber)
 					Expect(k8sClient.Create(context.Background(), &deployment)).Should(Succeed())
 
-					time.Sleep(time.Second * 5)
+					time.Sleep(time.Second * 6)
 
 					Eventually(func() v1.Deployment {
 						k8sClient.Get(context.Background(), key, &fetchedDeployment)
