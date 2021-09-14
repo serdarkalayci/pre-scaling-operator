@@ -27,7 +27,7 @@ func StepScale(ctx context.Context, _client client.Client, deploymentItem g.Scal
 		// Get the desired replica count
 		desiredReplicaCount = deploymentItem.DesiredReplicas
 		// Check (and wait until) deployment is ready to scale
-		err := WaitForReady(ctx, _client, deploymentItem, recorder, log)
+		deploymentItem, err := WaitForReady(ctx, _client, deploymentItem, recorder, log)
 		if err != nil {
 			log.Error(err, "Error waiting for deployment to become ready")
 			return err
@@ -74,7 +74,7 @@ func RapidScale(ctx context.Context, _client client.Client, deploymentItem g.Sca
 	deploymentItem.IsBeingScaled = true
 	g.GetDenyList().SetScalingItemOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, desiredReplicaCount)
 
-	err := WaitForReady(ctx, _client, deploymentItem, recorder, log)
+	deploymentItem, err := WaitForReady(ctx, _client, deploymentItem, recorder, log)
 
 	if err != nil {
 		log.Error(err, "Error waiting for deployment to become ready")
@@ -95,7 +95,7 @@ func RapidScale(ctx context.Context, _client client.Client, deploymentItem g.Sca
 
 }
 
-func WaitForReady(ctx context.Context, _client client.Client, deploymentItem g.ScalingInfo, recorder record.EventRecorder, log logr.Logger) error {
+func WaitForReady(ctx context.Context, _client client.Client, deploymentItem g.ScalingInfo, recorder record.EventRecorder, log logr.Logger) (g.ScalingInfo, error) {
 	var err error
 
 	stepReplicaCount := deploymentItem.SpecReplica
@@ -116,7 +116,7 @@ func WaitForReady(ctx context.Context, _client client.Client, deploymentItem g.S
 			RegisterEvents(ctx, _client, recorder, timeoutErr, deploymentItem)
 			// Set failure state to true
 			g.GetDenyList().SetScalingItemOnList(deploymentItem, true, timeoutErr.msg, deploymentItem.DesiredReplicas)
-			return timeoutErr
+			return deploymentItem, timeoutErr
 		default:
 			// While not timeout
 			time.Sleep(time.Second * 2)
@@ -127,7 +127,7 @@ func WaitForReady(ctx context.Context, _client client.Client, deploymentItem g.S
 				// The deployment does not exist anymore. Not putting it in failure state.
 				RegisterEvents(ctx, _client, recorder, nil, deploymentItem)
 				g.GetDenyList().RemoveFromList(deploymentItem)
-				return err
+				return deploymentItem, err
 			}
 
 			if deploymentItem.ReadyReplicas == stepReplicaCount || deploymentItem.SpecReplica == deploymentItem.ReadyReplicas {
@@ -141,9 +141,9 @@ func WaitForReady(ctx context.Context, _client client.Client, deploymentItem g.S
 				deploymentItem.IsBeingScaled = false
 				g.GetDenyList().SetScalingItemOnList(deploymentItem, true, "ProgressDeadlineExceeded", desiredReplicaCount)
 				RegisterEvents(ctx, _client, recorder, scaleErr, deploymentItem)
-				return scaleErr
+				return deploymentItem, scaleErr
 			}
 		}
 	}
-	return nil
+	return deploymentItem, nil
 }

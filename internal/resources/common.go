@@ -410,7 +410,7 @@ func RegisterEvents(ctx context.Context, _client client.Client, recorder record.
 			if scalerErr != nil {
 				recorder.Event(deplConf.DeepCopyObject(), "Warning", "Deploymentconfig scale error", scalerErr.Error()+" | "+fmt.Sprintf("Failed to scale the Deploymentconfig to %d replicas. Stuck on: %d replicas", scalingItem.DesiredReplicas, deplConf.Spec.Replicas))
 			} else {
-				recorder.Event(deplConf.DeepCopyObject(), "Normal", "Deploymentconfig scaled", fmt.Sprintf("Successfully scaled the Deploymentconfig to %d replicas", deplConf.Spec.Replicas))
+				recorder.Event(deplConf.DeepCopyObject(), "Normal", "Deploymentconfig scaled", fmt.Sprintf("Successfully scaled the Deploymentconfig to %d replicas", scalingItem.DesiredReplicas))
 			}
 		}
 	} else {
@@ -420,7 +420,7 @@ func RegisterEvents(ctx context.Context, _client client.Client, recorder record.
 			if scalerErr != nil {
 				recorder.Event(depl.DeepCopyObject(), "Warning", "Deployment scale error", scalerErr.Error()+" | "+fmt.Sprintf("Failed to scale the Deployment to %d replicas. Stuck on: %d replicas", scalingItem.DesiredReplicas, *depl.Spec.Replicas))
 			} else {
-				recorder.Event(depl.DeepCopyObject(), "Normal", "Deployment scaled", fmt.Sprintf("Successfully scaled the Deployment to %d replicas", *depl.Spec.Replicas))
+				recorder.Event(depl.DeepCopyObject(), "Normal", "Deployment scaled", fmt.Sprintf("Successfully scaled the Deployment to %d replicas", scalingItem.DesiredReplicas))
 			}
 		}
 
