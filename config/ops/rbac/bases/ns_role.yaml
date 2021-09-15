@@ -1,0 +1,59 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  creationTimestamp: null
+  name: pre-scaling-operator-ns-role
+  namespace: devops-scaling-operator
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.openshift.io
+  resources:
+  - deploymentconfigs
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - redis.containersolutions.com
+  resources:
+  - redisclusters
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - scaling.prescale.com
+  resources:
+  - scalingstates/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - scaling.prescale.com
+  resources:
+  - scalingstates/status
+  verbs:
+  - get
+  - patch
+  - update

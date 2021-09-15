@@ -99,7 +99,7 @@ undeploy:
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=pre-scaling-operator-cluster-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases output:rbac:artifacts:config=config/ops/rbac/bases
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=pre-scaling-operator-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases output:rbac:artifacts:config=config/ops/rbac/bases
 
 # Run go fmt against code
 fmt:
@@ -153,6 +153,16 @@ bundle: manifests kustomize
 	operator-sdk generate kustomize manifests -q
 	cd config/apps && $(KUSTOMIZE) edit set image containersol/pre-scaling-operator=$(IMAGE_REF)
 	$(KUSTOMIZE) build config | operator-sdk generate bundle -q --overwrite --channels $(CHANNELS) --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	operator-sdk bundle validate ./bundle
+
+
+# Generate bundle manifests and metadata, then validate generated files.
+.PHONY: bundle-static
+bundle-static:
+	rm -rf bundle/manifests/*
+	rm -rf bundle/metadata/*
+	cd config-static/apps && $(KUSTOMIZE) edit set image containersol/pre-scaling-operator=$(IMAGE_REF)
+	$(KUSTOMIZE) build config-static | operator-sdk generate bundle -q --overwrite --channels $(CHANNELS) --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	operator-sdk bundle validate ./bundle
 
 # Build the bundle image.
