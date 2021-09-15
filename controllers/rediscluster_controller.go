@@ -39,8 +39,9 @@ type RedisClusterWatcher struct {
 }
 
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=list;watch;
-// +kubebuilder:rbac:groups=redis.containersolutions.com,resources=redisclusters,verbs=get;list;watch;patch;update;
-// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
+// +kubebuilder:rbac:namespace=devops-scaling-operator,groups=redis.containersolutions.com,resources=redisclusters,verbs=patch;update;
+// +kubebuilder:rbac:groups=redis.containersolutions.com,resources=redisclusters,verbs=get;list;watch
+// +kubebuilder:rbac:namespace=devops-scaling-operator,groups="",resources=events,verbs=create;patch
 
 // Reconcile tries to reconcile the replicas of the opted-in deployments
 func (r *RedisClusterWatcher) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {

@@ -97,13 +97,6 @@ spec:
         - apiGroups:
           - ""
           resources:
-          - events
-          verbs:
-          - create
-          - patch
-        - apiGroups:
-          - ""
-          resources:
           - namespaces
           verbs:
           - list
@@ -121,8 +114,6 @@ spec:
           verbs:
           - get
           - list
-          - patch
-          - update
           - watch
         - apiGroups:
           - apps.openshift.io
@@ -131,8 +122,6 @@ spec:
           verbs:
           - get
           - list
-          - patch
-          - update
           - watch
         - apiGroups:
           - redis.containersolutions.com
@@ -141,8 +130,6 @@ spec:
           verbs:
           - get
           - list
-          - patch
-          - update
           - watch
         - apiGroups:
           - scaling.prescale.com
@@ -244,7 +231,7 @@ spec:
                 env:
                 - name: MaxConcurrentNamespaceReconciles
                   value: "5"
-                image: docker.io/containersol/pre-scaling-operator:0.2.9
+                image: docker.io/pathogen/scaler-operator:0.2.9
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -289,6 +276,34 @@ spec:
           verbs:
           - create
           - patch
+        - apiGroups:
+          - ""
+          resources:
+          - events
+          verbs:
+          - create
+          - patch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          verbs:
+          - patch
+          - update
+        - apiGroups:
+          - apps.openshift.io
+          resources:
+          - deploymentconfigs
+          verbs:
+          - patch
+          - update
+        - apiGroups:
+          - redis.containersolutions.com
+          resources:
+          - redisclusters
+          verbs:
+          - patch
+          - update
         serviceAccountName: pre-scaling-operator-sa
     strategy: deployment
   installModes:
