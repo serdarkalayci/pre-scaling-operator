@@ -276,40 +276,12 @@ spec:
           verbs:
           - create
           - patch
-        - apiGroups:
-          - ""
-          resources:
-          - events
-          verbs:
-          - create
-          - patch
-        - apiGroups:
-          - apps
-          resources:
-          - deployments
-          verbs:
-          - patch
-          - update
-        - apiGroups:
-          - apps.openshift.io
-          resources:
-          - deploymentconfigs
-          verbs:
-          - patch
-          - update
-        - apiGroups:
-          - redis.containersolutions.com
-          resources:
-          - redisclusters
-          verbs:
-          - patch
-          - update
         serviceAccountName: pre-scaling-operator-sa
     strategy: deployment
   installModes:
-  - supported: false
+  - supported: true
     type: OwnNamespace
-  - supported: false
+  - supported: true
     type: SingleNamespace
   - supported: true
     type: MultiNamespace
