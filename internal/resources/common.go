@@ -190,127 +190,34 @@ func ScaleOrStepScale(ctx context.Context, _client client.Client, deploymentItem
 	log := ctrl.Log.
 		WithValues("deploymentItem", deploymentItem.Name).
 		WithValues("namespace", deploymentItem.Namespace)
-	var err error
 
-	var oldReplicaCount int32
-	oldReplicaCount = deploymentItem.SpecReplica
+	oldReplicaCount := deploymentItem.SpecReplica
 	desiredReplicaCount := deploymentItem.DesiredReplicas
-	initialDesiredReplicaCount := deploymentItem.DesiredReplicas
 	// We need to skip this check in case of failure in order to get a new object from DoScaling() to check on the state on the cluster.
 	if oldReplicaCount == desiredReplicaCount && !deploymentItem.Failure {
 		log.Info("No Update on deploymentItem. Desired replica count already matches current.")
 		return nil
 	}
 
-	var stepReplicaCount int32
-	var stepCondition bool = true
-	var retryErr error = nil
-	stepReplicaCount = deploymentItem.SpecReplica
 	rapidScalingEnabled := states.GetRapidScalingSetting(deploymentItem)
 	log.Info("Putting deploymentItem on denylist")
 	deploymentItem.IsBeingScaled = true
 	g.GetDenyList().SetScalingItemOnList(deploymentItem, deploymentItem.Failure, deploymentItem.FailureMessage, desiredReplicaCount)
-	if !rapidScalingEnabled {
-		log.WithValues("Deployment: ", deploymentItem.Name).
-			WithValues("Namespace: ", deploymentItem.Namespace).
-			WithValues("Wherefrom: ", whereFrom).
-			WithValues("DesiredReplicaCount", desiredReplicaCount).
-			Info("Going into step scaler..")
-		// Loop step by step until deploymentItem has reached desiredreplica count.
-		for stepCondition {
 
-			deploymentItem, _ = g.GetDenyList().GetDeploymentInfoFromList(deploymentItem)
-			desiredReplicaCount = deploymentItem.DesiredReplicas
+	var err error
 
-			// Wait until deploymentItem is ready for the next step and check if it's failing for some reason
-			waitTime := time.Duration(time.Duration(deploymentItem.ProgressDeadline))*time.Second + time.Second
-			for stay, timeout := true, time.After(waitTime); stay; {
-				select {
-				case <-timeout:
-					timeoutErr := ScaleError{
-						msg: fmt.Sprintf("Message on the cluster: %s | The operator decided that it can't scale that deployment or deploymentconfig!", deploymentItem.ConditionReason),
-					}
-					deploymentItem.IsBeingScaled = false
-					RegisterEvents(ctx, _client, recorder, timeoutErr, deploymentItem)
-					g.GetDenyList().SetScalingItemOnList(deploymentItem, true, timeoutErr.msg, desiredReplicaCount)
-					return timeoutErr
-				default:
-					time.Sleep(time.Second * 2)
-					deploymentItem, err = GetRefreshedScalingItem(ctx, _client, deploymentItem)
-					if err != nil {
-						log.Error(err, "Error getting refreshed deploymentItem in wait for Readiness loop")
-						// The deployment does not exist anymore. Not putting it in failure state.
-						RegisterEvents(ctx, _client, recorder, nil, deploymentItem)
-						g.GetDenyList().RemoveFromList(deploymentItem)
-						return err
-					}
-
-					if deploymentItem.ReadyReplicas == stepReplicaCount || deploymentItem.SpecReplica == deploymentItem.ReadyReplicas {
-						stay = false
-					}
-					// k8s can't handle the deployment for some reason. We can't scale
-					if deploymentItem.ConditionReason == "ProgressDeadlineExceeded" {
-						scaleErr := ScaleError{
-							msg: "The deployment is in a failing state on the cluster! ProgressDeadlineExceeded!",
-						}
-						deploymentItem.IsBeingScaled = false
-						g.GetDenyList().SetScalingItemOnList(deploymentItem, true, "ProgressDeadlineExceeded", desiredReplicaCount)
-						RegisterEvents(ctx, _client, recorder, scaleErr, deploymentItem)
-						return scaleErr
-					}
-				}
-
-			}
-
-			if desiredReplicaCount == -1 {
-				desiredReplicaCount = initialDesiredReplicaCount
-			}
-
-			oldReplicaCount = deploymentItem.SpecReplica
-
-			// decide if we need to step up or down
-			if oldReplicaCount < desiredReplicaCount {
-				stepReplicaCount = oldReplicaCount + 1
-			} else if oldReplicaCount > desiredReplicaCount {
-				stepReplicaCount = oldReplicaCount - 1
-			}
-
-			// check if desired is reached from a fresh item
-			//deploymentItem, _ = GetRefreshedScalingItem(ctx, _client, deploymentItem)
-			if deploymentItem.ReadyReplicas == deploymentItem.DesiredReplicas {
-				stepCondition = false
-			} else {
-				// log.WithValues("ScalingItem: ", deploymentItem.Name).
-				// 	WithValues("Namespace: ", deploymentItem.Namespace).
-				// 	WithValues("Stepreplicacount", stepReplicaCount).
-				// 	WithValues("Oldreplicacount", oldReplicaCount).
-				// 	WithValues("Desiredreplicacount", desiredReplicaCount).
-				// 	WithValues("Wherefrom: ", whereFrom).
-				// 	Info("Step Scaling!")
-
-				retryErr = DoScaling(ctx, _client, deploymentItem, stepReplicaCount)
-			}
-
-			if retryErr != nil {
-				//log.Error(retryErr, "Unable to scale the deploymentItem, err: %v")
-				deploymentItem.IsBeingScaled = false
-				g.GetDenyList().SetScalingItemOnList(deploymentItem, true, retryErr.Error(), desiredReplicaCount)
-				RegisterEvents(ctx, _client, recorder, retryErr, deploymentItem)
-				return retryErr
-			}
-
-		}
+	// Scale the deployment
+	if rapidScalingEnabled {
+		err = RapidScale(ctx, _client, deploymentItem, recorder, log)
 	} else {
-		// Rapid scale. No Step Scale
-		retryErr = DoScaling(ctx, _client, deploymentItem, desiredReplicaCount)
+		err = StepScale(ctx, _client, deploymentItem, recorder, log)
+	}
 
-		if retryErr != nil {
-			//log.Error(retryErr, "Unable to scale the deploymentItem, err: %v")
-			deploymentItem.IsBeingScaled = false
-			g.GetDenyList().SetScalingItemOnList(deploymentItem, true, retryErr.Error(), desiredReplicaCount)
-			RegisterEvents(ctx, _client, recorder, retryErr, deploymentItem)
-			return retryErr
-		}
+	if err != nil {
+		log.Error(err, "Error scaling deployment")
+		RegisterEvents(ctx, _client, recorder, nil, deploymentItem)
+		g.GetDenyList().RemoveFromList(deploymentItem)
+		return err
 	}
 
 	log.WithValues("Desired Replica Count", deploymentItem.DesiredReplicas).
@@ -503,7 +410,7 @@ func RegisterEvents(ctx context.Context, _client client.Client, recorder record.
 			if scalerErr != nil {
 				recorder.Event(deplConf.DeepCopyObject(), "Warning", "Deploymentconfig scale error", scalerErr.Error()+" | "+fmt.Sprintf("Failed to scale the Deploymentconfig to %d replicas. Stuck on: %d replicas", scalingItem.DesiredReplicas, deplConf.Spec.Replicas))
 			} else {
-				recorder.Event(deplConf.DeepCopyObject(), "Normal", "Deploymentconfig scaled", fmt.Sprintf("Successfully scaled the Deploymentconfig to %d replicas", deplConf.Spec.Replicas))
+				recorder.Event(deplConf.DeepCopyObject(), "Normal", "Deploymentconfig scaled", fmt.Sprintf("Successfully scaled the Deploymentconfig to %d replicas", scalingItem.DesiredReplicas))
 			}
 		}
 	} else {
@@ -513,7 +420,7 @@ func RegisterEvents(ctx context.Context, _client client.Client, recorder record.
 			if scalerErr != nil {
 				recorder.Event(depl.DeepCopyObject(), "Warning", "Deployment scale error", scalerErr.Error()+" | "+fmt.Sprintf("Failed to scale the Deployment to %d replicas. Stuck on: %d replicas", scalingItem.DesiredReplicas, *depl.Spec.Replicas))
 			} else {
-				recorder.Event(depl.DeepCopyObject(), "Normal", "Deployment scaled", fmt.Sprintf("Successfully scaled the Deployment to %d replicas", *depl.Spec.Replicas))
+				recorder.Event(depl.DeepCopyObject(), "Normal", "Deployment scaled", fmt.Sprintf("Successfully scaled the Deployment to %d replicas", scalingItem.DesiredReplicas))
 			}
 		}
 
