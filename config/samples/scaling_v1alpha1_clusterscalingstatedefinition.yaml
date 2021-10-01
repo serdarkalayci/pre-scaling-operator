@@ -2,6 +2,7 @@ apiVersion: scaling.prescale.com/v1alpha1
 kind: ClusterScalingStateDefinition
 metadata:
   name: global-state-definition
+  resourceVersion: null
 spec:
 - name: peak
   description: "Maximum scaling settings"
