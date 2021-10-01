@@ -62,7 +62,7 @@ metadata:
     capabilities: Basic Install
     operators.operatorframework.io/builder: operator-sdk-v1.10.0+git
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
-  name: pre-scaling-operator.v0.2.9
+  name: pre-scaling-operator.v0.3.2
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -231,7 +231,7 @@ spec:
                 env:
                 - name: MaxConcurrentNamespaceReconciles
                   value: "5"
-                image: docker.io/pathogen/scaler-operator:0.2.9
+                image: docker.io/pathogen/scaler-operator:0.3.2
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -255,6 +255,34 @@ spec:
               terminationGracePeriodSeconds: 10
       permissions:
       - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - events
+          verbs:
+          - create
+          - patch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          verbs:
+          - patch
+          - update
+        - apiGroups:
+          - apps.openshift.io
+          resources:
+          - deploymentconfigs
+          verbs:
+          - patch
+          - update
+        - apiGroups:
+          - redis.containersolutions.com
+          resources:
+          - redisclusters
+          verbs:
+          - patch
+          - update
         - apiGroups:
           - ""
           - coordination.k8s.io
@@ -285,7 +313,7 @@ spec:
     type: SingleNamespace
   - supported: true
     type: MultiNamespace
-  - supported: true
+  - supported: false
     type: AllNamespaces
   keywords:
   - kubernetes
@@ -299,4 +327,4 @@ spec:
   maturity: alpha
   provider:
     name: Container Solutions
-  version: 0.2.9
+  version: 0.3.2

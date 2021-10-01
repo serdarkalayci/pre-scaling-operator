@@ -4,7 +4,9 @@ resources:
 - bases/leader_election_role.yaml
 - bases/leader_election_role_binding.yaml
 - bases/service_account.yaml
-- bases/cluster_role_edit.yaml
+- bases/ns_role_edit.yaml
+- bases/ns_role_edit_binding.yaml
+#- bases/cluster_role_edit.yaml
 #- bases/ns_role.yaml
 #- bases/ns_role_binding.yaml
 # Comment the following 4 lines if you want to disable
